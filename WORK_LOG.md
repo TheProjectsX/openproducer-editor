@@ -240,3 +240,13 @@
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/studio/video`.
 - Limitation: undo history is not yet persisted and this history only covers timeline edits, not playback position or view zoom.
 - Commit: `079f59c feat: add video timeline undo and clip duplication`.
+
+## 2026-11-14 — M6 local timeline export
+
+- Added a frame-by-frame canvas timeline renderer and export panel. The renderer checks WebCodecs encoders at runtime and picks MP4 (AVC/AAC) or WebM (VP8/VP9/Opus) only when the full combination is available.
+- Added custom canvas dimensions, frame rate, video bitrate, and audio bitrate controls. Export renders audio tracks to one 48 kHz stereo mix using local Bungee pitch-preserving time stretch, per-clip trim/speed/gain/mute, and peak normalization; frames and mixed audio are written through Mediabunny.
+- Added progress, cancellation, in-browser output preview/download, and explicit limits of 120 timeline seconds, 4 megapixels, 180 seconds of unique audio sources, and 512 MiB output. The project stays editable and sources unchanged.
+- Updated feature matrix and decision notes with primary Mediabunny API sources and known gaps.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `build/client/studio/video/index.html`; browser output-file fidelity remains unverified.
+- Limitation: this slice has not yet been browser-tested against representative files. Original audio embedded in video is muted/omitted; only explicit audio-lane clips are mixed. Full export can take longer than realtime and remains memory-backed. Transform/effects/text/transitions are not implemented.
+- Commit: pending.
