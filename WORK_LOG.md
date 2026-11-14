@@ -249,4 +249,13 @@
 - Updated feature matrix and decision notes with primary Mediabunny API sources and known gaps.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `build/client/studio/video/index.html`; browser output-file fidelity remains unverified.
 - Limitation: this slice has not yet been browser-tested against representative files. Original audio embedded in video is muted/omitted; only explicit audio-lane clips are mixed. Full export can take longer than realtime and remains memory-backed. Transform/effects/text/transitions are not implemented.
+- Commit: `3d75f5d feat: add local multitrack video export`.
+
+## 2026-11-14 — M6 visual clip transforms
+
+- Added custom per-clip X/Y position, scale, rotation, and opacity controls for video/image clips. Defaults preserve the existing centered fit; controls write into the saved clip model.
+- Updated the shared compositor so preview and export apply transforms around the canvas center in the same order; legacy clips without transform settings keep identity values.
+- Updated editor capability and data model notes.
+- Verification: pending typecheck and production build.
+- Limitation: no keyframe animation, transform interpolation, text overlays, or per-clip transform presets yet.
 - Commit: pending.

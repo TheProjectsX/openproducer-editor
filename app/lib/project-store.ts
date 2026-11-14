@@ -13,7 +13,8 @@ export type LocalProject = {
 };
 
 export type VideoTimelineAsset = { id: string; name: string; type: string; size: number; duration: number; kind: "video" | "audio" | "image" };
-export type VideoTimelineClip = { id: string; assetId: string; track: number; start: number; sourceStart: number; sourceEnd: number; speed: number; volume: number; muted: boolean };
+export type VideoClipTransform = { x: number; y: number; scale: number; rotation: number; opacity: number };
+export type VideoTimelineClip = { id: string; assetId: string; track: number; start: number; sourceStart: number; sourceEnd: number; speed: number; volume: number; muted: boolean; transform?: VideoClipTransform };
 export type VideoTimelineProject = { version: 1; width: number; height: number; fps: number; duration: number; playhead: number; assets: VideoTimelineAsset[]; clips: VideoTimelineClip[] };
 
 export type ImageProjectSettings = {

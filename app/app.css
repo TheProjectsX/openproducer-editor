@@ -111,6 +111,7 @@ a { color: inherit; }
 .editor-transport label { margin-left: auto; display: flex; align-items: center; gap: 8px; color: #66718a; font-size: 12px; }
 .editor-transport input, .timeline-toolbar input { width: 82px; border: 1px solid #d9deea; border-radius: 7px; padding: 7px; font: inherit; }
 .video-inspector .speed-field { gap: 5px; font-size: 12px; }
+.transform-fields { padding: 10px; border: 1px solid #e1e5ee; border-radius: 10px; background: #fafbfe; }
 .editor-action { margin-top: 3px; }
 .editor-action.danger { color: #a33b49; border-color: #ead7da; }
 .video-timeline { max-width: 1600px; margin: 14px auto; overflow: hidden; }

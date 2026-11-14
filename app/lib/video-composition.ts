@@ -20,9 +20,15 @@ export function drawVideoComposition(
     const width = source instanceof HTMLVideoElement ? source.videoWidth : source instanceof HTMLImageElement ? source.naturalWidth : 0;
     const height = source instanceof HTMLVideoElement ? source.videoHeight : source instanceof HTMLImageElement ? source.naturalHeight : 0;
     if (!source || width === 0 || height === 0 || (source instanceof HTMLVideoElement && source.readyState < 2)) continue;
-    const scale = Math.min(canvas.width / width, canvas.height / height);
-    const drawWidth = width * scale; const drawHeight = height * scale;
-    context.drawImage(source, (canvas.width - drawWidth) / 2, (canvas.height - drawHeight) / 2, drawWidth, drawHeight);
+    const fitScale = Math.min(canvas.width / width, canvas.height / height);
+    const transform = clip.transform ?? { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 };
+    const drawWidth = width * fitScale * transform.scale; const drawHeight = height * fitScale * transform.scale;
+    context.save();
+    context.globalAlpha = Math.max(0, Math.min(1, transform.opacity));
+    context.translate(canvas.width / 2 + transform.x, canvas.height / 2 + transform.y);
+    context.rotate(transform.rotation * Math.PI / 180);
+    context.drawImage(source, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+    context.restore();
   }
 }
 
