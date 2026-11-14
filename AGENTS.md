@@ -18,7 +18,7 @@ Read the root `README.md` and the guides under `project_research/` before changi
 - Implement capability detection for codecs, WebGPU, storage, and worker features. Never infer codec support from a file extension alone.
 - Put expensive processing in workers. Provide cancellation, progress, error recovery, and temporary-file cleanup.
 - Add tests for timing calculations, project migrations, export fidelity, route refresh, and offline behavior where failure would lose work or produce wrong media.
-- Record measurements, changed choices, and their evidence in `docs/10-decisions-and-sources.md`. Update affected specifications in the same change.
+- Record measurements, changed choices, and their evidence in `project_research/docs/10-decisions-and-sources.md`. Update affected specifications in the same change.
 - Respect third-party code and model redistribution terms before bundling assets. Do not silently add ffmpeg.wasm or an unverified model.
 
 ## Definition of a milestone complete

@@ -22,3 +22,12 @@
 - Moved the handoff README and all 11 guides into `project_research/`; `AGENTS.md` remains at the root. Root app README documents npm commands and the research folder.
 - Build result: Vite 8.3.8 and React Router 8.5.1 compiled successfully; React Router prerendered `/` to `build/client/index.html` and emitted the SPA fallback.
 - Commit: pending.
+
+## 2026-11-14 — M0 image resize prototype
+
+- Added a pre-rendered `/tools/image/resize` tool page and linked it from the home page.
+- Implemented local image import, exact custom width/height, aspect matching off by default, optional aspect locking, full-image stretch without crop/padding, canvas preview, and PNG download.
+- Added responsive styling and removed the starter welcome screen from the primary route.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/` plus `/tools/image/resize`.
+- Limitation: this is a feasibility prototype, not yet connected to local project persistence or a dedicated worker. Large-image limits still need measurement.
+- Commit: pending.
