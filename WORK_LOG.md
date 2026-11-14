@@ -123,4 +123,12 @@
 - Added `fflate` 0.8.3 (MIT) for local ZIP creation; source decoding is capped at 512 MiB and combined output at 256 MiB.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/audio/split`; the generated offline worker includes 26 static assets and 11 HTML routes.
 - Limitation: full decoded source, WAV segments, and ZIP are memory-backed; long files need worker/streaming export before production use.
+- Commit: `b95f3b6 feat: add custom audio splitting`.
+
+## 2026-11-14 — M0 broadband audio noise gate
+
+- Added `/tools/audio/noise-gate` with custom threshold, reduction amount, attack, and release controls; processed audio preview and WAV export run locally.
+- Uses envelope-following gain reduction with a soft knee, preserving the source sample rate and channel count.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/audio/noise-gate`; the generated offline worker includes 27 static assets and 12 HTML routes.
+- Limitation: this is a broadband gate for quieter noise, not neural or spectral denoising; voice quality and threshold tuning need sample-based browser evaluation. Audio processing currently runs on the UI thread.
 - Commit: pending.

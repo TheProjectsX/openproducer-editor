@@ -7,6 +7,7 @@ export default [
   route("tools/audio/speed", "routes/audio-speed.tsx"),
   route("tools/audio/merge", "routes/audio-merge.tsx"),
   route("tools/audio/split", "routes/audio-split.tsx"),
+  route("tools/audio/noise-gate", "routes/audio-noise-gate.tsx"),
   route("tools/video/trim", "routes/video-trim.tsx"),
   route("tools/video/extract-audio", "routes/video-extract-audio.tsx"),
   route("projects", "routes/projects.tsx"),
