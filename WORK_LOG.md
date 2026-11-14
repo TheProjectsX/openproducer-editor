@@ -309,4 +309,11 @@
 - Added a cancellable local WAV extraction action for the selected video clip. The extracted audio is stored as a normal local project asset and placed on Audio 1 with the clip's timeline start, source trim, and speed; the video source itself remains untouched.
 - Enforced the existing 512 MiB project media limit and added duplicate-detachment detection. Updated the known behavior: source audio is available through explicit detachment, not auto-mixed from video clips.
 - Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker. Typecheck required workspace write permission for generated React Router route types.
+- Commit: `6c5707e feat: detach video audio into timeline clips`.
+
+## 2026-11-14 — M6 timeline snapping
+
+- Added configurable snapping during clip drag/drop to same-lane clip starts/ends, current playhead, and nearest whole second. Users can turn snapping off or enter a custom tolerance.
+- Updated the feature matrix to reflect the behavior.
+- Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
 - Commit: pending.
