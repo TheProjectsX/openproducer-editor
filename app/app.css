@@ -86,6 +86,7 @@ a { color: inherit; }
 .project-delete { padding: 8px 10px; border: 1px solid #ead7da; border-radius: 8px; background: white; color: #a33b49; font: inherit; cursor: pointer; }
 .project-actions { display: flex; gap: 8px; }
 .project-open { padding: 8px 10px; border: 1px solid #d9deea; border-radius: 8px; background: white; color: #3949b5; font: inherit; cursor: pointer; }
+.image-order { max-width: 1180px; margin: 20px auto 0; }
 .resize-error { margin: 0; color: #b42332; font-size: 13px; }
 .resize-preview { min-height: 430px; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
 .preview-heading { display: flex; justify-content: space-between; gap: 12px; color: #36425b; font-size: 14px; }

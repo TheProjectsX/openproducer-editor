@@ -139,4 +139,12 @@
 - Uses high-quality browser canvas resampling with 100-megapixel and 32,768-pixel side limits. The interface explicitly states that this enlarges/interpolates pixels and does not invent details with AI.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/image/upscale`; the generated worker includes 28 static assets and 13 HTML routes.
 - Limitation: the requested AI super-resolution model, optional offline model download, tiling/progress, and before/after zoom comparison remain future work.
+- Commit: `4d76720 feat: add custom browser image upscaling`.
+
+## 2026-11-14 — M0 image collage prototype
+
+- Added `/tools/image/collage` with multiple local images, custom canvas size, columns, spacing, background color, cell-fit behavior, ordering/removal, live preview, and PNG export.
+- Uses `createImageBitmap` and Canvas locally; source files are capped at 20 and 512 MiB total, output at 100 megapixels.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/image/collage`; the generated worker contains 29 static assets and 14 HTML routes.
+- Limitation: this is a uniform grid collage with one shared fit mode; freeform cell placement, text, layers, and project persistence remain future editor work.
 - Commit: pending.
