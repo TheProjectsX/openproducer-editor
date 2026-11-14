@@ -2,6 +2,10 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
 export default [
   index("routes/home.tsx"),
+  route("tools", "routes/tools.tsx"),
+  route("tools/audio", "routes/tools-audio.tsx"),
+  route("tools/video", "routes/tools-video.tsx"),
+  route("tools/image", "routes/tools-image.tsx"),
   route("tools/image/resize", "routes/image-resize.tsx"),
   route("tools/image/upscale", "routes/image-upscale.tsx"),
   route("tools/image/collage", "routes/image-collage.tsx"),
@@ -13,12 +17,15 @@ export default [
   route("tools/audio/noise-gate", "routes/audio-noise-gate.tsx"),
   route("tools/audio/vocal-reducer", "routes/audio-vocal-reducer.tsx"),
   route("tools/audio/volume", "routes/audio-volume.tsx"),
+  route("tools/audio/normalize", "routes/audio-normalize.tsx"),
   route("tools/video/trim", "routes/video-trim.tsx"),
   route("tools/video/extract-audio", "routes/video-extract-audio.tsx"),
   route("tools/video/speed", "routes/video-speed.tsx"),
   route("tools/video/remove-audio", "routes/video-remove-audio.tsx"),
   route("tools/video/replace-audio", "routes/video-replace-audio.tsx"),
   route("studio/video", "routes/studio-video.tsx"),
+  route("studio/audio", "routes/studio-audio.tsx"),
   route("projects", "routes/projects.tsx"),
+  route("settings/storage", "routes/storage-settings.tsx"),
   route("studio/image", "routes/studio-image.tsx"),
 ] satisfies RouteConfig;

@@ -3,10 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "react-router build && node scripts/build-service-worker.mjs",
+    "build": "react-router build && node scripts/build-service-worker.mjs && node scripts/verify-static-output.mjs",
     "dev": "react-router dev",
     "preview": "vite preview",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "test:core": "node --experimental-strip-types --test tests/*.test.mjs"
   },
   "dependencies": {
     "@react-router/node": "^8.5.1",

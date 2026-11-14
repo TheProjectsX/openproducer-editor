@@ -9,5 +9,5 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function ImageStudio() {
-  return <ImageResizeTool />;
+  return <ImageResizeTool workspace />;
 }

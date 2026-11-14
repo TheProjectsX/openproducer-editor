@@ -2,6 +2,7 @@ import { BungeeStretcher, compileBungee, instantiateBungee, Transport } from "bu
 import wasmUrl from "bungee-web/bungee.wasm?url";
 import type { VideoTimelineAsset, VideoTimelineClip } from "./project-store";
 import { evaluateClipTransition } from "./video-keyframes";
+import { renderNaturalSpeedChunk, shouldUsePitchPreservingStretcher } from "./audio-speed";
 
 const OUTPUT_SAMPLE_RATE = 48_000;
 const MAX_SOURCE_AUDIO_SECONDS = 180;
@@ -30,7 +31,7 @@ export async function renderTimelineAudio(
       decoded.set(asset.id, await context.decodeAudioData(await file.arrayBuffer()));
       onProgress(Math.round(((index + 1) / audioAssets.length) * 20));
     }
-    const module = await instantiateBungee(await compileBungee(fetch(wasmUrl)));
+    let module: Awaited<ReturnType<typeof instantiateBungee>> | null = null;
     const sampleCount = Math.ceil(duration * OUTPUT_SAMPLE_RATE);
     const mixedLeft = new Float32Array(sampleCount); const mixedRight = new Float32Array(sampleCount);
     for (let clipIndex = 0; clipIndex < audioClips.length; clipIndex++) {
@@ -43,13 +44,19 @@ export async function renderTimelineAudio(
       const sourceFrames = endFrame - startFrame;
       const left = buffer.getChannelData(0).subarray(startFrame, endFrame);
       const right = buffer.numberOfChannels > 1 ? buffer.getChannelData(1).subarray(startFrame, endFrame) : left;
-      const stretcher = new BungeeStretcher(module, { sampleRate: rate, channels: 2 });
+      const preservesPitch = (clip.pitchMode ?? "preserve") === "preserve";
+      const useStretcher = shouldUsePitchPreservingStretcher(clip.pitchMode ?? "preserve", clip.speed);
+      if (useStretcher && !module) module = await instantiateBungee(await compileBungee(fetch(wasmUrl)));
+      const stretcher = useStretcher ? new BungeeStretcher(module!, { sampleRate: rate, channels: 2 }) : null;
       try {
         const keyframes = [...(clip.keyframes ?? [])].sort((a, b) => a.time - b.time);
         let keyframeIndex = 0;
-        const transport = new Transport(stretcher, sourceFrames);
-        transport.setSource("clip", { left, right }, { gain: clip.muted ? 0 : clip.keyframes?.length ? 1 : clip.volume, pan: 0 });
-        transport.speed = clip.speed; transport.play();
+        let transport: Transport | null = null;
+        if (stretcher) {
+          transport = new Transport(stretcher, sourceFrames);
+          transport.setSource("clip", { left, right }, { gain: clip.muted ? 0 : clip.keyframes?.length ? 1 : clip.volume, pan: 0 });
+          transport.speed = clip.speed; transport.play();
+        }
         const outputFrames = Math.min(Math.ceil(sourceFrames / clip.speed), sampleCount - Math.round(clip.start * OUTPUT_SAMPLE_RATE));
         const destination = Math.max(0, Math.round(clip.start * OUTPUT_SAMPLE_RATE));
         const chunkSize = 4096;
@@ -57,22 +64,23 @@ export async function renderTimelineAudio(
           if (isCancelled()) throw new Error("Export cancelled.");
           const length = Math.min(chunkSize, outputFrames - offset);
           const blockLeft = new Float32Array(length); const blockRight = new Float32Array(length);
-          transport.render(blockLeft, blockRight, length);
+          const rendered = transport ? null : renderNaturalSpeedChunk(left, right, clip.speed, offset, length);
+          if (transport) transport.render(blockLeft, blockRight, length);
           for (let sample = 0; sample < length; sample++) {
             const localTime = (offset + sample) / OUTPUT_SAMPLE_RATE;
             while (keyframeIndex < keyframes.length - 2 && keyframes[keyframeIndex + 1].time < localTime) keyframeIndex++;
             const left = keyframes[keyframeIndex]; const right = keyframes[keyframeIndex + 1];
             const animatedGain = !left ? clip.volume : !right ? left.volume : left.volume + (right.volume - left.volume) * Math.max(0, Math.min(1, (localTime - left.time) / Math.max(0.001, right.time - left.time)));
             const gain = clip.muted ? 0 : (keyframes.length ? animatedGain : clip.volume) * evaluateClipTransition(clip, localTime);
-            mixedLeft[destination + offset + sample] += blockLeft[sample] * gain;
-            mixedRight[destination + offset + sample] += blockRight[sample] * gain;
+            mixedLeft[destination + offset + sample] += (rendered?.left[sample] ?? blockLeft[sample]) * gain;
+            mixedRight[destination + offset + sample] += (rendered?.right[sample] ?? blockRight[sample]) * gain;
           }
           if (offset % (chunkSize * 32) === 0) {
             onProgress(20 + Math.round(((clipIndex + offset / Math.max(outputFrames, 1)) / audioClips.length) * 70));
             await new Promise((resolve) => setTimeout(resolve, 0));
           }
         }
-      } finally { stretcher.destroy(); }
+      } finally { stretcher?.destroy(); }
       onProgress(20 + Math.round(((clipIndex + 1) / audioClips.length) * 70));
     }
     let peak = 0;

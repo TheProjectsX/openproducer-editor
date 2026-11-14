@@ -13,7 +13,7 @@ export function meta({}: Route.MetaArgs) {
 export default function Home() {
   return (
     <main className="resize-page">
-      <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/projects">Projects</a></nav></header>
+      <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/tools">All tools</a><a href="/projects">Projects</a></nav></header>
       <section className="resize-intro">
         <p className="eyebrow">YOUR MEDIA STAYS ON YOUR DEVICE</p>
         <h1>A private workspace for audio, video, and images.</h1>
@@ -31,6 +31,7 @@ export default function Home() {
         <a className="tool-card" href="/tools/audio/noise-gate"><span className="eyebrow">AUDIO</span><strong>Reduce quiet noise</strong><span>Control a broadband gate with your own threshold and timing.</span><span className="tool-link">Open noise gate →</span></a>
         <a className="tool-card" href="/tools/audio/vocal-reducer"><span className="eyebrow">AUDIO</span><strong>Reduce centered vocals</strong><span>Try an adjustable stereo center-cancel effect.</span><span className="tool-link">Open vocal reducer →</span></a>
         <a className="tool-card" href="/tools/audio/volume"><span className="eyebrow">AUDIO</span><strong>Volume and fades</strong><span>Set custom gain, fade-in, and fade-out durations.</span><span className="tool-link">Open volume tool →</span></a>
+        <a className="tool-card" href="/tools/audio/normalize"><span className="eyebrow">AUDIO</span><strong>Normalize audio</strong><span>Set a custom peak target and preview the normalized WAV.</span><span className="tool-link">Open normalizer →</span></a>
         <a className="tool-card" href="/tools/video/trim"><span className="eyebrow">VIDEO</span><strong>Trim video</strong><span>Choose a precise range and export a local MP4.</span><span className="tool-link">Open video trim →</span></a>
         <a className="tool-card" href="/tools/video/extract-audio"><span className="eyebrow">VIDEO</span><strong>Extract video audio</strong><span>Export the primary audio track as a local WAV.</span><span className="tool-link">Open audio extractor →</span></a>
         <a className="tool-card" href="/tools/video/speed"><span className="eyebrow">VIDEO</span><strong>Custom video speed</strong><span>Record local playback at a custom rate with browser-supported audio pitch control.</span><span className="tool-link">Open video speed →</span></a>

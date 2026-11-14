@@ -355,3 +355,102 @@
 - Source-video audio extraction is user-triggered and creates a separate WAV. It is not automatically mixed from video clips.
 - Keyframe values interpolate linearly and are clip-relative. Undo history is in memory and resets after reload.
 - AI operations and claims are not implemented; no backend, upload, account, or runtime service should be introduced.
+
+## 2026-11-14 — Core transition and audio project slices
+
+- Added explicit “Dissolve into next clip” and “Crossfade into next clip” actions. They create same-track overlap and corresponding linear fades consumed by the shared preview/export timing; clips now composite in start order within a track.
+- Added a dependency-free `node:test` core suite for video keyframe holds/interpolation, keyframe replacement, and fade envelope boundaries.
+- Added `/studio/audio/` with local source persistence, waveform rendering, exact trim values, 0.1×–16× speed, pitch-preserved default/natural pitch option, gain/fades, cancellable chunked WAV rendering, progress, and project reopen. Audio source references are removed when deleting their project.
+- Verification: `npm run test:core` passed (4 tests) and `npm run typecheck` passed. Full browser, offline, external-player, and high-memory audio checks remain outstanding.
+
+## 2026-11-14 — M6 browser smoke check and title entry point
+
+- Installed the exact locked npm dependencies and started the local editor.
+- Found that the existing `addTitle` handler had no UI entry point. Added a responsive “Add text title” button next to media import so title clips can be created from the editor.
+- Used generated local SVG and WAV fixtures to import image/audio, create and edit a title, apply a custom fade and scale, render MP4, and refresh/reopen the same project. The rendered MP4 decoded in the browser at 1920×1080 and 5.013 seconds for the 5-second timeline.
+- Confirmed the canonical static production path `/studio/video/` prerenders the Video Studio shell. The no-slash path on Vite preview fell back to the public home page, so static-host direct-route behavior still needs verification against the actual deployment’s slash handling.
+- Verification: `npm run typecheck`, `npm run build`, and `git diff --check` passed. Build generated the service worker with 37 assets and 21 prerendered routes; Vite still reports a 642.98 kB minified chunk.
+- Updated the feature matrix and decision log with observed behavior and limitations. M6 remains incomplete: no external-player inspection, named Chrome/Edge run, actual video fixture/A/V sync check, or offline reload was completed.
+
+## 2026-11-14 — Core audio and image slices; phase audit
+
+- Added the `/studio/audio/` single-source local project path with waveform, trim range, custom speed and pitch mode, gain/fades, save/reopen model, and cancellable WAV render. Added a focused peak-normalize WAV tool, explicit video dissolve/crossfade controls, image shape/text layers and presets, plus project duplication/storage controls.
+- Re-ran current checks: `npm.cmd run typecheck`, `npm.cmd run test:core` (6/6), `npm.cmd run build`, and `git diff --check` passed. Build generated 23 prerendered routes and 41 precache assets; it reports a 642.98 kB media chunk and an ineffective dynamic WASM import.
+- Updated the feature matrix and decision log to state what exists and what is still incomplete. Core is not release-ready: collage edit documents, real-video A/V sync/output inspection, supported-browser/offline/deployed-route evidence, and storage recovery tests remain pending. Audio Studio is single-source; the existing noise tool is a broadband gate. M7 AI and M8 hardening are not complete.
+
+## 2026-11-14 — Static hosting metadata and 404
+
+- Added a pre-rendered static 404 page, baseline Cloudflare Pages security headers, canonical links from a configured `VITE_SITE_URL`, generated robots rules, and a sitemap derived from public prerendered HTML. An unset host omits sitemap URLs rather than guessing; a configured value must be an HTTPS origin.
+- Checked the generated sitemap with `https://example.invalid`: public routes appeared and studio/project shells did not. Checked that an unconfigured build removes sitemap output and keeps studio/project disallow rules. Removed a duplicate Normalize Audio card found during the route audit.
+- `npm.cmd run typecheck` and `npm.cmd run build` passed after these changes. Deployed 404 status, actual host headers, CSP, and route refresh behavior still require Pages verification.
+
+## 2026-11-14 — Editable collage projects
+
+- Added a versioned collage document with local source asset references, dimensions, layout, spacing, fit mode, background, caption, text size/color, and source order. The collage route can save and reopen projects; Projects opens collage documents in the collage editor; duplicate/delete copy and clean up referenced assets. Project schema now migrates through version 4.
+- Validation: typecheck and core suite passed (7/7), including the schema 3→4 migration. The actual browser import/save/refresh/reopen/PNG/offline path has not yet been run.
+
+## 2026-11-14 — Pre-rendered tool directories and route verifier
+
+- Added the all-tools index and audio, video, and image category pages with unique pre-rendered titles/descriptions. Home now links to the directory. The static build runs an output verifier for route HTML, titles/descriptions/headings, noindex pages, 404, headers, robots, optional origin-bound canonicals/sitemap, and service-worker entries.
+- Verified a normal build: 26 prerendered routes, 22 indexable public pages, and 4 noindex shells. Configured-origin build checks had already confirmed canonical/sitemap behavior; default build omits sitemap. Typecheck and core suite (7/7) passed. Build still reports the large media chunk and dynamic WASM import warning.
+
+## 2026-11-14 — Worker-based audio normalization
+
+- Moved peak scanning and PCM16 WAV encoding into a dedicated module worker. The main thread copies/transfers bounded 65,536-frame chunks, updates progress, supports cancellation between chunks, and builds the output from transferred PCM blocks. Decode remains on the main thread.
+- Added math/format tests for custom dBFS gain, silence, clipping/interleaving, channel-length validation, and WAV header fields. Core suite passes 10/10; typecheck and production build pass, and the worker is emitted as its own bundle asset. Other long-running media paths still need worker-job protocol coverage.
+
+## 2026-11-14 — Safer source replacement
+
+- Replaced in-place image/audio source writes with immutable asset IDs. New bytes are written before the project pointer changes; OPFS write failures remove partial directories before IndexedDB fallback. Audio keeps the prior source until its edit document commit succeeds. Legacy project source paths still reopen; project schema advances to version 5.
+- Reordered deletion so IndexedDB removes the project and asset references atomically before OPFS cleanup. A failed record transaction no longer removes the project’s source first.
+- Validation so far: typecheck and 10 core tests pass. Quota exhaustion, interrupted writes, and browser storage recovery are still untested, so storage integrity is not yet release-gated.
+- Extracted clip-duration math into a pure timing module and covered 3.7×, 0.1×, 16×, zero, and non-finite speed behavior. Final checks for this slice: typecheck, 12/12 core tests, production build/static verifier (26 routes; 22 indexable), and `git diff --check` passed.
+
+## 2026-11-14 — Storage settings and project cleanup
+
+- Added `/settings/storage/` with on-device usage/quota, persistent-storage status and request, a site-data clearing explanation, and confirmed per-project deletion. Linked it from Projects and marked it `noindex`; the static verifier now enforces that settings routes are also excluded from indexing.
+- Verification: typecheck passed, core suite passed 12/12, and build verified 27 prerendered routes (22 indexable, 5 noindex), including the settings shell. Quota-failure and browser eviction behavior remain unverified.
+
+## 2026-11-14 — User-controlled app updates
+
+- The service worker now stays waiting after a new cache is fully prepared. The app shell detects a waiting update, asks the user to finish/save active edits, and exposes a reload action that signals the worker to activate. The static verifier rejects automatic `skipWaiting` and requires the explicit activation message.
+- Typecheck, 12 core tests, production build, 27-route static verification, and `git diff --check` passed. Update installation and active-edit behavior still need a deployed/offline browser run.
+# 2026-11-14 — Studio import codec inspection
+
+- Added byte-based container and codec inspection to Audio and Video Studio import using the already pinned Mediabunny dependency.
+- Check rejects files with unknown containers, missing A/V tracks, or any audio/video track that this browser cannot decode. Detected format, codecs, and dimensions/sample format are available in the inspection result; project UI confirms recognized container and codec after import.
+- Verified with `npm.cmd run typecheck`, `npm.cmd run test:core` (12 passing), and `npm.cmd run build` (27 prerendered routes). Build continues to report the known ~643 kB media-processing chunk and Bungee WASM dynamic-import warning.
+- This does not close M3: shared import is not yet wired into every tool, and a fixture-based format matrix, external output inspection, and browser/device verification remain pending.
+- Audio Studio uses the same inspection before decoding and saving an audio source.
+
+## 2026-11-14 — Image export formats
+
+- Added JPEG export alongside PNG, with a typed 0–1 quality value and explicit white background for JPEG transparency handling.
+- Saved export format and quality with image-project settings; older projects default to PNG at quality 0.92 without a schema migration.
+- Updated the image workspace heading and product notes. Typecheck, 12 core tests, production build, 27-route static verification, and `git diff --check` pass. Browser route visually showed the new format selector; image fixture export and project reopen are not runtime-verified.
+- Replaced layer-only undo with one bounded 100-step history for image settings and layers. Source replacement starts a fresh history; older schema-5 project records remain compatible. Typecheck, 14 core tests, production build, 27-route static verification, and `git diff --check` pass. Browser-level undo/redo and reopen still require fixture-based verification.
+- Static preview direct-loaded `/studio/video` at its nested URL. Import now classifies audio/video media from parsed track bytes, not MIME prefixes; declared images are decoded and checked against project dimension limits before saving.
+- Added per-audio-clip pitch mode in Video Studio. Pitch preservation remains the default; natural mode uses browser playback without pitch preservation and matching linear resampling during export. Existing saved clips without the field retain preserve mode. Added resampling tests; typecheck and 15 core tests pass.
+- Added locally generated CC0 fixtures for H.264/AAC MP4, VP9/Opus WebM, mono PCM WAV at 48/44.1 kHz, a 400×340 checkerboard/transparency image, and two collage subjects. FFprobe 7.1.4 confirmed codecs, dimensions, rates, channels, and durations; fixture provenance and expected metadata are in `tests/fixtures/core-media/README.md`. No browser media import/export or spoken sync-marker check has passed yet.
+- Added a four-second H.264/AAC sync fixture with visual second markers and 1 kHz pulses at 1, 2, and 3 seconds. FFprobe confirmed 320×180/24 fps and mono/48 kHz; FFmpeg silence detection measured all pulses at their expected timestamps. The fixture still needs app-level import/preview/export verification.
+- Attempted the requested internal browser test against a fresh local preview origin. The browser tool reported that Computer Use was stopped with the physical Escape key and instructed that no further Computer Use calls be made this turn, so fixture testing in the browser could not proceed. This was resolved in the next turn using a fresh internal browser preview; see the M6 gate result below.
+
+## 2026-11-14 — M6 synthetic multitrack browser gate
+
+- Imported generated H.264/AAC MP4, VP9/Opus WebM, PCM WAV at 48/44.1 kHz, sync-marker MP4, and transparent PNG in the Codex in-app browser. SVG decoding failed with a user-visible unsupported-container error; raster PNG rendered.
+- Built two occupied video tracks, two audio tracks, text/image overlays, dissolve, crossfade, 1.5× natural-pitch audio, and detached sync audio. Refresh restored eight media assets and edit positions. At timeline 9.5s, sync video and detached audio were both at source time 1.0s; the second 1.5× audio clip advanced at the expected source rate.
+- Fixed playhead change crash by reading `event.currentTarget.value` before scheduling the React state updater. Added a regression helper so pitch-preserving processing is bypassed at exactly 1×, where no time stretch is required.
+- Exported and downloaded a 320×180, 24 fps, 15.168 s H.264/AAC file. FFmpeg fully decoded it; VLC returned exit code 0. Narrow-band analysis found 1 kHz sync pulses at 9.50, 10.50, and 11.50s. This caught and verified the 1× Bungee transient-loss fix.
+- Local dev preview cannot serve `sw.js`; offline/PWA checks are not covered. Named Chrome/Edge and longer sync/boundary checks remain open. The accompanying PNG was generated locally with Pillow from the documented CC0 pattern.
+
+## 2026-11-14 — M6 static preview checkpoint and pause
+
+- After the hydration guard fix, started a fresh production static preview at `127.0.0.1:4177` and loaded a new Video Studio project with the sync-marker MP4, transparent PNG overlay, text overlay, detached source audio, and 320×180/24 fps export settings.
+- The latest render produced a downloadable MP4 link without a browser error on the initial route load. A prior static preview export (`local-studio-edit (4).mp4`) was inspected: H.264/AAC, 320×180, 24 fps, 5.013 s; FFmpeg decoded it and VLC exited successfully. Narrow-band audio analysis found sync pulses at approximately 1.001, 2.001, and 3.001 seconds.
+- Stopped local preview sessions 4173, 4174, 4175, 4176, and 4177 at the user's request. The 4175 development server logged `/sw.js` as an unmatched route, so no offline pass is claimed.
+- Still pending: download and inspect the latest 4177 output; reload the post-fix static project route; test service-worker install and offline reload/export; complete the remaining M6 timing, interaction, browser, and representative-output gates. The phase is not complete.
+
+## 2026-11-15 — Paused-session handoff
+
+- Recorded the full active Core objective, worktree/process state, latest verified evidence and limitations, exact browser project IDs/outputs, roadmap-ordered open gates, useful commands, and next-session instructions in `SESSION_HANDOFF.md`.
+- Goal remains paused by user request; all local preview processes remain stopped. This entry is handoff documentation only, not phase completion or permission to begin M7.

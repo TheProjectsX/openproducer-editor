@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="340" viewBox="0 0 400 340">
+  <defs>
+    <pattern id="checker" width="20" height="20" patternUnits="userSpaceOnUse">
+      <rect width="20" height="20" fill="#f4f4f4"/>
+      <rect width="10" height="10" fill="#222"/>
+      <rect x="10" y="10" width="10" height="10" fill="#222"/>
+    </pattern>
+  </defs>
+  <rect width="320" height="340" fill="url(#checker)"/>
+  <rect x="24" y="24" width="100" height="82" rx="8" fill="#ef4444"/>
+  <circle cx="205" cy="65" r="42" fill="#22c55e"/>
+  <path d="M270 24h100v82H270z" fill="#3b82f6" fill-opacity=".68"/>
+  <text x="24" y="160" font-family="sans-serif" font-size="25" fill="#111">400 × 340 exact resize</text>
+  <rect x="210" y="190" width="150" height="110" fill="#f59e0b" fill-opacity=".4"/>
+</svg>

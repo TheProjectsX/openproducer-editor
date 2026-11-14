@@ -65,3 +65,94 @@ These are implementation evidence, not invitations to redesign the product: refe
 - Visual clips can store custom brightness, contrast, saturation, and grayscale percentages. These use the Canvas 2D filter pipeline in the shared compositor, keeping preview and export aligned; browser-specific filter differences still need device output verification.
 - Source video audio is detached on explicit user action to a local 48 kHz stereo WAV asset and inserted into Audio 1 with the selected clip's trim, start, and speed. Asset metadata records the source asset ID to prevent duplicate extraction. The source video clip stays muted in preview and embedded audio is not automatically included in export; users can mute, trim, fade, keyframe volume, move, or delete the detached audio independently.
 - Audio clip export uses the bundled local Bungee stretcher for pitch-preserving speed and sums clips to stereo PCM at 48 kHz before encoding. A master gain reduces mix peaks above −0.18 dBFS. Export remains memory-backed and is restricted to 120 seconds / 4 MP / 180 seconds unique audio / 512 MiB output until measurements justify increasing those limits.
+
+## M6 browser smoke-check (2026-11-14)
+
+- Environment: Codex in-app browser on the local development server; exact browser build and operating-system version were not exposed by the browser tool. This is not a Chrome/Edge compatibility claim.
+- Fixture: locally generated 640×360 SVG card and 2-second, 48 kHz mono 440 Hz PCM WAV; no user media or external files were used.
+- Import/preview: both assets appeared in the local media bin and timeline. The image displayed in the composite preview; the audio asset was available on Audio 1.
+- Editing/save/reopen: added a title, changed its text to “M6 Verification”, set 0.4-second fade-in and 1.2× scale, refreshed the studio route, and confirmed the source assets, title text, fade, and scale remained in the project.
+- Export: browser codec selection produced MP4. The in-app video element reached `readyState=4`, decoded 1920×1080, and reported 5.013333 seconds for the 5-second timeline. Export completed twice, including once with the title and audio clip present.
+- Limits: the output was not downloaded and opened in an independent media player. This run did not include an actual video source, inspect A/V sync markers, test source-audio detachment, emulate offline reload, or identify a named Chrome/Edge build. It is a smoke check, not the M6 release gate.
+- Finding/fix: the `addTitle` handler existed but no rendered control invoked it. Added an “Add text title” button beside media import; the title edit and export smoke check then passed.
+
+## Core implementation slices after the M6 smoke check (2026-11-14)
+
+- Added explicit next-clip dissolve and audio crossfade actions. They create a same-track overlap and use the existing linear opacity/gain envelopes in the shared preview and export model. The M6 actual-media renderer gate remains open; transition fidelity has not been externally inspected.
+- Added `/studio/audio/` as a local one-source editing project: waveform, source in/out, 0.1×–16× speed with pitch preservation default and natural-pitch mode, gain, fades, cancellable chunked WAV render, project persistence, and local source storage. This is a focused starter path and not a multitrack audio timeline.
+- Added `/tools/audio/normalize` with custom peak target, source/result preview, and WAV output. Peak normalization is a distinct operation from the broadband noise gate.
+- Added image layer visibility, ordering, shape/text editing and common filter presets to the existing resize editor, plus project duplication and storage estimate/persistence controls. These UI capabilities have typecheck/build coverage but no image fixture output comparison yet.
+- Verification on the current workspace: `npm.cmd run typecheck`, `npm.cmd run test:core` (6/6), `npm.cmd run build`, and `git diff --check` passed. Production output prerendered 23 routes and generated a service worker precache with 41 assets. The build reports a 642.98 kB minified media chunk and an ineffective dynamic import for Bungee WASM.
+- At the time of this earlier smoke check, the real-video fixture and external-player gates were open. See the subsequent fixture run below for local M6 evidence. Named Chrome/Edge, deployed route/SEO, offline close-and-reopen export, quota/missing-asset recovery, and image/collage export checks remain open. M7 AI and M8 hardening remain pending.
+
+## Static hosting and discoverability foundation (2026-11-14)
+
+- Added a static `404.html`, Cloudflare Pages `_headers` with baseline browser security headers, generated `robots.txt`, and a build-time sitemap sourced from rendered HTML. Route `<link rel="canonical">` values and absolute sitemap entries use `VITE_SITE_URL`; the build validates that it is an HTTPS origin. When unset, the sitemap is removed/omitted instead of embedding a fabricated production host.
+- The test origin `https://example.invalid` generated a sitemap with public tools only; `/studio/*` and `/projects` were absent. The rendered `/studio/audio/` shell had `noindex,nofollow` and was excluded. Re-running without a configured origin removed the sitemap and retained the disallow rules.
+- Removed the duplicate Normalize Audio home card discovered in the route audit.
+- This only establishes generated artifacts. Deployed Pages 404 status, headers/CSP behavior, canonical/SEO fetches on the production host, and SPA refresh semantics remain unverified.
+
+## Editable collage persistence (2026-11-14)
+
+- Added a schema-versioned collage document in IndexedDB and stores each referenced image as a local source asset. Layout values, order, background, fit, canvas dimensions, and caption styling reopen from Projects; duplication remaps source IDs and deletion removes associated blobs.
+- Added project migration to schema 4 and a unit check for schema 3 image records. Typecheck and the core suite pass. Browser-backed save/reopen, output inspection, and offline behavior have not been verified; the collage gate stays open until those runs.
+
+## Public tool directory and static route checks (2026-11-14)
+
+- Added prerendered `/tools/` plus audio, video, and image category entry pages. The updated build verifier checks route metadata and noindex behavior, static 404/headers/robots, sitemap/canonical behavior when an origin is configured, and service-worker route entries.
+- Local production build emitted 26 route pages: 22 indexable public pages and 4 noindex studio/project shells. This does not prove the hosted origin's route/404 status or post-deployment header behavior. Routes remain explicitly hand-authored; the typed catalog conversion and the missing storage settings/video merge routes remain pending.
+
+## Worker-based peak normalization (2026-11-14)
+
+- Peak scan and WAV PCM16 encoding now run in a dedicated module worker. Source PCM is copied in 65,536-frame chunks and transferred, bounding temporary copies; output blocks are transferred back and assembled into a Blob. The user can cancel between blocks and sees progress. Audio decode still occurs on the UI thread, and other large audio/video/image processing paths remain outside a shared worker-job protocol.
+- Pure tests cover gain target, silence, interleaving/clamping, malformed channel lengths, and RIFF/WAVE sizes. Typecheck, 10 core tests, and build passed; the production bundle emits `audio-normalize.worker` separately.
+
+## Versioned source replacement and project integrity (2026-11-14)
+
+- Source media now uses immutable asset IDs. New bytes are written to OPFS (with an IndexedDB fallback) before the project record points to them; failed writes remove the staged asset and leave the previous reference intact. Audio source replacement retains the previous source until the edit document transaction commits, then cleans old references. Legacy project-ID paths remain readable and are migrated forward to schema 5 without moving their bytes.
+- Project deletion removes the project record and IndexedDB references in one transaction, then removes OPFS directories. If the IndexedDB transaction fails, source bytes remain reachable from the still-existing project.
+- This prevents the prior in-place overwrite failure mode, but browser quota exhaustion, OPFS/IndexedDB partial failure, and interrupted-tab recovery still require browser-backed tests before the storage gate is met.
+- Extracted the shared timeline clip-duration calculation and added checks for 3.7×, 0.1×, 16×, and invalid speed values. The current core suite passes 12/12; this covers the pure timing formula, not full preview/export sync.
+
+## Storage settings route (2026-11-14)
+
+- Added `/settings/storage/` for browser-reported usage/quota, persistent-storage request/status, a clear-site-data warning, and per-project deletion. The route is pre-rendered but marked noindex and disallowed in robots. The static output verifier checks the setting shell’s noindex status.
+- Local typecheck and 12 core tests passed; build verifies 27 prerendered routes and excludes five private shells from the indexable set. User-agent eviction, quota exhaustion, and deletion recovery still need runtime coverage.
+
+## User-controlled service-worker activation (2026-11-14)
+
+- Removed install-time `skipWaiting`. A fully precached worker stays waiting; the app shell detects it, presents a save/review notice, and only sends `SKIP_WAITING` after the user selects reload. The active worker then claims clients and the app reloads on `controllerchange`.
+- A static build check confirms the explicit message handler and absence of automatic activation. Typecheck, 12 core tests, and the 27-route build pass. Real update install, active project autosave, and offline reload behavior remain unverified.
+# 2026-11-14 — Inspect studio media codecs before project import
+
+Studio import paths inspect container and track metadata from the local file bytes with Mediabunny. Imports check every audio/video track with `canDecode()` and report detected container and codecs; tracks unsupported by the browser are rejected before persistence. This avoids treating file extensions or MIME declarations as codec evidence. The check covers Audio and Video Studio; other quick tools still rely on their individual decoders, and support is not a substitute for the outstanding browser/format/export matrix. Verification: typecheck, 12 core tests, and static production build pass. Real browser fixture matrix is still required.
+
+# 2026-11-14 — JPEG export for image workspace
+
+Added JPEG export with custom quality input and an explicit white matte for transparent source pixels, alongside PNG. Persisted the format and quality in image project settings as optional fields, so existing schema-5 projects default to PNG at 0.92 quality. This closes the missing JPEG output control in the image UI but does not verify color, alpha, dimensions, or offline reopening using real fixture images.
+
+Image undo/redo now stores up to 100 edit-document snapshots and covers adjustments, resize settings, transforms, export controls, and layers. Selecting a different source resets the history so undo does not cross between images. Pure core tests do not exercise this browser interaction; route-level edit/undo/reopen still requires runtime verification.
+
+Video Studio import now classifies audio/video from parsed track content and validates image inputs by bitmap decode and supported dimensions. MIME declarations are retained as asset metadata but do not determine codec capability or media kind. Direct nested route load was observed in the built static preview; fixture import, refresh with a saved project, and offline operation remain open.
+
+Video Studio audio clips gained an optional `pitchMode`. Missing values migrate implicitly to preserve mode; natural mode uses linear source-rate resampling for output and disables preview pitch preservation. A unit test covers fractional-speed chunk interpolation. This confirms the calculation path only; audible comparison, export duration, and A/V sync still need representative fixtures.
+
+Added synthetic CC0 Core fixtures under `tests/fixtures/core-media`: H.264/AAC MP4 (320×180, 24 fps, 4 s), VP9/Opus WebM (320×180, 24 fps, 4.008 s), PCM sine WAVs at 48 kHz and 44.1 kHz, a 400×340 checkerboard/transparency image, and two collage subjects. FFprobe 7.1.4 confirms the expected stream metadata. This creates repeatable inputs but does not prove app import/preview/export, spoken intelligibility, or visible A/V sync.
+
+Added `sync-markers-24fps.mp4`, a synthetic four-second H.264/AAC fixture with a colored visual marker each second and 20 ms, 1 kHz audio pulses at 1, 2, and 3 seconds. FFprobe 7.1.4 confirms 320×180 at 24 fps and mono 48 kHz audio; FFmpeg silence detection locates the pulses at 1.000, 2.000, and 3.000 seconds. This establishes fixture metadata only; browser import, timeline offsets, exported sync, and external-player playback remain unverified.
+
+## M6 synthetic multitrack browser run (2026-11-14)
+
+- Environment: Codex in-app browser against local Vite development preview. The exact browser/OS build was not exposed. The development preview does not serve the production service worker (404), so this run is not offline evidence and does not establish Chrome/Edge support.
+- Imported locally generated H.264/AAC MP4, VP9/Opus WebM, 48 kHz and 44.1 kHz WAV, 24 fps sync-marker MP4, and transparent RGBA PNG. SVG import was rejected with “container is not recognized”; the raster fixture decoded and rendered. No user media was used.
+- Built a saved project with two occupied video tracks, two audio tracks, text and transparent image overlays, 0.5-second visual dissolve, 0.5-second audio crossfade, natural-pitch 1.5× audio, and detached sync-fixture audio. Refresh restored eight media entries, track positions, dimensions, edit settings, and local assets.
+- Preview check at 9.5 seconds: sync video source `currentTime` and detached audio source `currentTime` were both 1.0 seconds. During playback, both advanced together; the second 1.5× audio clip advanced at the corresponding 1.5× source rate.
+- The first export showed that the pitch-preserving Bungee path lost later 1 kHz transients at unity speed. Since unity speed does not alter pitch, `renderTimelineAudio` now bypasses Bungee at 1× and copies/resamples the decoded source directly. A pure helper regression test covers mode selection.
+- After the fix, the 320×180, 24 fps, 48 kHz stereo AAC/H.264 MP4 was downloaded, fully decoded by FFmpeg, and played by VLC (exit code 0). A narrow 1 kHz bandpass/silence check located exported pulses at 9.50, 10.50, and 11.50 seconds, matching the video clip start at 8.5 seconds plus source markers at 1, 2, and 3 seconds. Output duration was 15.168 seconds.
+- This is a targeted M6 renderer gate pass for the tested local configuration only. It does not close M6: static-host offline export, named browser matrix, speech review, longer sync/boundary cases, drag-trim/ripple, or cross-browser support remain unverified.
+
+## M6 static preview checkpoint (2026-11-14)
+
+- The post-hydration-fix production build was previewed on localhost port 4177. A new project with sync-marker video/audio, transparent image and text overlays, detached audio, and 320×180/24 fps output rendered a downloadable MP4 link on initial load. The output was not downloaded before the user asked to pause.
+- A preceding static preview export was inspected externally: H.264/AAC, 320×180, 24 fps, 5.013 s; FFmpeg decoded all streams and VLC exited successfully. Narrow-band pulse peaks were measured at approximately 1.001, 2.001, and 3.001 seconds.
+- All task-started local preview/development sessions were stopped. The development server does not serve `/sw.js`; service-worker install, offline reload, and offline export remain unverified. No result here closes M6 or establishes support for a named browser/OS combination.

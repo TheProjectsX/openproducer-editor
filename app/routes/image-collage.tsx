@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import type { Route } from "./+types/image-collage";
+import { createProject, getProject, readVideoAsset, saveCollageProject } from "../lib/project-store";
 
 type ImageFile = { id: string; file: File };
 const MAX_SOURCE_BYTES = 512 * 1024 * 1024;
@@ -13,15 +15,62 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function ImageCollage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const projectId = searchParams.get("project") ?? "";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [images, setImages] = useState<ImageFile[]>([]);
+  const [projectTitle, setProjectTitle] = useState("Untitled collage");
+  const [projectLoaded, setProjectLoaded] = useState(false);
+  const [projectStatus, setProjectStatus] = useState("");
   const [columns, setColumns] = useState("2");
   const [gap, setGap] = useState("16");
   const [width, setWidth] = useState("1200");
   const [height, setHeight] = useState("900");
   const [background, setBackground] = useState("#ffffff");
   const [fit, setFit] = useState("contain");
+  const [caption, setCaption] = useState("");
+  const [captionSize, setCaptionSize] = useState("48");
+  const [captionColor, setCaptionColor] = useState("#111827");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!projectId) { setProjectLoaded(true); return () => { cancelled = true; }; }
+    setProjectLoaded(false);
+    void (async () => {
+      try {
+        const project = await getProject(projectId);
+        if (!project || project.kind !== "image" || !project.collageDocument) throw new Error("This saved collage project is missing or unavailable.");
+        const restored = await Promise.all(project.collageDocument.assets.map(async (asset) => {
+          const file = await readVideoAsset(asset.id);
+          if (!file) throw new Error(`The saved collage source “${asset.name}” is missing.`);
+          return { id: asset.id, file };
+        }));
+        if (cancelled) return;
+        setImages(restored); setProjectTitle(project.title);
+        setWidth(project.collageDocument.width); setHeight(project.collageDocument.height); setColumns(project.collageDocument.columns);
+        setGap(project.collageDocument.gap); setBackground(project.collageDocument.background); setFit(project.collageDocument.fit);
+        setCaption(project.collageDocument.caption); setCaptionSize(project.collageDocument.captionSize); setCaptionColor(project.collageDocument.captionColor);
+        setProjectStatus("Editable collage reopened from this device.");
+      } catch (cause) { if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not open the collage project."); }
+      finally { if (!cancelled) setProjectLoaded(true); }
+    })();
+    return () => { cancelled = true; };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    const existing = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    const previousContent = existing?.getAttribute("content");
+    const robots = existing ?? document.createElement("meta");
+    robots.name = "robots"; robots.content = "noindex,nofollow";
+    if (!existing) document.head.append(robots);
+    return () => {
+      if (!existing) robots.remove();
+      else if (previousContent == null) robots.removeAttribute("content");
+      else robots.setAttribute("content", previousContent);
+    };
+  }, [projectId]);
 
   const layout = useMemo(() => {
     const columnCount = Number(columns), gapSize = Number(gap), outputWidth = Number(width), outputHeight = Number(height);
@@ -29,9 +78,10 @@ export default function ImageCollage() {
     const valid = Number.isInteger(columnCount) && columnCount >= 1 && columnCount <= 10
       && Number.isInteger(gapSize) && gapSize >= 0 && gapSize <= 256
       && Number.isInteger(outputWidth) && outputWidth > 0 && Number.isInteger(outputHeight) && outputHeight > 0
-      && outputWidth <= 32768 && outputHeight <= 32768 && outputWidth * outputHeight <= MAX_OUTPUT_PIXELS;
+      && outputWidth <= 32768 && outputHeight <= 32768 && outputWidth * outputHeight <= MAX_OUTPUT_PIXELS
+      && (!caption || (Number.isFinite(Number(captionSize)) && Number(captionSize) >= 8 && Number(captionSize) <= 512));
     return { columnCount, gapSize, outputWidth, outputHeight, rows, valid };
-  }, [columns, gap, width, height, images.length]);
+  }, [columns, gap, width, height, images.length, caption, captionSize]);
 
   useEffect(() => {
     if (!images.length || !layout.valid || !canvasRef.current) return;
@@ -67,12 +117,17 @@ export default function ImageCollage() {
             context.drawImage(bitmap, sx, sy, sw, sh, x, y, cellWidth, cellHeight);
           }
         });
+        if (caption) {
+          context.fillStyle = captionColor; context.font = `${captionSize}px system-ui, sans-serif`;
+          context.textAlign = "center"; context.textBaseline = "bottom";
+          context.fillText(caption, layout.outputWidth / 2, layout.outputHeight - layout.gapSize, layout.outputWidth - layout.gapSize * 2);
+        }
         setError("");
       } catch (cause) { setError(cause instanceof Error ? cause.message : "One or more images could not be decoded."); }
       finally { bitmaps.forEach((bitmap) => bitmap.close()); }
     })();
     return () => { cancelled = true; };
-  }, [images, layout, background, fit]);
+  }, [images, layout, background, fit, caption, captionSize, captionColor]);
 
   function addFiles(files: FileList | null) {
     if (!files?.length) return;
@@ -89,6 +144,21 @@ export default function ImageCollage() {
     const destination = index + direction;
     if (destination < 0 || destination >= images.length) return;
     const next = [...images]; [next[index], next[destination]] = [next[destination], next[index]]; setImages(next);
+  }
+
+  async function saveProject() {
+    if (!projectLoaded || !images.length || !layout.valid || !projectTitle.trim()) return;
+    try {
+      let id = projectId;
+      if (!id) id = (await createProject(projectTitle.trim(), "image")).id;
+      const document = {
+        version: 1 as const, width, height, columns, gap, background, fit, caption, captionSize, captionColor,
+        assets: images.map(({ id: assetId, file }) => ({ id: assetId, name: file.name, type: file.type, size: file.size })),
+      };
+      await saveCollageProject(id, document, images.map(({ id: assetId, file }) => ({ id: assetId, file })), projectTitle);
+      setProjectStatus("Collage project saved on this device."); setError("");
+      if (id !== projectId) setSearchParams({ project: id });
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save the collage project."); }
   }
 
   function download() {
@@ -108,12 +178,17 @@ export default function ImageCollage() {
     <section className="resize-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>Add images</span><input type="file" accept="image/*" multiple onChange={(event) => { addFiles(event.currentTarget.files); event.currentTarget.value = ""; }} /></label>
+        <label className="ratio-field">Project name<input maxLength={80} value={projectTitle} disabled={!projectLoaded} onChange={(event) => setProjectTitle(event.currentTarget.value)} /></label>
         <div className="dimension-fields"><label>Canvas width <span>px</span><input type="number" min="1" max="32768" step="1" value={width} onChange={(event) => setWidth(event.currentTarget.value)} /></label><label>Canvas height <span>px</span><input type="number" min="1" max="32768" step="1" value={height} onChange={(event) => setHeight(event.currentTarget.value)} /></label></div>
         <div className="dimension-fields"><label>Columns <span>1–10</span><input type="number" min="1" max="10" step="1" value={columns} onChange={(event) => setColumns(event.currentTarget.value)} /></label><label>Spacing <span>0–256 px</span><input type="number" min="0" max="256" step="1" value={gap} onChange={(event) => setGap(event.currentTarget.value)} /></label></div>
         <label className="ratio-field">Cell fit<select value={fit} onChange={(event) => setFit(event.currentTarget.value)}><option value="contain">Contain · show full image</option><option value="cover">Cover · crop to fill</option></select></label>
         <label className="ratio-field">Background color<input type="color" value={background} onChange={(event) => setBackground(event.currentTarget.value)} /></label>
+        <label className="ratio-field">Collage text<input value={caption} maxLength={240} onChange={(event) => setCaption(event.currentTarget.value)} placeholder="Optional caption" /></label>
+        <div className="dimension-fields"><label>Text size <span>px</span><input type="number" min="8" max="512" step="any" value={captionSize} onChange={(event) => setCaptionSize(event.currentTarget.value)} /></label><label>Text color<input type="color" value={captionColor} onChange={(event) => setCaptionColor(event.currentTarget.value)} /></label></div>
         <p className="resize-note">{images.length} image(s) · {layout.rows} row(s) · {layout.valid ? `${(layout.outputWidth * layout.outputHeight / 1_000_000).toFixed(1)} megapixels` : "Invalid canvas settings"}. Maximum 20 source files and 100 megapixels.</p>
         {error && <p className="resize-error" role="alert">{error}</p>}
+        {projectStatus && <p className="source-info" role="status">{projectStatus}</p>}
+        <button className="secondary-button export-button" disabled={!projectLoaded || !images.length || !layout.valid || !projectTitle.trim()} onClick={() => void saveProject()}>Save editable collage</button>
         <button className="export-button" disabled={!images.length || !layout.valid} onClick={download}>Download collage PNG</button>
       </div>
       <div className="resize-preview"><div className="preview-heading"><strong>Collage preview</strong><span>{images.length ? `${layout.outputWidth} × ${layout.outputHeight} px` : "Add images to begin"}</span></div>{images.length ? <canvas ref={canvasRef} className="preview-canvas" aria-label="Image collage preview" /> : <div className="empty-preview">Add two or more images to start a collage.</div>}</div>

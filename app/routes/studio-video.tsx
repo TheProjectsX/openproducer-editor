@@ -5,6 +5,7 @@ import { getProject, readVideoAsset, saveVideoTimeline, type VideoTimelineAsset,
 import { drawVideoComposition, getClipLength } from "../lib/video-composition";
 import { evaluateClipKeyframes, evaluateClipTransition, upsertClipKeyframe } from "../lib/video-keyframes";
 import { renderTimelineAudio } from "../lib/audio-timeline-render";
+import { inspectMediaFile } from "../lib/media-inspection";
 import wasmUrl from "bungee-web/bungee.wasm?url";
 
 const EMPTY: VideoTimelineProject = { version: 1, width: 1920, height: 1080, fps: 30, duration: 0, playhead: 0, assets: [], clips: [] };
@@ -29,6 +30,7 @@ export default function VideoStudio() {
   const [zoom, setZoom] = useState("60");
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [snapThreshold, setSnapThreshold] = useState("0.1");
+  const [transitionDuration, setTransitionDuration] = useState("0.5");
   const [exporting, setExporting] = useState(false);
   const [extractingAudio, setExtractingAudio] = useState(false);
   const [extractProgress, setExtractProgress] = useState(0);
@@ -116,7 +118,7 @@ export default function VideoStudio() {
       if (!isActive) { audio.pause(); continue; }
       const expected = clip.sourceStart + (current.playhead - clip.start) * clip.speed;
       if (Math.abs(audio.currentTime - expected) > 0.35) audio.currentTime = expected;
-      audio.playbackRate = clip.speed; audio.preservesPitch = true;
+      audio.playbackRate = clip.speed; audio.preservesPitch = (clip.pitchMode ?? "preserve") === "preserve";
       const localTime = Math.max(0, current.playhead - clip.start);
       audio.volume = Math.max(0, Math.min(1, evaluateClipKeyframes(clip, localTime).volume * evaluateClipTransition(clip, localTime))); audio.muted = clip.muted;
       if (playing && audio.paused) void audio.play().catch(() => setError("Audio preview was blocked by this browser. Press Play again to allow local audio preview."));
@@ -144,19 +146,32 @@ export default function VideoStudio() {
     const assets: VideoTimelineAsset[] = [];
     const nextFiles: Record<string, File> = {};
     const addedClips: VideoTimelineClip[] = [];
+    const inspectedMedia: string[] = [];
     for (const file of Array.from(list)) {
       if (file.size > MAX_ASSET_BYTES) { setError(`${file.name} is over the 256 MiB per-file limit.`); continue; }
-      const kind = file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : file.type.startsWith("image/") ? "image" : null;
+      const id = crypto.randomUUID(); let duration = 0; let kind: VideoTimelineAsset["kind"] | null = null;
+      if (file.type.startsWith("image/")) {
+        try {
+          const bitmap = await createImageBitmap(file);
+          const oversized = bitmap.width * bitmap.height > 100_000_000 || Math.max(bitmap.width, bitmap.height) > 32_768;
+          bitmap.close();
+          if (oversized) { setError(`${file.name} exceeds the 100-megapixel or 32,768-pixel side limit.`); continue; }
+          kind = "image"; duration = 3600;
+        } catch { /* The declared MIME may be wrong; inspect it as container media below. */ }
+      }
+      if (!kind) {
+        try {
+          const inspection = await inspectMediaFile(file);
+          kind = inspection.tracks.some((track) => track.kind === "video") ? "video" : "audio";
+          duration = inspection.duration ?? 0;
+          const trackSummary = inspection.tracks.map((track) => `${track.kind} ${track.codec}`).join(" + ");
+          inspectedMedia.push(`${file.name}: ${inspection.container}, ${trackSummary}`);
+        } catch (cause) {
+          setError(cause instanceof Error ? `${file.name}: ${cause.message}` : `Could not inspect ${file.name}.`);
+          continue;
+        }
+      }
       if (!kind) { setError(`${file.name} is not a supported video, audio, or image file.`); continue; }
-      const id = crypto.randomUUID(); let duration = 0;
-      if (kind === "image") duration = 3600;
-      else duration = await new Promise<number>((resolve) => {
-        const element = document.createElement(kind);
-        const url = URL.createObjectURL(file);
-        element.onloadedmetadata = () => { const value = Number.isFinite(element.duration) ? element.duration : 0; URL.revokeObjectURL(url); resolve(value); };
-        element.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
-        element.src = url;
-      });
       if (!duration) { setError(`Could not read a usable duration for ${file.name}.`); continue; }
       const asset = { id, name: file.name, type: file.type, size: file.size, duration, kind } satisfies VideoTimelineAsset;
       if ([...timeline.assets, ...assets].reduce((total, item) => total + item.size, file.size) > 512 * 1024 * 1024) { setError("The total local media limit for this prototype is 512 MiB per project."); continue; }
@@ -164,13 +179,13 @@ export default function VideoStudio() {
       const track = kind === "audio" ? -1 : 0;
       const clipDuration = kind === "image" ? 5 : duration;
       const start = Math.max(timeline.duration, ...addedClips.filter((clip) => clip.track === track).map((clip) => clip.start + clipLength(clip)), 0);
-      addedClips.push({ id: crypto.randomUUID(), assetId: id, track, start, sourceStart: 0, sourceEnd: clipDuration, speed: 1, volume: 1, muted: false });
+      addedClips.push({ id: crypto.randomUUID(), assetId: id, track, start, sourceStart: 0, sourceEnd: clipDuration, speed: 1, volume: 1, muted: false, ...(kind === "audio" ? { pitchMode: "preserve" as const } : {}) });
     }
     const updated = { ...timeline, assets: [...timeline.assets, ...assets], clips: [...timeline.clips, ...addedClips], duration: Math.max(timeline.duration, ...addedClips.map((clip) => clip.start + clipLength(clip)), 0) };
     try {
       await saveVideoTimeline(projectId, updated, assets.map((asset) => ({ id: asset.id, file: nextFiles[asset.id] })));
       setFiles((current) => ({ ...current, ...nextFiles })); applyTimelineEdit(() => updated); setSelected(addedClips[0]?.id ?? selected);
-      setStatus(`${assets.length} media item(s) added and saved locally.`);
+      setStatus(`${assets.length} media item(s) added and saved locally.${inspectedMedia.length ? ` Decoder support confirmed: ${inspectedMedia.join("; ")}.` : ""}`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save imported media in this browser."); }
   }
 
@@ -229,7 +244,7 @@ export default function VideoStudio() {
       const audioAsset: VideoTimelineAsset = { id: audioId, name: audioFile.name, type: audioFile.type, size: audioFile.size, duration: audioDuration, kind: "audio", derivedFromAssetId: selectedAsset.id };
       const sourceEnd = Math.min(selectedClip.sourceEnd, audioDuration);
       if (sourceEnd <= selectedClip.sourceStart) throw new Error("The extracted audio track does not cover this video clip's selected source range.");
-      const audioClip: VideoTimelineClip = { id: crypto.randomUUID(), assetId: audioId, track: -1, start: selectedClip.start, sourceStart: selectedClip.sourceStart, sourceEnd, speed: selectedClip.speed, volume: selectedClip.volume, muted: false };
+      const audioClip: VideoTimelineClip = { id: crypto.randomUUID(), assetId: audioId, track: -1, start: selectedClip.start, sourceStart: selectedClip.sourceStart, sourceEnd, speed: selectedClip.speed, volume: selectedClip.volume, muted: false, pitchMode: "preserve" };
       const current = timelineRef.current;
       const updated = { ...current, assets: [...current.assets, audioAsset], clips: [...current.clips, audioClip], duration: Math.max(current.duration, audioClip.start + clipLength(audioClip)) };
       await saveVideoTimeline(projectId, updated, [{ id: audioId, file: audioFile }]);
@@ -245,6 +260,32 @@ export default function VideoStudio() {
     if (!selectedClip?.keyframes?.length) return;
     const time = Math.max(0, Math.min(clipLength(selectedClip), timeline.playhead - selectedClip.start));
     editClip(selectedClip.id, { keyframes: selectedClip.keyframes.filter((frame) => Math.abs(frame.time - time) >= 0.05) });
+  }
+  function createTransitionToNext(kind: "dissolve" | "crossfade") {
+    if (!selectedClip || !selectedAsset) return;
+    const candidates = timeline.clips.filter((clip) => clip.id !== selectedClip.id && clip.track === selectedClip.track && clip.start > selectedClip.start + 0.001)
+      .sort((a, b) => a.start - b.start);
+    const next = candidates[0];
+    const nextAsset = next && timeline.assets.find((asset) => asset.id === next.assetId);
+    const allowedKinds = kind === "dissolve" ? ["video", "image", "text"] : ["audio"];
+    const duration = Number(transitionDuration);
+    if (!next || !nextAsset || !allowedKinds.includes(selectedAsset.kind) || !allowedKinds.includes(nextAsset.kind)) {
+      setError(`Select a ${kind === "dissolve" ? "visual" : "audio"} clip with a following clip on the same track.`); return;
+    }
+    const overlap = Math.max(0, Math.min(clipLength(selectedClip), clipLength(next), duration));
+    if (!Number.isFinite(duration) || overlap <= 0 || overlap !== duration) {
+      setError("Enter a transition duration greater than 0 and no longer than either clip."); return;
+    }
+    const nextStart = selectedClip.start + clipLength(selectedClip) - overlap;
+    const changes = new Map<string, Partial<VideoTimelineClip>>();
+    changes.set(selectedClip.id, { transitions: { fadeIn: selectedClip.transitions?.fadeIn ?? 0, fadeOut: kind === "crossfade" ? overlap : selectedClip.transitions?.fadeOut ?? 0 } });
+    changes.set(next.id, { start: nextStart, transitions: { fadeIn: overlap, fadeOut: next.transitions?.fadeOut ?? 0 } });
+    applyTimelineEdit((current) => ({
+      ...current,
+      clips: current.clips.map((clip) => changes.has(clip.id) ? { ...clip, ...changes.get(clip.id) } : clip),
+      duration: Math.max(current.duration, ...current.clips.map((clip) => clip.id === next.id ? nextStart + clipLength(clip) : clip.start + clipLength(clip))),
+    }));
+    setError(""); setStatus(kind === "dissolve" ? "Dissolve added between adjacent visual clips." : "Audio crossfade added between adjacent clips.");
   }
   function addTitle() {
     const asset: VideoTimelineAsset = { id: crypto.randomUUID(), name: "Text title", type: "text/plain", size: 0, duration: 3600, kind: "text", textSettings: { text: "Your title", fontSize: 72, color: "#ffffff", backgroundColor: "#172033", showBackground: false } };
@@ -323,7 +364,7 @@ export default function VideoStudio() {
       if (!audio) continue;
       audio.currentTime = clip.sourceStart + (timeline.playhead - clip.start) * clip.speed;
       const localTime = Math.max(0, timeline.playhead - clip.start);
-      audio.playbackRate = clip.speed; audio.preservesPitch = true; audio.volume = Math.max(0, Math.min(1, evaluateClipKeyframes(clip, localTime).volume * evaluateClipTransition(clip, localTime))); audio.muted = clip.muted;
+      audio.playbackRate = clip.speed; audio.preservesPitch = (clip.pitchMode ?? "preserve") === "preserve"; audio.volume = Math.max(0, Math.min(1, evaluateClipKeyframes(clip, localTime).volume * evaluateClipTransition(clip, localTime))); audio.muted = clip.muted;
       void audio.play().catch(() => setError("Audio preview was blocked by this browser. Press Play again to allow local audio preview."));
     }
     setPlaying(true);
@@ -422,14 +463,28 @@ export default function VideoStudio() {
     }
   }
 
-  return <main className="video-studio-page">
+  return <main className="video-studio-page" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (event.dataTransfer.files.length) void importFiles(event.dataTransfer.files); }}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav><a href="/projects">Projects</a></nav><span role="status">{status}</span></header>
-    <div className="video-studio-top"><section><p className="eyebrow">LOCAL VIDEO STUDIO · TIMELINE FOUNDATION</p><h1>Video Studio</h1><p>Arrange local video, image, and audio clips on independent tracks. Project edits and imported assets stay in this browser.</p></section><label className="file-picker"><span>{projectId ? "Import video, audio, or images" : "Open a project to import media"}<input type="file" multiple accept="video/*,audio/*,image/*" disabled={!projectId || exporting} onChange={(event) => void importFiles(event.currentTarget.files)} /></span></label></div>
+    <div className="video-studio-top">
+      <section>
+        <p className="eyebrow">LOCAL VIDEO STUDIO · TIMELINE FOUNDATION</p>
+        <h1>Video Studio</h1>
+        <p>Arrange local video, image, and audio clips on independent tracks. Project edits and imported assets stay in this browser.</p>
+      </section>
+      <div className="editor-top-actions">
+        <label className="file-picker">
+          <span>{projectId && ready ? "Import video, audio, or images" : "Open a project to import media"}
+            <input type="file" multiple accept="video/*,audio/*,image/*" disabled={!projectId || !ready || exporting} onChange={(event) => void importFiles(event.currentTarget.files)} />
+          </span>
+        </label>
+        <button className="secondary-button" disabled={!projectId || !ready || exporting} onClick={addTitle}>Add text title</button>
+      </div>
+    </div>
     {error && <p className="resize-error" role="alert">{error}</p>}
     {extractingAudio && <p className="source-info" role="status">Detaching source audio: {extractProgress}% <button className="editor-action danger" onClick={() => void cancelAudioExtraction()}>Cancel</button></p>}
     <section className="video-editor-layout" inert={exporting || extractingAudio}>
       <aside className="video-bin"><div className="preview-heading"><strong>Media bin</strong><span>{timeline.assets.length} items</span></div>{timeline.assets.map((asset) => <button key={asset.id} className="bin-item" onClick={() => setSelected(timeline.clips.find((clip) => clip.assetId === asset.id)?.id ?? "")}><strong>{asset.name}</strong><small>{asset.kind} · {asset.duration.toFixed(2)} s · {(asset.size / 1048576).toFixed(1)} MiB</small></button>)}{!timeline.assets.length && <p className="resize-note">Import media to build your timeline.</p>}</aside>
-      <section className="editor-preview"><div className="preview-heading"><strong>Composite preview</strong><span>{previewAsset?.name ?? "Nothing at playhead"} · {timeline.playhead.toFixed(2)} s · {timeline.width}×{timeline.height}</span></div><div className="editor-stage"><canvas ref={canvasRef} aria-label="Composited video timeline preview" /><div className="media-sources" aria-hidden="true">{timeline.assets.filter((asset) => asset.kind === "image").map((asset) => <img key={asset.id} ref={(el) => { if (el) imageRefs.current[asset.id] = el; else delete imageRefs.current[asset.id]; }} src={assetUrls[asset.id]} alt="" onLoad={() => setMediaRevision((n) => n + 1)} />)}{timeline.clips.filter((clip) => timeline.assets.find((asset) => asset.id === clip.assetId)?.kind === "video").map((clip) => <video key={clip.id} ref={(el) => { if (el) videoRefs.current[clip.id] = el; else delete videoRefs.current[clip.id]; }} src={assetUrls[clip.assetId]} muted playsInline preload="auto" onLoadedData={() => setMediaRevision((n) => n + 1)} />)}{timeline.clips.filter((clip) => clip.track < 0).map((clip) => <audio key={clip.id} ref={(el) => { if (el) audioRefs.current[clip.id] = el; else delete audioRefs.current[clip.id]; }} src={assetUrls[clip.assetId]} preload="auto" />)}</div></div><div className="editor-transport"><button onClick={togglePlayback}>{playing ? "Pause" : "Play"}</button><button onClick={() => setTimeline((current) => ({ ...current, playhead: 0 }))}>Start</button><label>Playhead (s)<input type="number" min="0" max={timeline.duration} step="any" value={timeline.playhead.toFixed(2)} onChange={(event) => setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, Number(event.currentTarget.value) || 0)) }))} /></label></div></section>
+      <section className="editor-preview"><div className="preview-heading"><strong>Composite preview</strong><span>{previewAsset?.name ?? "Nothing at playhead"} · {timeline.playhead.toFixed(2)} s · {timeline.width}×{timeline.height}</span></div><div className="editor-stage"><canvas ref={canvasRef} aria-label="Composited video timeline preview" /><div className="media-sources" aria-hidden="true">{timeline.assets.filter((asset) => asset.kind === "image").map((asset) => <img key={asset.id} ref={(el) => { if (el) imageRefs.current[asset.id] = el; else delete imageRefs.current[asset.id]; }} src={assetUrls[asset.id]} alt="" onLoad={() => setMediaRevision((n) => n + 1)} />)}{timeline.clips.filter((clip) => timeline.assets.find((asset) => asset.id === clip.assetId)?.kind === "video").map((clip) => <video key={clip.id} ref={(el) => { if (el) videoRefs.current[clip.id] = el; else delete videoRefs.current[clip.id]; }} src={assetUrls[clip.assetId]} muted playsInline preload="auto" onLoadedData={() => setMediaRevision((n) => n + 1)} />)}{timeline.clips.filter((clip) => clip.track < 0).map((clip) => <audio key={clip.id} ref={(el) => { if (el) audioRefs.current[clip.id] = el; else delete audioRefs.current[clip.id]; }} src={assetUrls[clip.assetId]} preload="auto" />)}</div></div><div className="editor-transport"><button onClick={togglePlayback}>{playing ? "Pause" : "Play"}</button><button onClick={() => setTimeline((current) => ({ ...current, playhead: 0 }))}>Start</button><label>Playhead (s)<input type="number" min="0" max={timeline.duration} step="any" value={timeline.playhead.toFixed(2)} onChange={(event) => { const playhead = Number(event.currentTarget.value) || 0; setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, playhead)) })); }} /></label></div></section>
       <aside className="video-inspector">
         <div className="preview-heading"><strong>Inspector</strong><span>{selectedClip ? "Selected clip" : "No selection"}</span></div>
         {selectedClip && <>
@@ -439,6 +494,7 @@ export default function VideoStudio() {
           <label className="speed-field">Source out <span>seconds</span><input type="number" min="0.01" max={selectedAsset?.duration} step="any" value={selectedClip.sourceEnd} onChange={(event) => editClip(selectedClip.id, { sourceEnd: Math.min(selectedAsset?.duration ?? selectedClip.sourceEnd, Math.max(selectedClip.sourceStart + 0.01, Number(event.currentTarget.value) || 0)) })} /></label>
           <label className="speed-field">Speed <span>custom 0.1-16x</span><input type="number" min="0.1" max="16" step="any" value={selectedClip.speed} onChange={(event) => editClip(selectedClip.id, { speed: Math.max(0.1, Math.min(16, Number(event.currentTarget.value) || 1)) })} /></label>
           <label className="speed-field">Volume <span>custom 0-1x</span><input type="number" min="0" max="1" step="any" value={selectedValues?.volume ?? selectedClip.volume} onChange={(event) => editClip(selectedClip.id, { volume: Math.max(0, Math.min(1, Number(event.currentTarget.value) || 0)) })} /></label>
+          {selectedClip.track < 0 && <label className="ratio-field">Audio pitch mode<select value={selectedClip.pitchMode ?? "preserve"} onChange={(event) => editClip(selectedClip.id, { pitchMode: event.currentTarget.value as "preserve" | "natural" })}><option value="preserve">Preserve pitch (default)</option><option value="natural">Natural pitch change</option></select></label>}
           {selectedAsset?.kind === "video" && <button className="secondary-button editor-action" disabled={extractingAudio} onClick={() => void detachVideoAudio()}>Detach source audio to Audio 1</button>}
           <button className="secondary-button editor-action" onClick={addOrUpdateKeyframe}>Add/update keyframe at playhead</button>
           {selectedClip.keyframes?.some((frame) => Math.abs(frame.time - Math.max(0, Math.min(clipLength(selectedClip), timeline.playhead - selectedClip.start))) < 0.05) && <button className="editor-action" onClick={removeKeyframeAtPlayhead}>Remove keyframe at playhead</button>}
@@ -453,6 +509,14 @@ export default function VideoStudio() {
             <label>Fade in <span>custom seconds</span><input type="number" min="0" max={clipLength(selectedClip)} step="any" value={selectedClip.transitions?.fadeIn ?? 0} onChange={(event) => editClip(selectedClip.id, { transitions: { fadeIn: Math.max(0, Math.min(clipLength(selectedClip), Number(event.currentTarget.value) || 0)), fadeOut: selectedClip.transitions?.fadeOut ?? 0 } })} /></label>
             <label>Fade out <span>custom seconds</span><input type="number" min="0" max={clipLength(selectedClip)} step="any" value={selectedClip.transitions?.fadeOut ?? 0} onChange={(event) => editClip(selectedClip.id, { transitions: { fadeIn: selectedClip.transitions?.fadeIn ?? 0, fadeOut: Math.max(0, Math.min(clipLength(selectedClip), Number(event.currentTarget.value) || 0)) } })} /></label>
           </div>
+          {selectedClip.track >= 0 && selectedAsset && ["video", "image", "text"].includes(selectedAsset.kind) && <div className="transition-controls">
+            <label>Transition duration <span>custom seconds</span><input type="number" min="0.01" max={clipLength(selectedClip)} step="any" value={transitionDuration} onChange={(event) => setTransitionDuration(event.currentTarget.value)} /></label>
+            <button className="secondary-button editor-action" onClick={() => createTransitionToNext("dissolve")}>Dissolve into next clip</button>
+          </div>}
+          {selectedClip.track < 0 && <div className="transition-controls">
+            <label>Crossfade duration <span>custom seconds</span><input type="number" min="0.01" max={clipLength(selectedClip)} step="any" value={transitionDuration} onChange={(event) => setTransitionDuration(event.currentTarget.value)} /></label>
+            <button className="secondary-button editor-action" onClick={() => createTransitionToNext("crossfade")}>Crossfade into next clip</button>
+          </div>}
           {selectedClip.track >= 0 && selectedAsset?.kind !== "text" && <div className="filter-fields two-column transform-fields">
             <label>Brightness <span>custom percent</span><input type="number" min="0" max="300" step="any" value={selectedClip.effects?.brightness ?? 100} onChange={(event) => editClip(selectedClip.id, { effects: { brightness: Math.max(0, Math.min(300, Number(event.currentTarget.value) || 0)), contrast: selectedClip.effects?.contrast ?? 100, saturation: selectedClip.effects?.saturation ?? 100, grayscale: selectedClip.effects?.grayscale ?? 0 } })} /></label>
             <label>Contrast <span>custom percent</span><input type="number" min="0" max="300" step="any" value={selectedClip.effects?.contrast ?? 100} onChange={(event) => editClip(selectedClip.id, { effects: { brightness: selectedClip.effects?.brightness ?? 100, contrast: Math.max(0, Math.min(300, Number(event.currentTarget.value) || 0)), saturation: selectedClip.effects?.saturation ?? 100, grayscale: selectedClip.effects?.grayscale ?? 0 } })} /></label>

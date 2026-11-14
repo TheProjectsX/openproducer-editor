@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import type { Route } from "./+types/image-resize";
-import { getProject, readProjectSource, saveImageSettings, saveProjectSource, type ImageProjectSettings } from "../lib/project-store";
+import { getProject, readProjectSource, saveImageSettings, saveProjectSource, type ImageLayer, type ImageProjectSettings } from "../lib/project-store";
+import { createImageHistory, recordImageEdit, redoImageEdit, undoImageEdit } from "../lib/image-history";
 
 type SourceImage = { file: File; url: string; width: number; height: number };
 
@@ -16,7 +17,7 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export function ImageResizeTool() {
+export function ImageResizeTool({ workspace = false }: { workspace?: boolean } = {}) {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("project");
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -31,6 +32,12 @@ export function ImageResizeTool() {
   const [saturation, setSaturation] = useState("100");
   const [rotation, setRotation] = useState("0");
   const [flipHorizontal, setFlipHorizontal] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"png" | "jpeg">("png");
+  const [jpegQuality, setJpegQuality] = useState("0.92");
+  const [layers, setLayers] = useState<ImageLayer[]>([]);
+  const [selectedLayerId, setSelectedLayerId] = useState("");
+  const historyRef = useRef(createImageHistory<ImageProjectSettings>());
+  const [, refreshHistory] = useState(0);
   const [error, setError] = useState("");
   const [projectTitle, setProjectTitle] = useState("");
   const [projectStatus, setProjectStatus] = useState("");
@@ -41,6 +48,7 @@ export function ImageResizeTool() {
       : ratioMode === "custom" ? Number(customRatioWidth) / Number(customRatioHeight)
         : Number(ratioMode.split(":")[0]) / Number(ratioMode.split(":")[1]);
   const ratio = selectedRatio !== null && Number.isFinite(selectedRatio) && selectedRatio > 0 ? selectedRatio : null;
+  const selectedLayer = layers.find((layer) => layer.id === selectedLayerId);
   const degrees = Number(rotation), radians = degrees * Math.PI / 180;
   const sin = Math.abs(Math.sin(radians)) < 1e-10 ? 0 : Math.abs(Math.sin(radians));
   const cos = Math.abs(Math.cos(radians)) < 1e-10 ? 0 : Math.abs(Math.cos(radians));
@@ -81,11 +89,19 @@ export function ImageResizeTool() {
       context.filter = `brightness(${amount(brightness)}%) contrast(${amount(contrast)}%) saturate(${amount(saturation)}%)`;
       context.drawImage(image, -width / 2, -height / 2, width, height);
       context.filter = "none";
+      for (const layer of layers) {
+        if (!layer.visible) continue;
+        context.fillStyle = layer.fill;
+        const left = layer.x - width / 2, top = layer.y - height / 2;
+        if (layer.kind === "rectangle") context.fillRect(left, top, layer.width, layer.height);
+        else if (layer.kind === "ellipse") { context.beginPath(); context.ellipse(left + layer.width / 2, top + layer.height / 2, layer.width / 2, layer.height / 2, 0, 0, Math.PI * 2); context.fill(); }
+        else { context.font = `700 ${layer.fontSize}px system-ui, sans-serif`; context.textBaseline = "top"; context.fillText(layer.text, left, top, Math.max(1, layer.width)); }
+      }
       setError("");
     };
     image.onerror = () => setError("The selected image could not be decoded.");
     image.src = source.url;
-  }, [source, width, height, rotatedWidth, rotatedHeight, radians, flipHorizontal, outputValid, brightness, contrast, saturation]);
+  }, [source, width, height, rotatedWidth, rotatedHeight, radians, flipHorizontal, outputValid, brightness, contrast, saturation, layers]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -109,19 +125,31 @@ export function ImageResizeTool() {
 
   useEffect(() => {
     if (!projectId || !source) return;
-    const settings: ImageProjectSettings = { width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation, rotation, flipHorizontal };
+    const settings: ImageProjectSettings = { width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation, rotation, flipHorizontal, layers, exportFormat, jpegQuality };
     const timeout = window.setTimeout(() => {
       void saveImageSettings(projectId, settings).then(() => setProjectStatus("Project changes saved on this device."))
         .catch((cause: unknown) => setProjectStatus(cause instanceof Error ? cause.message : "Could not save project changes."));
     }, 400);
     return () => window.clearTimeout(timeout);
-  }, [projectId, source, width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation, rotation, flipHorizontal]);
+  }, [projectId, source, width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation, rotation, flipHorizontal, layers, exportFormat, jpegQuality]);
+
+  useEffect(() => {
+    if (!source) return;
+    const snapshot = getSettingsSnapshot();
+    if (recordImageEdit(historyRef.current, source.file, snapshot)) refreshHistory((version) => version + 1);
+  }, [source, width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation, rotation, flipHorizontal, layers, exportFormat, jpegQuality]);
+
+  function getSettingsSnapshot(): ImageProjectSettings {
+    return structuredClone({ width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation, rotation, flipHorizontal, layers, exportFormat, jpegQuality });
+  }
 
   function applySettings(settings: ImageProjectSettings) {
     setWidth(settings.width); setHeight(settings.height); setRatioMode(settings.ratioMode);
     setCustomRatioWidth(settings.customRatioWidth); setCustomRatioHeight(settings.customRatioHeight);
     setBrightness(settings.brightness); setContrast(settings.contrast); setSaturation(settings.saturation);
     setRotation(settings.rotation ?? "0"); setFlipHorizontal(settings.flipHorizontal ?? false);
+    setLayers(settings.layers ?? []);
+    setExportFormat(settings.exportFormat ?? "png"); setJpegQuality(settings.jpegQuality ?? "0.92");
   }
 
   function importImage(file?: File, restoring = false, settings?: ImageProjectSettings) {
@@ -135,7 +163,7 @@ export function ImageResizeTool() {
     image.onload = () => {
       setSource({ file, url, width: image.naturalWidth, height: image.naturalHeight });
       if (settings) applySettings(settings);
-      else { setWidth(image.naturalWidth); setHeight(image.naturalHeight); }
+      else { setWidth(image.naturalWidth); setHeight(image.naturalHeight); setLayers([]); setSelectedLayerId(""); }
       setError("");
       if (projectId && !restoring) {
         setProjectStatus("Saving source image…");
@@ -155,6 +183,32 @@ export function ImageResizeTool() {
     if (ratio && Number.isFinite(value) && value > 0) {
       setHeight(Math.max(1, Math.round(value / ratio)));
     }
+  }
+
+  function updateLayers(next: ImageLayer[]) {
+    setLayers(next);
+  }
+  function addLayer(kind: ImageLayer["kind"]) {
+    const layer: ImageLayer = { id: crypto.randomUUID(), kind, x: Math.round(width * 0.1), y: Math.round(height * 0.1), width: Math.max(40, Math.round(width * 0.35)), height: Math.max(32, Math.round(height * 0.18)), fontSize: 48, fill: kind === "text" ? "#ffffff" : "#ec4899", text: "Your text", visible: true };
+    updateLayers([...layers, layer]); setSelectedLayerId(layer.id);
+  }
+  function updateLayer(id: string, values: Partial<ImageLayer>) {
+    updateLayers(layers.map((layer) => layer.id === id ? { ...layer, ...values } : layer));
+  }
+  function reorderLayer(id: string, direction: -1 | 1) {
+    const index = layers.findIndex((layer) => layer.id === id), nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= layers.length) return;
+    const next = [...layers]; [next[index], next[nextIndex]] = [next[nextIndex], next[index]]; updateLayers(next);
+  }
+  function undoEdit() {
+    const previous = undoImageEdit(historyRef.current); if (!previous) return;
+    applySettings(previous);
+    refreshHistory((version) => version + 1);
+  }
+  function redoEdit() {
+    const next = redoImageEdit(historyRef.current); if (!next) return;
+    applySettings(next);
+    refreshHistory((version) => version + 1);
   }
 
   function changeHeight(value: number) {
@@ -177,18 +231,33 @@ export function ImageResizeTool() {
   function download() {
     const canvas = canvasRef.current;
     if (!canvas || !source || !outputValid) return;
-    canvas.toBlob((blob) => {
+    const quality = Number(jpegQuality);
+    if (exportFormat === "jpeg" && (!Number.isFinite(quality) || quality < 0 || quality > 1)) {
+      setError("JPEG quality must be a number from 0 through 1.");
+      return;
+    }
+    let outputCanvas = canvas;
+    if (exportFormat === "jpeg") {
+      outputCanvas = document.createElement("canvas");
+      outputCanvas.width = canvas.width; outputCanvas.height = canvas.height;
+      const context = outputCanvas.getContext("2d");
+      if (!context) { setError("This browser could not prepare the JPEG export."); return; }
+      context.fillStyle = "#ffffff"; context.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+      context.drawImage(canvas, 0, 0);
+    }
+    const mime = exportFormat === "jpeg" ? "image/jpeg" : "image/png";
+    outputCanvas.toBlob((blob) => {
       if (!blob) {
-        setError("The resized image could not be exported.");
+        setError(`The ${exportFormat.toUpperCase()} image could not be exported.`);
         return;
       }
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${source.file.name.replace(/\.[^.]+$/, "")}-${rotatedWidth}x${rotatedHeight}.png`;
+      anchor.download = `${source.file.name.replace(/\.[^.]+$/, "")}-${rotatedWidth}x${rotatedHeight}.${exportFormat === "jpeg" ? "jpg" : "png"}`;
       anchor.click();
-      URL.revokeObjectURL(url);
-    }, "image/png");
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }, mime, exportFormat === "jpeg" ? quality : undefined);
   }
 
   return (
@@ -198,11 +267,11 @@ export function ImageResizeTool() {
         <nav aria-label="Main navigation"><a href="/projects">Projects</a></nav>
       </header>
       <section className="resize-intro">
-        <p className="eyebrow">IMAGE TOOL · PRIVATE BY DESIGN</p>
-        <h1>Resize and adjust your image.</h1>
-        <p>Set exact output pixels and tune brightness, contrast, and saturation. Your image stays in this browser.</p>
+        <p className="eyebrow">{workspace ? "IMAGE STUDIO · LOCAL PROJECT" : "IMAGE TOOL · PRIVATE BY DESIGN"}</p>
+        <h1>{workspace ? "Edit your image project." : "Resize and adjust your image."}</h1>
+        <p>{workspace ? "Resize, rotate, flip, adjust color, and arrange editable text and shape layers. Project instructions and source image stay on this device." : "Set exact output pixels and tune brightness, contrast, and saturation. Your image stays in this browser."}</p>
       </section>
-      <section className="resize-workspace" aria-label="Image resizing workspace">
+      <section className="resize-workspace" aria-label="Image resizing workspace" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); importImage(event.dataTransfer.files?.[0]); }}>
         <div className="resize-controls">
           <label className="file-picker">
             <span>{source ? "Choose another image" : "Choose an image"}</span>
@@ -222,9 +291,28 @@ export function ImageResizeTool() {
             <label>Contrast <span>0–300%</span><input type="number" min="0" max="300" step="any" value={contrast} onChange={(event) => setContrast(event.currentTarget.value)} /></label>
             <label>Saturation <span>0–300%</span><input type="number" min="0" max="300" step="any" value={saturation} onChange={(event) => setSaturation(event.currentTarget.value)} /></label>
           </div>
+          <div className="speed-presets" aria-label="Common image filter presets"><button type="button" onClick={() => { setBrightness("100"); setContrast("100"); setSaturation("0"); }}>Grayscale</button><button type="button" onClick={() => { setBrightness("105"); setContrast("115"); setSaturation("135"); }}>Vivid</button><button type="button" onClick={() => { setBrightness("100"); setContrast("92"); setSaturation("75"); }}>Muted</button><button type="button" onClick={() => { setBrightness("100"); setContrast("100"); setSaturation("100"); }}>Reset filters</button></div>
           <label className="speed-field">Rotation <span>custom degrees · −180 to 180</span><input type="number" min="-180" max="180" step="any" value={rotation} onChange={(event) => setRotation(event.currentTarget.value)} /></label>
           <label className="ratio-toggle"><input type="checkbox" checked={flipHorizontal} onChange={(event) => setFlipHorizontal(event.currentTarget.checked)} /> Flip horizontally</label>
-          <button className="export-button" type="button" disabled={!source || !outputValid} onClick={download}>Download PNG</button>
+          <label className="ratio-field">Export format<select value={exportFormat} onChange={(event) => setExportFormat(event.currentTarget.value as "png" | "jpeg")}><option value="png">PNG (lossless, transparency)</option><option value="jpeg">JPEG (white background)</option></select></label>
+          {exportFormat === "jpeg" && <label className="speed-field">JPEG quality <span>custom value from 0 to 1</span><input type="number" min="0" max="1" step="any" value={jpegQuality} onChange={(event) => setJpegQuality(event.currentTarget.value)} /></label>}
+          <section className="image-layers" aria-label="Image layers">
+            <div className="preview-heading"><strong>Layers</strong><span>{layers.length}</span></div>
+            <div className="image-layer-actions"><button type="button" className="secondary-button" disabled={!source} onClick={() => addLayer("text")}>Add text</button><button type="button" className="secondary-button" disabled={!source} onClick={() => addLayer("rectangle")}>Add rectangle</button><button type="button" className="secondary-button" disabled={!source} onClick={() => addLayer("ellipse")}>Add ellipse</button></div>
+            <div className="image-layer-list">{layers.map((layer, index) => <div className={`image-layer-row ${selectedLayerId === layer.id ? "selected" : ""}`} key={layer.id}><button type="button" className="image-layer-select" onClick={() => setSelectedLayerId(layer.id)}>{index + 1}. {layer.kind === "text" ? layer.text || "Text" : layer.kind}</button><button type="button" aria-label={`Move layer ${index + 1} up`} disabled={index === 0} onClick={() => reorderLayer(layer.id, -1)}>↑</button><button type="button" aria-label={`Move layer ${index + 1} down`} disabled={index === layers.length - 1} onClick={() => reorderLayer(layer.id, 1)}>↓</button><button type="button" aria-label={`Remove layer ${index + 1}`} onClick={() => { updateLayers(layers.filter((item) => item.id !== layer.id)); if (selectedLayerId === layer.id) setSelectedLayerId(""); }}>×</button></div>)}</div>
+            {selectedLayer && <div className="filter-fields two-column transform-fields">
+              <label>Layer left <span>px</span><input type="number" step="any" value={selectedLayer.x} onChange={(event) => updateLayer(selectedLayer.id, { x: event.currentTarget.valueAsNumber })} /></label>
+              <label>Layer top <span>px</span><input type="number" step="any" value={selectedLayer.y} onChange={(event) => updateLayer(selectedLayer.id, { y: event.currentTarget.valueAsNumber })} /></label>
+              <label>Layer width <span>px</span><input type="number" min="1" step="any" value={selectedLayer.width} onChange={(event) => updateLayer(selectedLayer.id, { width: event.currentTarget.valueAsNumber })} /></label>
+              <label>Layer height <span>px</span><input type="number" min="1" step="any" value={selectedLayer.height} onChange={(event) => updateLayer(selectedLayer.id, { height: event.currentTarget.valueAsNumber })} /></label>
+              {selectedLayer.kind === "text" && <label>Font size <span>px</span><input type="number" min="8" max="512" step="any" value={selectedLayer.fontSize} onChange={(event) => updateLayer(selectedLayer.id, { fontSize: event.currentTarget.valueAsNumber })} /></label>}
+              <label>Layer color<input type="color" value={selectedLayer.fill} onChange={(event) => updateLayer(selectedLayer.id, { fill: event.currentTarget.value })} /></label>
+              {selectedLayer.kind === "text" && <label className="ratio-field">Text<textarea rows={2} maxLength={500} value={selectedLayer.text} onChange={(event) => updateLayer(selectedLayer.id, { text: event.currentTarget.value })} /></label>}
+              <label className="ratio-toggle"><input type="checkbox" checked={selectedLayer.visible} onChange={(event) => updateLayer(selectedLayer.id, { visible: event.currentTarget.checked })} />Show layer</label>
+            </div>}
+            <div className="image-layer-actions"><button type="button" className="secondary-button" disabled={historyRef.current.undo.length === 0} onClick={undoEdit}>Undo</button><button type="button" className="secondary-button" disabled={historyRef.current.redo.length === 0} onClick={redoEdit}>Redo</button></div>
+          </section>
+          <button className="export-button" type="button" disabled={!source || !outputValid} onClick={download}>Download {exportFormat.toUpperCase()}</button>
           {error && <p className="resize-error" role="alert">{error}</p>}
         </div>
         <div className="resize-preview">

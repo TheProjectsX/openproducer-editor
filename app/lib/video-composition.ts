@@ -1,5 +1,7 @@
 import type { VideoTimelineAsset, VideoTimelineClip, VideoTimelineProject } from "./project-store";
 import { evaluateClipKeyframes, evaluateClipTransition } from "./video-keyframes";
+import { getClipLength } from "./video-timing";
+export { getClipLength } from "./video-timing";
 
 export type VideoMediaElements = { videos: Record<string, HTMLVideoElement>; images: Record<string, HTMLImageElement> };
 
@@ -14,7 +16,7 @@ export function drawVideoComposition(
   const context = canvas.getContext("2d");
   if (!context) throw new Error("This browser cannot create a 2D canvas renderer.");
   context.fillStyle = "#11131a"; context.fillRect(0, 0, canvas.width, canvas.height);
-  const clips = timeline.clips.filter((clip) => clip.track >= 0 && time >= clip.start && time < clip.start + getClipLength(clip)).sort((a, b) => a.track - b.track);
+  const clips = timeline.clips.filter((clip) => clip.track >= 0 && time >= clip.start && time < clip.start + getClipLength(clip)).sort((a, b) => a.track - b.track || a.start - b.start);
   for (const clip of clips) {
     const asset = assets.find((item) => item.id === clip.assetId);
     const clipTime = time - clip.start;
@@ -50,8 +52,4 @@ export function drawVideoComposition(
     context.drawImage(source, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
     context.restore();
   }
-}
-
-export function getClipLength(clip: VideoTimelineClip) {
-  return Math.max(0, (clip.sourceEnd - clip.sourceStart) / clip.speed);
 }
