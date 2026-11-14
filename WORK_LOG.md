@@ -274,4 +274,12 @@
 - Added custom per-clip linear fade-in and fade-out durations for video, image, and text overlay clips. Opacity ramps are evaluated in the shared canvas compositor, so preview and export use the same transition behavior and lower lanes show through.
 - Updated the editor guidance and feature matrix. Audio crossfades and other transition curves remain unimplemented.
 - Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
+- Commit: `3979b03 feat: add custom video fade transitions`.
+
+## 2026-11-14 — M6 clip keyframes
+
+- Added optional clip-relative keyframes that capture transforms and audio volume at the playhead. Inspector controls show interpolated values; changing those controls after the first key updates the key at that time.
+- Added linear interpolation shared by the video compositor, live audio preview, and exported audio mix. The model remains backward compatible for clips without keyframes.
+- Updated the feature matrix and implementation decisions.
+- Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
 - Commit: pending.

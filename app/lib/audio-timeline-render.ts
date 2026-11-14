@@ -44,8 +44,10 @@ export async function renderTimelineAudio(
       const right = buffer.numberOfChannels > 1 ? buffer.getChannelData(1).subarray(startFrame, endFrame) : left;
       const stretcher = new BungeeStretcher(module, { sampleRate: rate, channels: 2 });
       try {
+        const keyframes = [...(clip.keyframes ?? [])].sort((a, b) => a.time - b.time);
+        let keyframeIndex = 0;
         const transport = new Transport(stretcher, sourceFrames);
-        transport.setSource("clip", { left, right }, { gain: clip.muted ? 0 : clip.volume, pan: 0 });
+        transport.setSource("clip", { left, right }, { gain: clip.muted ? 0 : clip.keyframes?.length ? 1 : clip.volume, pan: 0 });
         transport.speed = clip.speed; transport.play();
         const outputFrames = Math.min(Math.ceil(sourceFrames / clip.speed), sampleCount - Math.round(clip.start * OUTPUT_SAMPLE_RATE));
         const destination = Math.max(0, Math.round(clip.start * OUTPUT_SAMPLE_RATE));
@@ -56,8 +58,13 @@ export async function renderTimelineAudio(
           const blockLeft = new Float32Array(length); const blockRight = new Float32Array(length);
           transport.render(blockLeft, blockRight, length);
           for (let sample = 0; sample < length; sample++) {
-            mixedLeft[destination + offset + sample] += blockLeft[sample];
-            mixedRight[destination + offset + sample] += blockRight[sample];
+            const localTime = (offset + sample) / OUTPUT_SAMPLE_RATE;
+            while (keyframeIndex < keyframes.length - 2 && keyframes[keyframeIndex + 1].time < localTime) keyframeIndex++;
+            const left = keyframes[keyframeIndex]; const right = keyframes[keyframeIndex + 1];
+            const animatedGain = !left ? clip.volume : !right ? left.volume : left.volume + (right.volume - left.volume) * Math.max(0, Math.min(1, (localTime - left.time) / Math.max(0.001, right.time - left.time)));
+            const gain = clip.muted ? 0 : keyframes.length ? animatedGain : clip.volume;
+            mixedLeft[destination + offset + sample] += blockLeft[sample] * gain;
+            mixedRight[destination + offset + sample] += blockRight[sample] * gain;
           }
           if (offset % (chunkSize * 32) === 0) {
             onProgress(20 + Math.round(((clipIndex + offset / Math.max(outputFrames, 1)) / audioClips.length) * 70));

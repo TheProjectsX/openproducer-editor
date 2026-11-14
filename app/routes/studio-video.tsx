@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router";
 import type { Route } from "./+types/studio-video";
 import { getProject, readVideoAsset, saveVideoTimeline, type VideoTimelineAsset, type VideoTimelineClip, type VideoTimelineProject } from "../lib/project-store";
 import { drawVideoComposition, getClipLength } from "../lib/video-composition";
+import { evaluateClipKeyframes, upsertClipKeyframe } from "../lib/video-keyframes";
 import { renderTimelineAudio } from "../lib/audio-timeline-render";
 import wasmUrl from "bungee-web/bungee.wasm?url";
 
@@ -48,7 +49,8 @@ export default function VideoStudio() {
   timelineRef.current = timeline;
   const selectedClip = timeline.clips.find((clip) => clip.id === selected);
   const selectedAsset = selectedClip && timeline.assets.find((asset) => asset.id === selectedClip.assetId);
-  const selectedTransform = selectedClip?.transform ?? IDENTITY_TRANSFORM;
+  const selectedValues = selectedClip ? evaluateClipKeyframes(selectedClip, Math.max(0, timeline.playhead - selectedClip.start)) : null;
+  const selectedTransform = selectedValues?.transform ?? IDENTITY_TRANSFORM;
   const sourceFile = selectedClip ? files[selectedClip.assetId] : undefined;
 
   useEffect(() => {
@@ -110,7 +112,7 @@ export default function VideoStudio() {
       const expected = clip.sourceStart + (current.playhead - clip.start) * clip.speed;
       if (Math.abs(audio.currentTime - expected) > 0.35) audio.currentTime = expected;
       audio.playbackRate = clip.speed; audio.preservesPitch = true;
-      audio.volume = Math.max(0, Math.min(1, clip.volume)); audio.muted = clip.muted;
+      audio.volume = Math.max(0, Math.min(1, evaluateClipKeyframes(clip, Math.max(0, current.playhead - clip.start)).volume)); audio.muted = clip.muted;
       if (playing && audio.paused) void audio.play().catch(() => setError("Audio preview was blocked by this browser. Press Play again to allow local audio preview."));
       if (!playing && !audio.paused) audio.pause();
     }
@@ -168,9 +170,25 @@ export default function VideoStudio() {
 
   function editClip(id: string, patch: Partial<VideoTimelineClip>) {
     applyTimelineEdit((current) => {
-      const clips = current.clips.map((clip) => clip.id === id ? { ...clip, ...patch } : clip);
+      const clips = current.clips.map((clip) => {
+        if (clip.id !== id) return clip;
+        const updated = { ...clip, ...patch };
+        if (clip.keyframes?.length && (patch.transform || patch.volume !== undefined)) {
+          const time = Math.max(0, Math.min(clipLength(clip), timeline.playhead - clip.start));
+          const values = evaluateClipKeyframes(clip, time);
+          updated.keyframes = upsertClipKeyframe(clip, { time, transform: patch.transform ?? values.transform, volume: patch.volume ?? values.volume });
+        }
+        return updated;
+      });
       return { ...current, clips, duration: Math.max(0, ...clips.map((clip) => clip.start + clipLength(clip))) };
     });
+  }
+  function addOrUpdateKeyframe() {
+    if (!selectedClip) return;
+    const time = Math.max(0, Math.min(clipLength(selectedClip), timeline.playhead - selectedClip.start));
+    const values = evaluateClipKeyframes(selectedClip, time);
+    editClip(selectedClip.id, { keyframes: upsertClipKeyframe(selectedClip, { time, ...values }) });
+    setStatus(`Keyframe set at ${time.toFixed(2)} seconds in the selected clip.`);
   }
   function addTitle() {
     const asset: VideoTimelineAsset = { id: crypto.randomUUID(), name: "Text title", type: "text/plain", size: 0, duration: 3600, kind: "text", textSettings: { text: "Your title", fontSize: 72, color: "#ffffff", backgroundColor: "#172033", showBackground: false } };
@@ -248,7 +266,7 @@ export default function VideoStudio() {
       const audio = audioRefs.current[clip.id];
       if (!audio) continue;
       audio.currentTime = clip.sourceStart + (timeline.playhead - clip.start) * clip.speed;
-      audio.playbackRate = clip.speed; audio.preservesPitch = true; audio.volume = Math.max(0, Math.min(1, clip.volume)); audio.muted = clip.muted;
+      audio.playbackRate = clip.speed; audio.preservesPitch = true; audio.volume = Math.max(0, Math.min(1, evaluateClipKeyframes(clip, Math.max(0, timeline.playhead - clip.start)).volume)); audio.muted = clip.muted;
       void audio.play().catch(() => setError("Audio preview was blocked by this browser. Press Play again to allow local audio preview."));
     }
     setPlaying(true);
@@ -362,7 +380,9 @@ export default function VideoStudio() {
           <label className="speed-field">Source in <span>seconds</span><input type="number" min="0" max={selectedAsset?.duration} step="any" value={selectedClip.sourceStart} onChange={(event) => editClip(selectedClip.id, { sourceStart: Math.max(0, Math.min(selectedClip.sourceEnd - 0.01, Number(event.currentTarget.value) || 0)) })} /></label>
           <label className="speed-field">Source out <span>seconds</span><input type="number" min="0.01" max={selectedAsset?.duration} step="any" value={selectedClip.sourceEnd} onChange={(event) => editClip(selectedClip.id, { sourceEnd: Math.min(selectedAsset?.duration ?? selectedClip.sourceEnd, Math.max(selectedClip.sourceStart + 0.01, Number(event.currentTarget.value) || 0)) })} /></label>
           <label className="speed-field">Speed <span>custom 0.1-16x</span><input type="number" min="0.1" max="16" step="any" value={selectedClip.speed} onChange={(event) => editClip(selectedClip.id, { speed: Math.max(0.1, Math.min(16, Number(event.currentTarget.value) || 1)) })} /></label>
-          <label className="speed-field">Volume <span>custom 0-1x</span><input type="number" min="0" max="1" step="any" value={selectedClip.volume} onChange={(event) => editClip(selectedClip.id, { volume: Math.max(0, Math.min(1, Number(event.currentTarget.value) || 0)) })} /></label>
+          <label className="speed-field">Volume <span>custom 0-1x</span><input type="number" min="0" max="1" step="any" value={selectedValues?.volume ?? selectedClip.volume} onChange={(event) => editClip(selectedClip.id, { volume: Math.max(0, Math.min(1, Number(event.currentTarget.value) || 0)) })} /></label>
+          <button className="secondary-button editor-action" onClick={addOrUpdateKeyframe}>Add/update keyframe at playhead</button>
+          <p className="resize-note">{selectedClip.keyframes?.length ?? 0} keyframe(s). Values interpolate linearly between keys in clip-relative seconds.</p>
           {selectedAsset?.kind === "text" && selectedAsset.textSettings && <div className="title-inspector">
             <label className="ratio-field">Title text<textarea rows={3} maxLength={500} value={selectedAsset.textSettings.text} onChange={(event) => editTitleAsset(selectedAsset.id, { ...selectedAsset.textSettings!, text: event.currentTarget.value })} /></label>
             <label className="speed-field">Font size <span>custom 8-512 px</span><input type="number" min="8" max="512" step="any" value={selectedAsset.textSettings.fontSize} onChange={(event) => editTitleAsset(selectedAsset.id, { ...selectedAsset.textSettings!, fontSize: Math.max(8, Math.min(512, Number(event.currentTarget.value) || 72)) })} /></label>

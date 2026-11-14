@@ -1,4 +1,5 @@
 import type { VideoTimelineAsset, VideoTimelineClip, VideoTimelineProject } from "./project-store";
+import { evaluateClipKeyframes } from "./video-keyframes";
 
 export type VideoMediaElements = { videos: Record<string, HTMLVideoElement>; images: Record<string, HTMLImageElement> };
 
@@ -24,7 +25,7 @@ export function drawVideoComposition(
     const fadeOutAlpha = fadeOut > 0 ? Math.min(1, (clipDuration - clipTime) / fadeOut) : 1;
     const transitionAlpha = Math.min(fadeInAlpha, fadeOutAlpha);
     if (asset?.kind === "text" && asset.textSettings) {
-      const transform = clip.transform ?? { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 };
+      const transform = evaluateClipKeyframes(clip, clipTime).transform;
       const settings = asset.textSettings;
       const fontSize = Math.max(8, Math.min(512, settings.fontSize * transform.scale));
       const lines = settings.text.split("\n");
@@ -43,7 +44,7 @@ export function drawVideoComposition(
     const height = source instanceof HTMLVideoElement ? source.videoHeight : source instanceof HTMLImageElement ? source.naturalHeight : 0;
     if (!source || width === 0 || height === 0 || (source instanceof HTMLVideoElement && source.readyState < 2)) continue;
     const fitScale = Math.min(canvas.width / width, canvas.height / height);
-    const transform = clip.transform ?? { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 };
+    const transform = evaluateClipKeyframes(clip, clipTime).transform;
     const drawWidth = width * fitScale * transform.scale; const drawHeight = height * fitScale * transform.scale;
     context.save();
     context.globalAlpha = Math.max(0, Math.min(1, transform.opacity * transitionAlpha));
