@@ -115,4 +115,12 @@
 - Uses Mediabunny browser-side conversion and predicts PCM output size before export; input and output are capped at 512 MiB.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/video/extract-audio`; the lazy Mediabunny bundle is now 614.01 kB minified and triggers Vite's chunk-size warning.
 - Limitation: this exports only the primary audio track and depends on browser decoding/encoding support; broader audio format selection and streaming writes remain future improvements.
+- Commit: `9510506 feat: add local video audio extraction`.
+
+## 2026-11-14 — M0 audio split prototype
+
+- Added `/tools/audio/split` with arbitrary comma-separated custom cut timestamps, segment plan preview, and multi-file 16-bit PCM WAV output packaged into a ZIP.
+- Added `fflate` 0.8.3 (MIT) for local ZIP creation; source decoding is capped at 512 MiB and combined output at 256 MiB.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/audio/split`; the generated offline worker includes 26 static assets and 11 HTML routes.
+- Limitation: full decoded source, WAV segments, and ZIP are memory-backed; long files need worker/streaming export before production use.
 - Commit: pending.
