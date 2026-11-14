@@ -21,7 +21,7 @@
 - Removed `app-scaffold/` after confirming the root app, package files, and root `node_modules/.bin/react-router.cmd` existed. This also removed the only nested `.git`; the project now has one Git repository.
 - Moved the handoff README and all 11 guides into `project_research/`; `AGENTS.md` remains at the root. Root app README documents npm commands and the research folder.
 - Build result: Vite 8.3.8 and React Router 8.5.1 compiled successfully; React Router prerendered `/` to `build/client/index.html` and emitted the SPA fallback.
-- Commit: pending.
+- Commit: `08da46d chore: initialize static app in root workspace`.
 
 ## 2026-11-14 — M0 audio trim prototype
 
@@ -29,7 +29,7 @@
 - Implemented local audio decoding, exact custom start/end times, selected-range preview, and PCM 16-bit WAV export that preserves sample rate and channel count.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/audio/trim`.
 - Limitation: this prototype decodes the complete input into memory and does not yet persist an editable project; derive safe file limits and move large jobs to workers during feasibility work.
-- Commit: pending.
+- Commit: `334efe6 feat: add local audio trim prototype`.
 
 ## 2026-11-14 — M0 custom audio speed prototype
 
@@ -38,7 +38,7 @@
 - Export estimates output size and disables rendering above a 512 MB prototype limit to avoid predictable memory exhaustion.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/audio/speed`, including the local WASM and worklet assets.
 - Limitation: large-source decode and export still use in-memory audio buffers; benchmark quality and memory across the speed range before calling the M0 audio gate complete.
-- Commit: pending.
+- Commit: `6c141e6 feat: add pitch-preserving audio speed prototype`.
 
 ## 2026-11-14 — M0 image resize prototype
 
@@ -47,7 +47,7 @@
 - Added responsive styling and removed the starter welcome screen from the primary route.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/` plus `/tools/image/resize`.
 - Limitation: this is a feasibility prototype, not yet connected to local project persistence or a dedicated worker. Large-image limits still need measurement.
-- Commit: pending.
+- Commit: `7b09843 feat: add local exact image resize prototype`.
 
 ## 2026-11-14 — M0 video trim/export prototype
 
@@ -56,7 +56,7 @@
 - Added a 512 MiB source-file ceiling because this prototype buffers exported output in memory; error messaging explains compatibility and memory limitations.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/video/trim`; Vite reports one 600.79 kB minified lazy media-processing chunk, which is expected from the codec library and should be profiled/code-split as the tool set grows.
 - Limitation: this is a single-range trim proof of feasibility, not a CapCut-style timeline. Browser codec support, trim boundaries, and output quality vary by media; sample files still need interactive browser QA.
-- Commit: pending.
+- Commit: `b0da596 feat: add local video trim prototype`.
 
 ## 2026-11-14 — M0 audio merge prototype
 
@@ -64,4 +64,12 @@
 - Added linear resampling to the highest input sample rate and mono-to-multichannel duplication where needed. Decoded and exported buffers each have a 512 MiB prototype guard.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/audio/merge`; the existing 600.79 kB lazy media-processing chunk warning remains.
 - Limitation: export renders the entire file in memory and uses 16-bit PCM WAV; workers, streaming output, project persistence, and broader export formats remain future work.
+- Commit: `ab575d7 feat: add local audio merge prototype`.
+
+## 2026-11-14 — M0 image aspect controls
+
+- Expanded `/tools/image/resize` with selectable free/original/common/custom ratios. Locked ratios update the paired dimension when either width or height changes; free mode keeps independent custom dimensions.
+- Kept the full-frame resize behavior without cropping or padding, and added a 100-megapixel / 32,768-pixel-per-side guard to prevent unreasonable canvas allocations.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered the updated `/tools/image/resize` route; the existing lazy media-processing chunk warning remains.
+- Limitation: browser canvas resampling is not a dedicated high-quality image-processing pipeline; image editing filters, layers, and AI upscaling remain separate work.
 - Commit: pending.

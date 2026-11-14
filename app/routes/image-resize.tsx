@@ -19,11 +19,19 @@ export default function ImageResize() {
   const [source, setSource] = useState<SourceImage | null>(null);
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
-  const [matchRatio, setMatchRatio] = useState(false);
+  const [ratioMode, setRatioMode] = useState("free");
+  const [customRatioWidth, setCustomRatioWidth] = useState("1");
+  const [customRatioHeight, setCustomRatioHeight] = useState("1");
   const [error, setError] = useState("");
 
-  const aspectRatio = source ? source.width / source.height : 1;
-  const outputValid = Number.isInteger(width) && width > 0 && Number.isInteger(height) && height > 0;
+  const originalRatio = source ? source.width / source.height : 1;
+  const selectedRatio = ratioMode === "free" ? null
+    : ratioMode === "original" ? originalRatio
+      : ratioMode === "custom" ? Number(customRatioWidth) / Number(customRatioHeight)
+        : Number(ratioMode.split(":")[0]) / Number(ratioMode.split(":")[1]);
+  const ratio = selectedRatio !== null && Number.isFinite(selectedRatio) && selectedRatio > 0 ? selectedRatio : null;
+  const outputValid = Number.isInteger(width) && width > 0 && Number.isInteger(height) && height > 0
+    && width <= 32768 && height <= 32768 && width * height <= 100_000_000;
   const ratioText = useMemo(
     () => (source ? `${source.width} × ${source.height}` : "No image selected"),
     [source],
@@ -79,21 +87,26 @@ export default function ImageResize() {
 
   function changeWidth(value: number) {
     setWidth(value);
-    if (matchRatio && Number.isFinite(value) && value > 0) {
-      setHeight(Math.max(1, Math.round(value / aspectRatio)));
+    if (ratio && Number.isFinite(value) && value > 0) {
+      setHeight(Math.max(1, Math.round(value / ratio)));
     }
   }
 
   function changeHeight(value: number) {
     setHeight(value);
-    if (matchRatio && Number.isFinite(value) && value > 0) {
-      setWidth(Math.max(1, Math.round(value * aspectRatio)));
+    if (ratio && Number.isFinite(value) && value > 0) {
+      setWidth(Math.max(1, Math.round(value * ratio)));
     }
   }
 
-  function toggleRatio(enabled: boolean) {
-    setMatchRatio(enabled);
-    if (enabled && source) setHeight(Math.max(1, Math.round(width / aspectRatio)));
+  function chooseRatio(value: string) {
+    setRatioMode(value);
+    if (value !== "free" && source) {
+      const nextRatio = value === "original" ? originalRatio
+        : value === "custom" ? Number(customRatioWidth) / Number(customRatioHeight)
+          : Number(value.split(":")[0]) / Number(value.split(":")[1]);
+      if (Number.isFinite(nextRatio) && nextRatio > 0) setHeight(Math.max(1, Math.round(width / nextRatio)));
+    }
   }
 
   function download() {
@@ -135,8 +148,9 @@ export default function ImageResize() {
             <label>Width <span>px</span><input type="number" min="1" step="1" value={width || ""} onChange={(event) => changeWidth(event.currentTarget.valueAsNumber)} /></label>
             <label>Height <span>px</span><input type="number" min="1" step="1" value={height || ""} onChange={(event) => changeHeight(event.currentTarget.valueAsNumber)} /></label>
           </div>
-          <label className="ratio-toggle"><input type="checkbox" checked={matchRatio} onChange={(event) => toggleRatio(event.currentTarget.checked)} /> Match aspect ratio</label>
-          <p className="resize-note">{matchRatio ? "The other dimension follows the original image ratio." : "Independent dimensions stretch the full image. No crop or padding is added."}</p>
+          <label className="ratio-field">Aspect ratio<select value={ratioMode} onChange={(event) => chooseRatio(event.currentTarget.value)}><option value="free">Custom dimensions (stretch)</option><option value="original">Original ratio</option><option value="1:1">1:1 · Square</option><option value="4:3">4:3</option><option value="3:2">3:2</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="custom">Custom ratio</option></select></label>
+          {ratioMode === "custom" && <div className="dimension-fields"><label>Ratio width<input type="number" min="1" step="any" value={customRatioWidth} onChange={(event) => { setCustomRatioWidth(event.currentTarget.value); if (Number(event.currentTarget.value) > 0) setHeight(Math.max(1, Math.round(width * Number(customRatioHeight) / Number(event.currentTarget.value)))); }} /></label><label>Ratio height<input type="number" min="1" step="any" value={customRatioHeight} onChange={(event) => { setCustomRatioHeight(event.currentTarget.value); if (Number(event.currentTarget.value) > 0) setHeight(Math.max(1, Math.round(width * Number(event.currentTarget.value) / Number(customRatioWidth)))); }} /></label></div>}
+          <p className="resize-note">{ratio ? "Changing either dimension keeps the selected ratio. The full image is stretched to fit; no crop or padding is added." : "Custom dimensions resize the full image without cropping or padding."} Exports are limited to 100 megapixels and 32,768 px per side.</p>
           <button className="export-button" type="button" disabled={!source || !outputValid} onClick={download}>Download PNG</button>
           {error && <p className="resize-error" role="alert">{error}</p>}
         </div>

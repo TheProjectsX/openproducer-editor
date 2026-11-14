@@ -52,6 +52,8 @@ a { color: inherit; }
 .speed-presets button:hover { border-color: #6574db; color: #3949b5; }
 .ratio-toggle { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 650; }
 .ratio-toggle input { width: 17px; height: 17px; accent-color: #5364d7; }
+.ratio-field { display: flex; flex-direction: column; gap: 8px; color: #505d75; font-size: 13px; font-weight: 700; }
+.ratio-field select { width: 100%; border: 1px solid #d9deea; border-radius: 9px; padding: 12px 10px; background: #fff; color: #172033; font: inherit; font-size: 15px; }
 .export-button { margin-top: auto; min-height: 48px; border: 0; border-radius: 11px; background: #4e5fd0; color: white; font: inherit; font-weight: 750; cursor: pointer; }
 .export-button:disabled { background: #aeb5c8; cursor: not-allowed; }
 .secondary-button { background: #263452; }
