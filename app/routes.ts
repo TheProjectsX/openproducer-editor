@@ -5,6 +5,7 @@ export default [
   route("tools/image/resize", "routes/image-resize.tsx"),
   route("tools/image/upscale", "routes/image-upscale.tsx"),
   route("tools/image/collage", "routes/image-collage.tsx"),
+  route("tools/image/crop", "routes/image-crop.tsx"),
   route("tools/audio/trim", "routes/audio-trim.tsx"),
   route("tools/audio/speed", "routes/audio-speed.tsx"),
   route("tools/audio/merge", "routes/audio-merge.tsx"),

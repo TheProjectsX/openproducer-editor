@@ -147,4 +147,12 @@
 - Uses `createImageBitmap` and Canvas locally; source files are capped at 20 and 512 MiB total, output at 100 megapixels.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/image/collage`; the generated worker contains 29 static assets and 14 HTML routes.
 - Limitation: this is a uniform grid collage with one shared fit mode; freeform cell placement, text, layers, and project persistence remain future editor work.
+- Commit: `b622d82 feat: add local image collage maker`.
+
+## 2026-11-14 — M0 explicit image crop tool
+
+- Added `/tools/image/crop` with local image import, exact left/top/width/height crop coordinates, live result preview, validation against source bounds, and PNG export.
+- Kept cropping as its own explicit workflow; exact resize continues to stretch the full source frame unless a user visits this crop tool first.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/image/crop`; the generated offline worker includes 30 static assets and 15 routes.
+- Limitation: crop selection currently uses exact fields rather than a draggable overlay; common/custom ratio constraints are future improvements.
 - Commit: pending.
