@@ -213,4 +213,12 @@
 - Updated the feature matrix and decision log to state precisely what this foundation does and does not yet render.
 - Verification: `npm run typecheck` passed. `npm run build` passed and generated `build/client/studio/video/index.html`; `build/client/sw.js` lists both `/studio/video` and `/studio/video/` for offline navigation. Browser runtime behavior has not yet been exercised.
 - Limitation: this is not yet a composed multitrack preview or MP4/WebM export. Audio mix, overlays/text, transforms/keyframes, transitions, history, and renderer parity remain subsequent M6 work.
+- Commit: `8beb57b feat: add local multitrack video timeline foundation`.
+
+## 2026-11-14 — M6 composited video preview
+
+- Replaced the single-source preview with an HTML canvas compositor that layers all active video/image clips from low to high track at the current playhead. Video sources are locally sought and played at each clip's custom speed; images retain transparency.
+- Updated the feature matrix and decision record. The preview uses fitted sources on a dark canvas and does not yet evaluate transforms, filters, titles, transitions, or audio mixing.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/studio/video`.
+- Limitation: this is an in-app visual preview only; export parity and audio synchronization are not available until the renderer and audio mixer slices land.
 - Commit: pending.
