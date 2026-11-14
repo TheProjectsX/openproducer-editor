@@ -2,7 +2,7 @@
 
 ## Dependency plan
 
-Install only the packages needed by the milestone being implemented. Pin compatible stable patches with `pnpm-lock.yaml`, then audit bundles and notices before release.
+Install only the packages needed by the milestone being implemented. Pin compatible stable patches with `package-lock.json` using npm, then audit bundles and notices before release. pnpm was evaluated but its native executable is blocked by this environment's Windows Device Guard policy.
 
 | Purpose | Preferred package/API | Packaging rule |
 |---|---|---|

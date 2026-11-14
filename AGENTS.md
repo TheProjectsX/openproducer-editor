@@ -1,6 +1,6 @@
 # Agent instructions for Local Studio
 
-Read `README.md` and all files in `docs/` before changing implementation. This directory is a handoff specification, not an existing application. Follow [docs/07-implementation-roadmap.md](docs/07-implementation-roadmap.md) in order and use [docs/08-test-and-release-plan.md](docs/08-test-and-release-plan.md) as the completion gate.
+Read the root `README.md` and the guides under `project_research/` before changing implementation. Follow [the roadmap](project_research/docs/07-implementation-roadmap.md) in order and use [the test and release plan](project_research/docs/08-test-and-release-plan.md) as the completion gate. Keep this `AGENTS.md` at the repository root.
 
 ## Non-negotiable behavior
 
