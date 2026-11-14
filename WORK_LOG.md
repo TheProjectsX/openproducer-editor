@@ -239,4 +239,4 @@
 - Updated editor capability notes and documented that undo history resets on page reload.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/studio/video`.
 - Limitation: undo history is not yet persisted and this history only covers timeline edits, not playback position or view zoom.
-- Commit: pending.
+- Commit: `079f59c feat: add video timeline undo and clip duplication`.
