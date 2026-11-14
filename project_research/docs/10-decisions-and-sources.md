@@ -50,3 +50,9 @@ These are implementation evidence, not invitations to redesign the product: refe
 ## Change log
 
 - **2026-11-14:** Initial complete handoff drafted. All project decisions above come from the planning discussion; technical sources were checked at handoff. No implementation or measured benchmark has yet been completed.
+
+## M6 implementation decisions
+
+- The first editor slice persists its versioned timeline model and source blobs in IndexedDB. OPFS migration and large-project benchmarks remain pending; the current editor caps each file at 256 MiB and each project at 512 MiB.
+- Timeline preview currently selects the topmost active visual clip and seeks/plays that source locally. It is not a composited render, and audio lanes are not yet mixed in preview.
+- Clip speed is represented in timeline duration as `(sourceEnd - sourceStart) / speed`; timeline video export and preview/export parity have not been proven.

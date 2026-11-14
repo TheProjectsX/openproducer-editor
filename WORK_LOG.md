@@ -203,4 +203,14 @@
 - Uses Mediabunny composable conversions, trims new audio to the remaining video duration, and caps each source/output at 512 MiB.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/video/replace-audio`; the generated worker now includes 35 assets and 20 routes.
 - Limitation: output requires supported video/audio browser codecs; no custom gain/fades, waveform alignment, multiple audio tracks, or streaming target yet.
+- Commit: `fa34dac feat: add local video audio replacement`.
+
+## 2026-11-14 — M6 video timeline foundation
+
+- Added `/studio/video` and wired video workspaces in Projects to open it. The home page now links creators into project creation rather than marking the studio as planned.
+- Added a versioned timeline record with local media bin, six video/audio tracks, draggable clip placement, exact source in/out and timeline start fields, split at playhead, custom clip speed/volume/mute, timeline zoom, and topmost visual source preview.
+- Source media and timeline edits persist in IndexedDB; per-file and per-project size limits are enforced. Removed media references are cleaned up when the edit model is saved.
+- Updated the feature matrix and decision log to state precisely what this foundation does and does not yet render.
+- Verification: `npm run typecheck` passed. `npm run build` passed and generated `build/client/studio/video/index.html`; `build/client/sw.js` lists both `/studio/video` and `/studio/video/` for offline navigation. Browser runtime behavior has not yet been exercised.
+- Limitation: this is not yet a composed multitrack preview or MP4/WebM export. Audio mix, overlays/text, transforms/keyframes, transitions, history, and renderer parity remain subsequent M6 work.
 - Commit: pending.

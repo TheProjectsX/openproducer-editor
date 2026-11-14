@@ -9,7 +9,12 @@ export type LocalProject = {
   imageSettings?: ImageProjectSettings;
   assetName?: string;
   assetType?: string;
+  videoTimeline?: VideoTimelineProject;
 };
+
+export type VideoTimelineAsset = { id: string; name: string; type: string; size: number; duration: number; kind: "video" | "audio" | "image" };
+export type VideoTimelineClip = { id: string; assetId: string; track: number; start: number; sourceStart: number; sourceEnd: number; speed: number; volume: number; muted: boolean };
+export type VideoTimelineProject = { version: 1; width: number; height: number; fps: number; duration: number; playhead: number; assets: VideoTimelineAsset[]; clips: VideoTimelineClip[] };
 
 export type ImageProjectSettings = {
   width: number;
@@ -157,11 +162,41 @@ export async function deleteProject(id: string): Promise<void> {
     if (directory) await directory.removeEntry("source-media").catch(() => undefined);
   } catch { /* No OPFS source to remove. */ }
   const database = await openDatabase();
+  const project = await getProject(id);
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([PROJECTS_STORE, ASSETS_STORE], "readwrite");
     transaction.objectStore(PROJECTS_STORE).delete(id);
     transaction.objectStore(ASSETS_STORE).delete(id);
+    for (const asset of project?.videoTimeline?.assets ?? []) transaction.objectStore(ASSETS_STORE).delete(asset.id);
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("Could not delete the local project."));
+  });
+}
+
+export async function saveVideoTimeline(id: string, timeline: VideoTimelineProject, files?: { id: string; file: File }[]): Promise<void> {
+  const database = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction([PROJECTS_STORE, ASSETS_STORE], "readwrite");
+    const projects = transaction.objectStore(PROJECTS_STORE);
+    const request = projects.get(id) as IDBRequest<LocalProject | undefined>;
+    request.onsuccess = () => {
+      if (!request.result || request.result.kind !== "video") { transaction.abort(); return; }
+      const nextAssetIds = new Set(timeline.assets.map((asset) => asset.id));
+      for (const asset of request.result.videoTimeline?.assets ?? []) if (!nextAssetIds.has(asset.id)) transaction.objectStore(ASSETS_STORE).delete(asset.id);
+      for (const asset of files ?? []) transaction.objectStore(ASSETS_STORE).put(asset);
+      projects.put({ ...request.result, videoTimeline: timeline, updatedAt: Date.now() });
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("Could not save the video timeline."));
+    transaction.onabort = () => reject(transaction.error ?? new Error("The video project is missing or no longer available."));
+  });
+}
+
+export async function readVideoAsset(id: string): Promise<File | null> {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const request = database.transaction(ASSETS_STORE, "readonly").objectStore(ASSETS_STORE).get(id) as IDBRequest<{ id: string; file: File } | undefined>;
+    request.onsuccess = () => resolve(request.result?.file ?? null);
+    request.onerror = () => reject(request.error ?? new Error("Could not read the saved video asset."));
   });
 }

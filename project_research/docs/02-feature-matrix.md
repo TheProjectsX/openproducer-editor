@@ -30,6 +30,8 @@ Legend: **Core** = first usable release; **AI** = subsequent downloaded-model re
 
 The video timeline is a Core feature. Standalone trim/merge cards are quick-entry workflows into this editor, not replacements for it.
 
+Implementation status (2026-11-14): `/studio/video` now has a local media bin, six independent lanes, draggable clips, numeric source in/out, split, clip speed/volume/mute, a topmost-video/image preview, and IndexedDB project/media persistence. This is the editor foundation only: composited preview, mixed audio playback, transform/text/effects, transitions, history, and timeline render/export remain unimplemented. Do not advertise the studio as a complete editor until those renderer and save/reopen/export/offline gates pass.
+
 | Release | Capability | Required behavior |
 |---|---|---|
 | Core | Media bin and timeline | Import video, audio, and images. Multiple video/overlay, text, and audio tracks; clip move, reorder, trim, split, duplicate, delete, snapping, playhead, timeline zoom, and undo/redo. |
