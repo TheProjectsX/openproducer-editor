@@ -97,5 +97,14 @@
 - Added a prerendered `/projects` page with typed audio/video/image workspace creation and deletion. The page is `noindex` and clearly states that this stage saves metadata only; editor state and source media are not yet attached.
 - Added a link to project management from the home navigation. The build-time service-worker generator includes the new prerendered route automatically.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/projects`; the generated offline worker now includes 19 assets and 8 local HTML routes.
-- Limitation: project metadata is local to the browser profile and can be removed by clearing site data. No IndexedDB media blobs, OPFS files, quota UI, or tool-to-project save integration yet.
+- Limitation at this step: project metadata was local to the browser profile and audio/video editing states were not connected.
+- Commit: `7eaf2a9 feat: add local project registry`.
+
+## 2026-11-14 — M1 image project persistence
+
+- Upgraded project storage to IndexedDB schema v2 and added image project settings, source metadata, get/update operations, and deletion cleanup.
+- Source image files use the Origin Private File System (OPFS) when available, with a Blob-in-IndexedDB fallback. Image adjustment settings auto-save and restore from `/studio/image?project=<id>`.
+- Image workspaces created from `/projects` now open the saved image editor; the route is prerendered and marked noindex. Audio/video workspace records remain metadata-only.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/studio/image`; the generated offline worker includes 23 static assets and 9 HTML routes.
+- Limitation: OPFS/browser quota errors can still prevent project media saves; there is no quota dashboard or storage cleanup UI yet.
 - Commit: pending.

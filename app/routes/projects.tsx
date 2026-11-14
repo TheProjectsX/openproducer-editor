@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/projects";
+import { useNavigate } from "react-router";
 import { createProject, deleteProject, listProjects, type LocalProject, type ProjectKind } from "../lib/project-store";
 
 export function meta({}: Route.MetaArgs) {
@@ -11,6 +12,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function Projects() {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<LocalProject[]>([]);
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<ProjectKind>("video");
@@ -29,8 +31,9 @@ export default function Projects() {
     event.preventDefault();
     if (!title.trim()) return;
     try {
-      await createProject(title, kind);
+      const project = await createProject(title, kind);
       setTitle(""); setError("");
+      if (kind === "image") { navigate(`/studio/image?project=${encodeURIComponent(project.id)}`); return; }
       await refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not create a local project."); }
   }
@@ -49,11 +52,11 @@ export default function Projects() {
         <h2>Create a workspace</h2>
         <label className="ratio-field">Project name<input required maxLength={80} value={title} onChange={(event) => setTitle(event.currentTarget.value)} placeholder="Untitled project" /></label>
         <label className="ratio-field">Workspace type<select value={kind} onChange={(event) => setKind(event.currentTarget.value as ProjectKind)}><option value="video">Video</option><option value="audio">Audio</option><option value="image">Image</option></select></label>
-        <p className="resize-note">This first storage step saves workspace metadata. Media editing state will be connected in later milestones.</p>
+        <p className="resize-note">Image workspaces open a local image editor and save the source image and resize adjustments. Audio and video workspaces currently store metadata only.</p>
         <button className="export-button" disabled={!title.trim() || loading}>Create local workspace</button>
       </form>
       <section className="resize-preview" aria-label="Saved project workspaces"><div className="preview-heading"><strong>Saved workspaces</strong><span>{projects.length} project(s)</span></div>
-        {loading ? <div className="empty-preview">Loading local project records…</div> : projects.length ? <ul className="project-list">{projects.map((project) => <li key={project.id}><div><span className="eyebrow">{project.kind.toUpperCase()} WORKSPACE</span><strong>{project.title}</strong><small>Updated {new Date(project.updatedAt).toLocaleString()}</small></div><button type="button" className="project-delete" onClick={() => void remove(project)}>Delete</button></li>)}</ul> : <div className="empty-preview">No local workspaces yet. Create one to start.</div>}
+        {loading ? <div className="empty-preview">Loading local project records…</div> : projects.length ? <ul className="project-list">{projects.map((project) => <li key={project.id}><div><span className="eyebrow">{project.kind.toUpperCase()} WORKSPACE</span><strong>{project.title}</strong><small>Updated {new Date(project.updatedAt).toLocaleString()}</small></div><div className="project-actions">{project.kind === "image" && <button type="button" className="project-open" onClick={() => navigate(`/studio/image?project=${encodeURIComponent(project.id)}`)}>Open</button>}<button type="button" className="project-delete" onClick={() => void remove(project)}>Delete</button></div></li>)}</ul> : <div className="empty-preview">No local workspaces yet. Create one to start.</div>}
         {error && <p className="resize-error" role="alert">{error}</p>}
       </section>
     </section>

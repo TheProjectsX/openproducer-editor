@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import type { Route } from "./+types/image-resize";
+import { getProject, readProjectSource, saveImageSettings, saveProjectSource, type ImageProjectSettings } from "../lib/project-store";
 
 type SourceImage = { file: File; url: string; width: number; height: number };
 
@@ -14,7 +16,9 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export default function ImageResize() {
+export function ImageResizeTool() {
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get("project");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [source, setSource] = useState<SourceImage | null>(null);
   const [width, setWidth] = useState(0);
@@ -26,6 +30,8 @@ export default function ImageResize() {
   const [contrast, setContrast] = useState("100");
   const [saturation, setSaturation] = useState("100");
   const [error, setError] = useState("");
+  const [projectTitle, setProjectTitle] = useState("");
+  const [projectStatus, setProjectStatus] = useState("");
 
   const originalRatio = source ? source.width / source.height : 1;
   const selectedRatio = ratioMode === "free" ? null
@@ -70,7 +76,43 @@ export default function ImageResize() {
     image.src = source.url;
   }, [source, width, height, outputValid, brightness, contrast, saturation]);
 
-  function importImage(file?: File) {
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const project = await getProject(projectId);
+        if (!project || project.kind !== "image") throw new Error("This image project is missing or has the wrong workspace type.");
+        const file = await readProjectSource(projectId);
+        if (cancelled) return;
+        setProjectTitle(project.title);
+        if (project.imageSettings) applySettings(project.imageSettings);
+        if (!file) { setProjectStatus("Choose an image to attach it to this project."); return; }
+        importImage(file, true, project.imageSettings);
+      } catch (cause) {
+        if (!cancelled) setProjectStatus(cause instanceof Error ? cause.message : "Could not restore this image project.");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId || !source) return;
+    const settings: ImageProjectSettings = { width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation };
+    const timeout = window.setTimeout(() => {
+      void saveImageSettings(projectId, settings).then(() => setProjectStatus("Project changes saved on this device."))
+        .catch((cause: unknown) => setProjectStatus(cause instanceof Error ? cause.message : "Could not save project changes."));
+    }, 400);
+    return () => window.clearTimeout(timeout);
+  }, [projectId, source, width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation]);
+
+  function applySettings(settings: ImageProjectSettings) {
+    setWidth(settings.width); setHeight(settings.height); setRatioMode(settings.ratioMode);
+    setCustomRatioWidth(settings.customRatioWidth); setCustomRatioHeight(settings.customRatioHeight);
+    setBrightness(settings.brightness); setContrast(settings.contrast); setSaturation(settings.saturation);
+  }
+
+  function importImage(file?: File, restoring = false, settings?: ImageProjectSettings) {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       setError("Choose an image file.");
@@ -80,9 +122,14 @@ export default function ImageResize() {
     const image = new Image();
     image.onload = () => {
       setSource({ file, url, width: image.naturalWidth, height: image.naturalHeight });
-      setWidth(image.naturalWidth);
-      setHeight(image.naturalHeight);
+      if (settings) applySettings(settings);
+      else { setWidth(image.naturalWidth); setHeight(image.naturalHeight); }
       setError("");
+      if (projectId && !restoring) {
+        setProjectStatus("Saving source image…");
+        void saveProjectSource(projectId, file).then(() => setProjectStatus("Source image saved on this device."))
+          .catch((cause: unknown) => setProjectStatus(cause instanceof Error ? cause.message : "Could not save the source image."));
+      }
     };
     image.onerror = () => {
       URL.revokeObjectURL(url);
@@ -136,7 +183,7 @@ export default function ImageResize() {
     <main className="resize-page">
       <header className="resize-header">
         <a href="/" className="brand">Local Studio</a>
-        <nav aria-label="Main navigation"><a href="/tools/image/resize">Image Resize</a></nav>
+        <nav aria-label="Main navigation"><a href="/projects">Projects</a></nav>
       </header>
       <section className="resize-intro">
         <p className="eyebrow">IMAGE TOOL · PRIVATE BY DESIGN</p>
@@ -149,6 +196,7 @@ export default function ImageResize() {
             <span>{source ? "Choose another image" : "Choose an image"}</span>
             <input type="file" accept="image/*" onChange={(event) => importImage(event.currentTarget.files?.[0])} />
           </label>
+          {projectId && <p className="resize-note" role="status">Project: {projectTitle || "Loading…"}. {projectStatus}</p>}
           {source && <p className="source-info">Original: {ratioText} px</p>}
           <div className="dimension-fields">
             <label>Width <span>px</span><input type="number" min="1" step="1" value={width || ""} onChange={(event) => changeWidth(event.currentTarget.valueAsNumber)} /></label>
@@ -173,4 +221,8 @@ export default function ImageResize() {
       </section>
     </main>
   );
+}
+
+export default function ImageResize() {
+  return <ImageResizeTool />;
 }

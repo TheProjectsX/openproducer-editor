@@ -6,11 +6,26 @@ export type LocalProject = {
   kind: ProjectKind;
   createdAt: number;
   updatedAt: number;
+  imageSettings?: ImageProjectSettings;
+  assetName?: string;
+  assetType?: string;
+};
+
+export type ImageProjectSettings = {
+  width: number;
+  height: number;
+  ratioMode: string;
+  customRatioWidth: string;
+  customRatioHeight: string;
+  brightness: string;
+  contrast: string;
+  saturation: string;
 };
 
 const DATABASE_NAME = "local-studio-projects";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const PROJECTS_STORE = "projects";
+const ASSETS_STORE = "asset-fallback";
 let databasePromise: Promise<IDBDatabase> | null = null;
 
 function openDatabase() {
@@ -23,6 +38,7 @@ function openDatabase() {
           const store = database.createObjectStore(PROJECTS_STORE, { keyPath: "id" });
           store.createIndex("updatedAt", "updatedAt");
         }
+        if (!database.objectStoreNames.contains(ASSETS_STORE)) database.createObjectStore(ASSETS_STORE, { keyPath: "id" });
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error ?? new Error("Could not open local project storage."));
@@ -30,6 +46,84 @@ function openDatabase() {
     }).catch((error: unknown) => { databasePromise = null; throw error; });
   }
   return databasePromise!;
+}
+
+export async function getProject(id: string): Promise<LocalProject | undefined> {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const request = database.transaction(PROJECTS_STORE, "readonly").objectStore(PROJECTS_STORE).get(id) as IDBRequest<LocalProject | undefined>;
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("Could not load the local project."));
+  });
+}
+
+async function updateProject(id: string, update: (project: LocalProject) => LocalProject) {
+  const database = await openDatabase();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(PROJECTS_STORE, "readwrite");
+    const store = transaction.objectStore(PROJECTS_STORE);
+    const request = store.get(id) as IDBRequest<LocalProject | undefined>;
+    request.onsuccess = () => {
+      if (!request.result) { transaction.abort(); return; }
+      store.put(update(request.result));
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("Could not update the local project."));
+    transaction.onabort = () => reject(transaction.error ?? new Error("The local project no longer exists."));
+  });
+}
+
+async function getOpfsAssetDirectory(projectId: string, create: boolean) {
+  const storage = navigator.storage as StorageManager & { getDirectory?: () => Promise<FileSystemDirectoryHandle> };
+  if (!storage.getDirectory) return null;
+  const root = await storage.getDirectory();
+  const appDirectory = await root.getDirectoryHandle("local-studio", { create });
+  const projectDirectory = await appDirectory.getDirectoryHandle(projectId, { create });
+  return projectDirectory;
+}
+
+export async function saveProjectSource(id: string, file: File): Promise<void> {
+  let storedInOpfs = false;
+  try {
+    const directory = await getOpfsAssetDirectory(id, true);
+    if (directory) {
+      const handle = await directory.getFileHandle("source-media", { create: true });
+      const writable = await handle.createWritable();
+      await writable.write(file); await writable.close(); storedInOpfs = true;
+    }
+  } catch { /* Fall back to IndexedDB when OPFS is unavailable or rejects the write. */ }
+  if (!storedInOpfs) {
+    const database = await openDatabase();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(ASSETS_STORE, "readwrite");
+      transaction.objectStore(ASSETS_STORE).put({ id, file });
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error ?? new Error("Could not save the source media locally."));
+    });
+  }
+  await updateProject(id, (project) => ({ ...project, assetName: file.name, assetType: file.type, updatedAt: Date.now() }));
+}
+
+export async function readProjectSource(id: string): Promise<File | null> {
+  try {
+    const directory = await getOpfsAssetDirectory(id, false);
+    if (directory) {
+      const handle = await directory.getFileHandle("source-media");
+      const file = await handle.getFile();
+      const project = await getProject(id);
+      return new File([file], project?.assetName ?? "source-image", { type: project?.assetType ?? file.type });
+    }
+  } catch { /* The asset may be in the IndexedDB fallback. */ }
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const request = database.transaction(ASSETS_STORE, "readonly").objectStore(ASSETS_STORE).get(id) as IDBRequest<{ id: string; file: File } | undefined>;
+    request.onsuccess = () => resolve(request.result?.file ?? null);
+    request.onerror = () => reject(request.error ?? new Error("Could not read the source media."));
+  });
+}
+
+export function saveImageSettings(id: string, imageSettings: ImageProjectSettings): Promise<void> {
+  return updateProject(id, (project) => ({ ...project, imageSettings, updatedAt: Date.now() }));
 }
 
 export async function listProjects(): Promise<LocalProject[]> {
@@ -56,10 +150,15 @@ export async function createProject(title: string, kind: ProjectKind): Promise<L
 }
 
 export async function deleteProject(id: string): Promise<void> {
+  try {
+    const directory = await getOpfsAssetDirectory(id, false);
+    if (directory) await directory.removeEntry("source-media").catch(() => undefined);
+  } catch { /* No OPFS source to remove. */ }
   const database = await openDatabase();
   return new Promise((resolve, reject) => {
-    const transaction = database.transaction(PROJECTS_STORE, "readwrite");
+    const transaction = database.transaction([PROJECTS_STORE, ASSETS_STORE], "readwrite");
     transaction.objectStore(PROJECTS_STORE).delete(id);
+    transaction.objectStore(ASSETS_STORE).delete(id);
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("Could not delete the local project."));
   });
