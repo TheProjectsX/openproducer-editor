@@ -142,6 +142,7 @@ a { color: inherit; }
 .timeline-clip strong, .timeline-clip small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .timeline-clip strong { font-size: 10px; }
 .timeline-clip small { font-size: 9px; }
+.timeline-keyframe { position: absolute; bottom: 2px; width: 6px; height: 6px; border-radius: 1px; background: #ef9d36; transform: translateX(-50%) rotate(45deg); pointer-events: none; }
 .timeline-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #eb4958; pointer-events: none; z-index: 3; }
 .editor-disclaimer { max-width: 1600px; margin: 14px auto; }
 .resize-error { margin: 0; color: #b42332; font-size: 13px; }

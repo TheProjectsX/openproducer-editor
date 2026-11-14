@@ -278,7 +278,7 @@
 
 ## 2026-11-14 — M6 clip keyframes
 
-- Added optional clip-relative keyframes that capture transforms and audio volume at the playhead. Inspector controls show interpolated values; changing those controls after the first key updates the key at that time.
+- Added optional clip-relative keyframes that capture transforms and audio volume at the playhead. Inspector controls show interpolated values; changing those controls after the first key updates the key at that time. Timeline markers show key positions, and the inspector can remove a key at the playhead.
 - Added linear interpolation shared by the video compositor, live audio preview, and exported audio mix. The model remains backward compatible for clips without keyframes.
 - Updated the feature matrix and implementation decisions.
 - Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
@@ -295,5 +295,11 @@
 
 - Extended per-clip custom fade-in/fade-out from visual clips to audio clips. Live audio preview and rendered PCM apply the same linear envelope; overlapping clips on audio lanes can now crossfade.
 - Updated the feature matrix and implementation decisions. Curved fades and source-video embedded-audio extraction in the timeline remain outstanding.
+- Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
+- Commit: `848f32e feat: add audio timeline fade transitions`.
+
+## 2026-11-14 — M6 keyframe timeline controls
+
+- Added visible keyframe markers on clip blocks and a control for removing the key at the playhead, completing basic key placement and cleanup affordances.
 - Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
 - Commit: pending.
