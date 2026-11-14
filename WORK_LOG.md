@@ -180,3 +180,11 @@
 - Verification: `npm run typecheck` passed. `npm run build` passed with all routes prerendered and the offline worker regenerated; its route/asset count remains 17/32.
 - Limitation: no arbitrary-angle drag control, vertical flip, rotation interpolation modes, or nondestructive transform stack yet.
 - Commit: pending.
+
+## 2026-11-14 — M0 custom video speed prototype
+
+- Added `/tools/video/speed` with a custom 0.1×–16× playback rate, pitch-preservation toggle, estimated output duration, local preview, and realtime browser recording.
+- Uses `HTMLMediaElement.captureStream` and `MediaRecorder` only when the browser reports a compatible capture/recording path; the output container/extension is selected from supported MIME types.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/video/speed`; the generated worker contains 33 assets and 18 routes.
+- Limitation: export runs in real time, browser codecs and captured audio behavior vary, and output is WebM in browsers without MP4 MediaRecorder support. User must inspect output, especially at extreme speeds where browsers may mute audio.
+- Commit: pending.

@@ -33,6 +33,7 @@ export default function Home() {
         <a className="tool-card" href="/tools/audio/volume"><span className="eyebrow">AUDIO</span><strong>Volume and fades</strong><span>Set custom gain, fade-in, and fade-out durations.</span><span className="tool-link">Open volume tool →</span></a>
         <a className="tool-card" href="/tools/video/trim"><span className="eyebrow">VIDEO</span><strong>Trim video</strong><span>Choose a precise range and export a local MP4.</span><span className="tool-link">Open video trim →</span></a>
         <a className="tool-card" href="/tools/video/extract-audio"><span className="eyebrow">VIDEO</span><strong>Extract video audio</strong><span>Export the primary audio track as a local WAV.</span><span className="tool-link">Open audio extractor →</span></a>
+        <a className="tool-card" href="/tools/video/speed"><span className="eyebrow">VIDEO</span><strong>Custom video speed</strong><span>Record local playback at a custom rate with browser-supported audio pitch control.</span><span className="tool-link">Open video speed →</span></a>
         <article className="tool-card coming-soon"><span className="eyebrow">VIDEO</span><strong>Multitrack video studio</strong><span>Build edits on a CapCut-style timeline.</span><span className="tool-link">Planned</span></article>
       </section>
     </main>
