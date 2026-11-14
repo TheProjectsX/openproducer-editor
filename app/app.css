@@ -75,6 +75,14 @@ a { color: inherit; }
 .clip-list li > div { display: flex; gap: 5px; }
 .clip-list button { width: 34px; height: 34px; border: 1px solid #d9deea; border-radius: 8px; background: #fff; color: #47536a; font: inherit; cursor: pointer; }
 .clip-list button:disabled { opacity: .4; cursor: default; }
+.project-layout { display: grid; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); gap: 20px; max-width: 1180px; margin: 0 auto; }
+.project-layout h2 { margin: 0; font-size: 20px; letter-spacing: -.03em; }
+.project-list { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.project-list li { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px; border: 1px solid #e1e5ee; border-radius: 12px; background: white; }
+.project-list li > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.project-list strong { overflow-wrap: anywhere; color: #36425b; }
+.project-list small { color: #79849a; }
+.project-delete { padding: 8px 10px; border: 1px solid #ead7da; border-radius: 8px; background: white; color: #a33b49; font: inherit; cursor: pointer; }
 .resize-error { margin: 0; color: #b42332; font-size: 13px; }
 .resize-preview { min-height: 430px; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
 .preview-heading { display: flex; justify-content: space-between; gap: 12px; color: #36425b; font-size: 14px; }
@@ -87,5 +95,6 @@ a { color: inherit; }
   .resize-page { padding: 0 18px 36px; }
   .resize-intro { margin: 48px auto 28px; }
   .resize-workspace { grid-template-columns: 1fr; }
+  .project-layout { grid-template-columns: 1fr; }
   .resize-preview { min-height: 300px; }
 }

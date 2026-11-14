@@ -7,4 +7,5 @@ export default [
   route("tools/audio/speed", "routes/audio-speed.tsx"),
   route("tools/audio/merge", "routes/audio-merge.tsx"),
   route("tools/video/trim", "routes/video-trim.tsx"),
+  route("projects", "routes/projects.tsx"),
 ] satisfies RouteConfig;

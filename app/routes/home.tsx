@@ -13,7 +13,7 @@ export function meta({}: Route.MetaArgs) {
 export default function Home() {
   return (
     <main className="resize-page">
-      <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/tools/image/resize">Image tools</a></nav></header>
+      <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/projects">Projects</a></nav></header>
       <section className="resize-intro">
         <p className="eyebrow">YOUR MEDIA STAYS ON YOUR DEVICE</p>
         <h1>A private workspace for audio, video, and images.</h1>

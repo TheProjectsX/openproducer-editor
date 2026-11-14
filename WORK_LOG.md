@@ -81,7 +81,7 @@
 - User-selected media is never added to service-worker caches.
 - Verification: `npm run typecheck` and the production build passed; the build generated the worker with 18 static assets and 7 prerendered HTML routes. `node --check build/client/sw.js` passed. Browser installation/offline behavior still needs hands-on verification on the deployed HTTPS origin.
 - Limitation: this is the core app shell only; project storage, OPFS, persistence UX, and large optional models are not cached or implemented. Cache install needs connectivity and enough browser storage for all listed app assets.
-- Commit: pending.
+- Commit: `fae6e5f feat: add installable offline app shell`.
 
 ## 2026-11-14 — M0 basic image adjustments
 
@@ -89,4 +89,13 @@
 - Invalid/temporarily empty inputs render with neutral 100% values, and valid values are bounded to the documented range.
 - Verification: `npm run typecheck` passed. `npm run build` passed and regenerated the prerendered image route and offline worker; the existing 600.79 kB media-processing chunk warning remains.
 - Limitation: browser canvas filters are basic destructive adjustments; there are no layers, masks, nondestructive history, or color-managed professional controls yet.
+- Commit: `3d2b784 feat: add basic image adjustment controls`.
+
+## 2026-11-14 — M1 IndexedDB project registry
+
+- Added a versioned IndexedDB store for local project records with create, list-by-recent-update, and delete operations.
+- Added a prerendered `/projects` page with typed audio/video/image workspace creation and deletion. The page is `noindex` and clearly states that this stage saves metadata only; editor state and source media are not yet attached.
+- Added a link to project management from the home navigation. The build-time service-worker generator includes the new prerendered route automatically.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/projects`; the generated offline worker now includes 19 assets and 8 local HTML routes.
+- Limitation: project metadata is local to the browser profile and can be removed by clearing site data. No IndexedDB media blobs, OPFS files, quota UI, or tool-to-project save integration yet.
 - Commit: pending.
