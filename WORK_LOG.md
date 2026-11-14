@@ -163,4 +163,12 @@
 - The tool explains that center cancellation also removes centered instruments and is not neural voice separation; mono sources are rejected with an explanation.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/audio/vocal-reducer`; the generated worker contains 31 assets and 16 routes.
 - Limitation: quality varies significantly by mix and stereo placement; actual AI vocal separation requires a separate model and license review.
+- Commit: `563db3f feat: add stereo center vocal reducer`.
+
+## 2026-11-14 — M0 audio gain and fade controls
+
+- Added `/tools/audio/volume` with custom gain from −60 to +24 dB and custom fade-in/fade-out seconds, preview comparison, and WAV export.
+- Fades use sample-level linear envelopes and validate their combined duration against the source; output preserves sample rate and channel count.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/audio/volume`; the generated worker contains 32 assets and 17 routes.
+- Limitation: this prototype renders full buffers in memory and clamps boosted samples if the selected gain clips; production export needs metering and workers.
 - Commit: pending.
