@@ -155,4 +155,12 @@
 - Kept cropping as its own explicit workflow; exact resize continues to stretch the full source frame unless a user visits this crop tool first.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/image/crop`; the generated offline worker includes 30 static assets and 15 routes.
 - Limitation: crop selection currently uses exact fields rather than a draggable overlay; common/custom ratio constraints are future improvements.
+- Commit: `0ab8071 feat: add exact image crop tool`.
+
+## 2026-11-14 — M0 stereo vocal reducer
+
+- Added `/tools/audio/vocal-reducer` with stereo-only center cancellation, custom 0–100% strength, original/processed preview, and WAV download.
+- The tool explains that center cancellation also removes centered instruments and is not neural voice separation; mono sources are rejected with an explanation.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/audio/vocal-reducer`; the generated worker contains 31 assets and 16 routes.
+- Limitation: quality varies significantly by mix and stereo placement; actual AI vocal separation requires a separate model and license review.
 - Commit: pending.
