@@ -5,5 +5,6 @@ export default [
   route("tools/image/resize", "routes/image-resize.tsx"),
   route("tools/audio/trim", "routes/audio-trim.tsx"),
   route("tools/audio/speed", "routes/audio-speed.tsx"),
+  route("tools/audio/merge", "routes/audio-merge.tsx"),
   route("tools/video/trim", "routes/video-trim.tsx"),
 ] satisfies RouteConfig;
