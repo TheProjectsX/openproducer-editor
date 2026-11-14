@@ -221,4 +221,13 @@
 - Updated the feature matrix and decision record. The preview uses fitted sources on a dark canvas and does not yet evaluate transforms, filters, titles, transitions, or audio mixing.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/studio/video`.
 - Limitation: this is an in-app visual preview only; export parity and audio synchronization are not available until the renderer and audio mixer slices land.
+- Commit: `c5c3cb5 feat: add composited video timeline preview`.
+
+## 2026-11-14 — M6 synchronized audio preview
+
+- Connected each audio clip to the shared timeline playhead. Multiple audio clips now play concurrently with custom clip offsets, source trims, speed, mute, and 0–1 volume; audio is paused outside its active timeline interval.
+- Retained pitch where supported by setting the browser media element's `preservesPitch` behavior. Play begins directly from the user action to work with autoplay policies.
+- Updated the feature matrix and browser-dependence notes. No media leaves the browser.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/studio/video`.
+- Limitation: this is browser playback preview; it does not yet create a mixed audio track in export. Pitch-preservation implementation is browser-dependent and awaits device verification.
 - Commit: pending.
