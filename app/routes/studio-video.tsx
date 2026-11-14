@@ -28,6 +28,8 @@ export default function VideoStudio() {
   const imageRefs = useRef<Record<string, HTMLImageElement>>({});
   const timelineRef = useRef(timeline);
   const drawFrameRef = useRef<() => void>(() => undefined);
+  const historyRef = useRef({ past: [] as VideoTimelineProject[], future: [] as VideoTimelineProject[] });
+  const [historyVersion, setHistoryVersion] = useState(0);
   timelineRef.current = timeline;
   const selectedClip = timeline.clips.find((clip) => clip.id === selected);
   const selectedAsset = selectedClip && timeline.assets.find((asset) => asset.id === selectedClip.assetId);
@@ -151,24 +153,23 @@ export default function VideoStudio() {
       addedClips.push({ id: crypto.randomUUID(), assetId: id, track, start, sourceStart: 0, sourceEnd: clipDuration, speed: 1, volume: 1, muted: false });
     }
     const updated = { ...timeline, assets: [...timeline.assets, ...assets], clips: [...timeline.clips, ...addedClips], duration: Math.max(timeline.duration, ...addedClips.map((clip) => clip.start + clipLength(clip)), 0) };
-    setFiles((current) => ({ ...current, ...nextFiles })); setTimeline(updated); setSelected(addedClips[0]?.id ?? selected);
-    try { await saveVideoTimeline(projectId, updated, assets.map((asset) => ({ id: asset.id, file: nextFiles[asset.id] }))); setStatus(`${assets.length} media item(s) added and saved locally.`); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save imported media in this browser."); }
+    try {
+      await saveVideoTimeline(projectId, updated, assets.map((asset) => ({ id: asset.id, file: nextFiles[asset.id] })));
+      setFiles((current) => ({ ...current, ...nextFiles })); applyTimelineEdit(() => updated); setSelected(addedClips[0]?.id ?? selected);
+      setStatus(`${assets.length} media item(s) added and saved locally.`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save imported media in this browser."); }
   }
 
   function editClip(id: string, patch: Partial<VideoTimelineClip>) {
-    setTimeline((current) => {
+    applyTimelineEdit((current) => {
       const clips = current.clips.map((clip) => clip.id === id ? { ...clip, ...patch } : clip);
       return { ...current, clips, duration: Math.max(0, ...clips.map((clip) => clip.start + clipLength(clip))) };
     });
   }
   function removeClip(id: string) {
-    setTimeline((current) => {
+    applyTimelineEdit((current) => {
       const clips = current.clips.filter((clip) => clip.id !== id);
-      const used = new Set(clips.map((clip) => clip.assetId));
-      const assets = current.assets.filter((asset) => used.has(asset.id));
-      setFiles((existing) => Object.fromEntries(Object.entries(existing).filter(([key]) => used.has(key))));
-      return { ...current, clips, assets, duration: Math.max(0, ...clips.map((clip) => clip.start + clipLength(clip))) };
+      return { ...current, clips, duration: Math.max(0, ...clips.map((clip) => clip.start + clipLength(clip))) };
     });
     setSelected("");
   }
@@ -178,9 +179,46 @@ export default function VideoStudio() {
     if (cut <= selectedClip.start || cut >= selectedClip.start + clipLength(selectedClip)) { setError("Move the playhead inside the selected clip to split it."); return; }
     const sourceCut = selectedClip.sourceStart + (cut - selectedClip.start) * selectedClip.speed;
     const right = { ...selectedClip, id: crypto.randomUUID(), start: cut, sourceStart: sourceCut };
-    editClip(selectedClip.id, { sourceEnd: sourceCut }); setTimeline((current) => ({ ...current, clips: [...current.clips, right] })); setSelected(right.id); setError("");
+    applyTimelineEdit((current) => ({ ...current, clips: [...current.clips.map((clip) => clip.id === selectedClip.id ? { ...clip, sourceEnd: sourceCut } : clip), right] })); setSelected(right.id); setError("");
   }
   const pxPerSecond = Math.max(12, Math.min(160, Number(zoom) || 60));
+
+  function applyTimelineEdit(update: (current: VideoTimelineProject) => VideoTimelineProject) {
+    const current = timelineRef.current;
+    const next = update(current);
+    historyRef.current.past.push(current);
+    if (historyRef.current.past.length > 50) historyRef.current.past.shift();
+    historyRef.current.future = [];
+    timelineRef.current = next;
+    setTimeline(next); setHistoryVersion((value) => value + 1);
+  }
+  function undo() {
+    const previous = historyRef.current.past.pop();
+    if (!previous) return;
+    historyRef.current.future.push(timelineRef.current);
+    timelineRef.current = previous; setTimeline(previous); setHistoryVersion((value) => value + 1);
+  }
+  function redo() {
+    const next = historyRef.current.future.pop();
+    if (!next) return;
+    historyRef.current.past.push(timelineRef.current);
+    timelineRef.current = next; setTimeline(next); setHistoryVersion((value) => value + 1);
+  }
+  function duplicateClip(id: string) {
+    const clip = timelineRef.current.clips.find((item) => item.id === id);
+    if (!clip) return;
+    const copy = { ...clip, id: crypto.randomUUID(), start: clip.start + clipLength(clip) };
+    applyTimelineEdit((current) => ({ ...current, clips: [...current.clips, copy], duration: Math.max(current.duration, copy.start + clipLength(copy)) }));
+    setSelected(copy.id);
+  }
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "z") return;
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
+      event.preventDefault(); if (event.shiftKey) redo(); else undo();
+    }
+    window.addEventListener("keydown", onKeyDown); return () => window.removeEventListener("keydown", onKeyDown);
+  });
 
   function togglePlayback() {
     if (playing) { setPlaying(false); return; }
@@ -202,9 +240,9 @@ export default function VideoStudio() {
     <section className="video-editor-layout">
       <aside className="video-bin"><div className="preview-heading"><strong>Media bin</strong><span>{timeline.assets.length} items</span></div>{timeline.assets.map((asset) => <button key={asset.id} className="bin-item" onClick={() => setSelected(timeline.clips.find((clip) => clip.assetId === asset.id)?.id ?? "")}><strong>{asset.name}</strong><small>{asset.kind} · {asset.duration.toFixed(2)} s · {(asset.size / 1048576).toFixed(1)} MiB</small></button>)}{!timeline.assets.length && <p className="resize-note">Import media to build your timeline.</p>}</aside>
       <section className="editor-preview"><div className="preview-heading"><strong>Composite preview</strong><span>{previewAsset?.name ?? "Nothing at playhead"} · {timeline.playhead.toFixed(2)} s · {timeline.width}×{timeline.height}</span></div><div className="editor-stage"><canvas ref={canvasRef} aria-label="Composited video timeline preview" /><div className="media-sources" aria-hidden="true">{timeline.assets.map((asset) => asset.kind === "video" ? <video key={asset.id} ref={(el) => { if (el) videoRefs.current[asset.id] = el; else delete videoRefs.current[asset.id]; }} src={assetUrls[asset.id]} muted playsInline preload="auto" onLoadedData={() => setMediaRevision((n) => n + 1)} /> : asset.kind === "image" ? <img key={asset.id} ref={(el) => { if (el) imageRefs.current[asset.id] = el; else delete imageRefs.current[asset.id]; }} src={assetUrls[asset.id]} alt="" onLoad={() => setMediaRevision((n) => n + 1)} /> : null)}{timeline.clips.filter((clip) => clip.track < 0).map((clip) => <audio key={clip.id} ref={(el) => { if (el) audioRefs.current[clip.id] = el; else delete audioRefs.current[clip.id]; }} src={assetUrls[clip.assetId]} preload="auto" />)}</div></div><div className="editor-transport"><button onClick={togglePlayback}>{playing ? "Pause" : "Play"}</button><button onClick={() => setTimeline((current) => ({ ...current, playhead: 0 }))}>Start</button><label>Playhead (s)<input type="number" min="0" max={timeline.duration} step="any" value={timeline.playhead.toFixed(2)} onChange={(event) => setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, Number(event.currentTarget.value) || 0)) }))} /></label></div></section>
-      <aside className="video-inspector"><div className="preview-heading"><strong>Inspector</strong><span>{selectedClip ? "Selected clip" : "No selection"}</span></div>{selectedClip && <><label className="speed-field">Track <span>video 0–2 · audio −1 to −3</span><input type="number" min="-3" max="2" step="1" value={selectedClip.track} onChange={(event) => editClip(selectedClip.id, { track: Number(event.currentTarget.value) })} /></label><label className="speed-field">Timeline start <span>seconds</span><input type="number" min="0" step="any" value={selectedClip.start} onChange={(event) => editClip(selectedClip.id, { start: Math.max(0, Number(event.currentTarget.value) || 0) })} /></label><label className="speed-field">Source in <span>seconds</span><input type="number" min="0" max={selectedAsset?.duration} step="any" value={selectedClip.sourceStart} onChange={(event) => editClip(selectedClip.id, { sourceStart: Math.max(0, Math.min(selectedClip.sourceEnd - 0.01, Number(event.currentTarget.value) || 0)) })} /></label><label className="speed-field">Source out <span>seconds</span><input type="number" min="0.01" max={selectedAsset?.duration} step="any" value={selectedClip.sourceEnd} onChange={(event) => editClip(selectedClip.id, { sourceEnd: Math.min(selectedAsset?.duration ?? selectedClip.sourceEnd, Math.max(selectedClip.sourceStart + 0.01, Number(event.currentTarget.value) || 0)) })} /></label><label className="speed-field">Speed <span>custom · 0.1–16×</span><input type="number" min="0.1" max="16" step="any" value={selectedClip.speed} onChange={(event) => editClip(selectedClip.id, { speed: Math.max(0.1, Math.min(16, Number(event.currentTarget.value) || 1)) })} /></label><label className="speed-field">Volume <span>custom · 0–1×</span><input type="number" min="0" max="1" step="any" value={selectedClip.volume} onChange={(event) => editClip(selectedClip.id, { volume: Math.max(0, Math.min(1, Number(event.currentTarget.value) || 0)) })} /></label><label className="ratio-toggle"><input type="checkbox" checked={selectedClip.muted} onChange={(event) => editClip(selectedClip.id, { muted: event.currentTarget.checked })} />Mute clip</label><button className="secondary-button editor-action" onClick={splitSelected}>Split at playhead</button><button className="editor-action danger" onClick={() => removeClip(selectedClip.id)}>Delete clip</button></>}</aside>
+      <aside className="video-inspector"><div className="preview-heading"><strong>Inspector</strong><span>{selectedClip ? "Selected clip" : "No selection"}</span></div>{selectedClip && <><label className="speed-field">Track <span>video 0–2 · audio −1 to −3</span><input type="number" min="-3" max="2" step="1" value={selectedClip.track} onChange={(event) => editClip(selectedClip.id, { track: Number(event.currentTarget.value) })} /></label><label className="speed-field">Timeline start <span>seconds</span><input type="number" min="0" step="any" value={selectedClip.start} onChange={(event) => editClip(selectedClip.id, { start: Math.max(0, Number(event.currentTarget.value) || 0) })} /></label><label className="speed-field">Source in <span>seconds</span><input type="number" min="0" max={selectedAsset?.duration} step="any" value={selectedClip.sourceStart} onChange={(event) => editClip(selectedClip.id, { sourceStart: Math.max(0, Math.min(selectedClip.sourceEnd - 0.01, Number(event.currentTarget.value) || 0)) })} /></label><label className="speed-field">Source out <span>seconds</span><input type="number" min="0.01" max={selectedAsset?.duration} step="any" value={selectedClip.sourceEnd} onChange={(event) => editClip(selectedClip.id, { sourceEnd: Math.min(selectedAsset?.duration ?? selectedClip.sourceEnd, Math.max(selectedClip.sourceStart + 0.01, Number(event.currentTarget.value) || 0)) })} /></label><label className="speed-field">Speed <span>custom · 0.1–16×</span><input type="number" min="0.1" max="16" step="any" value={selectedClip.speed} onChange={(event) => editClip(selectedClip.id, { speed: Math.max(0.1, Math.min(16, Number(event.currentTarget.value) || 1)) })} /></label><label className="speed-field">Volume <span>custom · 0–1×</span><input type="number" min="0" max="1" step="any" value={selectedClip.volume} onChange={(event) => editClip(selectedClip.id, { volume: Math.max(0, Math.min(1, Number(event.currentTarget.value) || 0)) })} /></label><label className="ratio-toggle"><input type="checkbox" checked={selectedClip.muted} onChange={(event) => editClip(selectedClip.id, { muted: event.currentTarget.checked })} />Mute clip</label><button className="secondary-button editor-action" onClick={splitSelected}>Split at playhead</button><button className="editor-action" onClick={() => duplicateClip(selectedClip.id)}>Duplicate clip</button><button className="editor-action danger" onClick={() => removeClip(selectedClip.id)}>Delete clip</button></>}</aside>
     </section>
-    <section className="video-timeline"><div className="timeline-toolbar"><strong>Timeline · {timeline.duration.toFixed(2)} seconds</strong><label>Zoom<input type="number" min="12" max="160" value={zoom} onChange={(event) => setZoom(event.currentTarget.value)} />px/s</label></div><div className="timeline-scroll"><div className="timeline-ruler" style={{ width: Math.max(800, timeline.duration * pxPerSecond) }} onClick={(event) => { const bounds = event.currentTarget.getBoundingClientRect(); setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, (event.clientX - bounds.left + event.currentTarget.scrollLeft) / pxPerSecond)) })); }}>{Array.from({ length: Math.ceil(timeline.duration) + 1 }, (_, second) => <span key={second} style={{ left: second * pxPerSecond }}>{second}s</span>)}</div>{[2, 1, 0, -1, -2, -3].map((track) => <div className="timeline-track" key={track}><strong>{track >= 0 ? `Video ${track + 1}` : `Audio ${-track}`}</strong><div className="track-lane" style={{ width: Math.max(800, timeline.duration * pxPerSecond) }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const id = event.dataTransfer.getData("text/clip"); const rect = event.currentTarget.getBoundingClientRect(); editClip(id, { track, start: Math.max(0, (event.clientX - rect.left + event.currentTarget.scrollLeft) / pxPerSecond) }); }} onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, (event.clientX - rect.left + event.currentTarget.scrollLeft) / pxPerSecond)) })); }}>{timeline.clips.filter((clip) => clip.track === track).map((clip) => { const asset = timeline.assets.find((item) => item.id === clip.assetId); return <button draggable key={clip.id} className={`timeline-clip ${selected === clip.id ? "selected" : ""} ${asset?.kind ?? ""}`} style={{ left: clip.start * pxPerSecond, width: Math.max(22, clipLength(clip) * pxPerSecond) }} onDragStart={(event) => event.dataTransfer.setData("text/clip", clip.id)} onClick={(event) => { event.stopPropagation(); setSelected(clip.id); }}><strong>{asset?.name}</strong><small>{clipLength(clip).toFixed(2)}s · {clip.speed}×</small></button>; })}</div></div>)}<div className="timeline-playhead" style={{ left: 104 + timeline.playhead * pxPerSecond }} /> </div></section>
+    <section className="video-timeline"><div className="timeline-toolbar"><strong>Timeline · {timeline.duration.toFixed(2)} seconds</strong><div className="timeline-actions" data-history-version={historyVersion}><button disabled={!historyRef.current.past.length} onClick={undo}>Undo</button><button disabled={!historyRef.current.future.length} onClick={redo}>Redo</button><label>Zoom<input type="number" min="12" max="160" value={zoom} onChange={(event) => setZoom(event.currentTarget.value)} />px/s</label></div></div><div className="timeline-scroll"><div className="timeline-ruler" style={{ width: Math.max(800, timeline.duration * pxPerSecond) }} onClick={(event) => { const bounds = event.currentTarget.getBoundingClientRect(); setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, (event.clientX - bounds.left + event.currentTarget.scrollLeft) / pxPerSecond)) })); }}>{Array.from({ length: Math.ceil(timeline.duration) + 1 }, (_, second) => <span key={second} style={{ left: second * pxPerSecond }}>{second}s</span>)}</div>{[2, 1, 0, -1, -2, -3].map((track) => <div className="timeline-track" key={track}><strong>{track >= 0 ? `Video ${track + 1}` : `Audio ${-track}`}</strong><div className="track-lane" style={{ width: Math.max(800, timeline.duration * pxPerSecond) }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const id = event.dataTransfer.getData("text/clip"); const rect = event.currentTarget.getBoundingClientRect(); editClip(id, { track, start: Math.max(0, (event.clientX - rect.left + event.currentTarget.scrollLeft) / pxPerSecond) }); }} onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, (event.clientX - rect.left + event.currentTarget.scrollLeft) / pxPerSecond)) })); }}>{timeline.clips.filter((clip) => clip.track === track).map((clip) => { const asset = timeline.assets.find((item) => item.id === clip.assetId); return <button draggable key={clip.id} className={`timeline-clip ${selected === clip.id ? "selected" : ""} ${asset?.kind ?? ""}`} style={{ left: clip.start * pxPerSecond, width: Math.max(22, clipLength(clip) * pxPerSecond) }} onDragStart={(event) => event.dataTransfer.setData("text/clip", clip.id)} onClick={(event) => { event.stopPropagation(); setSelected(clip.id); }}><strong>{asset?.name}</strong><small>{clipLength(clip).toFixed(2)}s · {clip.speed}×</small></button>; })}</div></div>)}<div className="timeline-playhead" style={{ left: 104 + timeline.playhead * pxPerSecond }} /> </div></section>
     <p className="resize-note editor-disclaimer">Timeline preview composites active visual clips from bottom to top and mixes active local audio tracks through the browser. The renderer is for preview only; transform controls, keyframes, transitions, undo/redo, and rendered timeline export are future slices.</p>
   </main>;
 }

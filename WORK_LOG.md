@@ -230,4 +230,13 @@
 - Updated the feature matrix and browser-dependence notes. No media leaves the browser.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/studio/video`.
 - Limitation: this is browser playback preview; it does not yet create a mixed audio track in export. Pitch-preservation implementation is browser-dependent and awaits device verification.
+- Commit: `2401f90 feat: add synchronized video timeline audio preview`.
+
+## 2026-11-14 — M6 timeline history and clip duplication
+
+- Added clip duplication, 50-step undo/redo buttons, and Ctrl/Cmd+Z plus Ctrl/Cmd+Shift+Z shortcuts. Import, move, trim, split, duplicate, mute/volume/speed edits, and clip deletion are timeline history steps.
+- Kept media-bin source assets when deleting their last clip so undo can restore project references without losing the local file. Timeline model remains autosaved independently of the in-memory history stack.
+- Updated editor capability notes and documented that undo history resets on page reload.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/studio/video`.
+- Limitation: undo history is not yet persisted and this history only covers timeline edits, not playback position or view zoom.
 - Commit: pending.
