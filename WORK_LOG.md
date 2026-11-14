@@ -267,4 +267,11 @@
 - Updated editor status and local-project data notes.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/studio/video`; `git diff --check` passed.
 - Limitation: one system sans-serif style is available; text tracks do not yet include fonts, borders, shadows, animations, or keyframes.
+- Commit: `4470ef6 feat: add editable timeline text titles`.
+
+## 2026-11-14 — M6 visual fade transitions
+
+- Added custom per-clip linear fade-in and fade-out durations for video, image, and text overlay clips. Opacity ramps are evaluated in the shared canvas compositor, so preview and export use the same transition behavior and lower lanes show through.
+- Updated the editor guidance and feature matrix. Audio crossfades and other transition curves remain unimplemented.
+- Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
 - Commit: pending.

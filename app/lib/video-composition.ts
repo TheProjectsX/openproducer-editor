@@ -16,12 +16,19 @@ export function drawVideoComposition(
   const clips = timeline.clips.filter((clip) => clip.track >= 0 && time >= clip.start && time < clip.start + getClipLength(clip)).sort((a, b) => a.track - b.track);
   for (const clip of clips) {
     const asset = assets.find((item) => item.id === clip.assetId);
+    const clipTime = time - clip.start;
+    const clipDuration = getClipLength(clip);
+    const fadeIn = Math.max(0, Math.min(clipDuration, clip.transitions?.fadeIn ?? 0));
+    const fadeOut = Math.max(0, Math.min(clipDuration, clip.transitions?.fadeOut ?? 0));
+    const fadeInAlpha = fadeIn > 0 ? Math.min(1, clipTime / fadeIn) : 1;
+    const fadeOutAlpha = fadeOut > 0 ? Math.min(1, (clipDuration - clipTime) / fadeOut) : 1;
+    const transitionAlpha = Math.min(fadeInAlpha, fadeOutAlpha);
     if (asset?.kind === "text" && asset.textSettings) {
       const transform = clip.transform ?? { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 };
       const settings = asset.textSettings;
       const fontSize = Math.max(8, Math.min(512, settings.fontSize * transform.scale));
       const lines = settings.text.split("\n");
-      context.save(); context.globalAlpha = Math.max(0, Math.min(1, transform.opacity));
+      context.save(); context.globalAlpha = Math.max(0, Math.min(1, transform.opacity * transitionAlpha));
       context.translate(canvas.width / 2 + transform.x, canvas.height / 2 + transform.y);
       context.rotate(transform.rotation * Math.PI / 180);
       context.font = `700 ${fontSize}px system-ui, sans-serif`; context.textAlign = "center"; context.textBaseline = "middle";
@@ -39,7 +46,7 @@ export function drawVideoComposition(
     const transform = clip.transform ?? { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 };
     const drawWidth = width * fitScale * transform.scale; const drawHeight = height * fitScale * transform.scale;
     context.save();
-    context.globalAlpha = Math.max(0, Math.min(1, transform.opacity));
+    context.globalAlpha = Math.max(0, Math.min(1, transform.opacity * transitionAlpha));
     context.translate(canvas.width / 2 + transform.x, canvas.height / 2 + transform.y);
     context.rotate(transform.rotation * Math.PI / 180);
     context.drawImage(source, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
