@@ -48,6 +48,11 @@ a { color: inherit; }
 .ratio-toggle input { width: 17px; height: 17px; accent-color: #5364d7; }
 .export-button { margin-top: auto; min-height: 48px; border: 0; border-radius: 11px; background: #4e5fd0; color: white; font: inherit; font-weight: 750; cursor: pointer; }
 .export-button:disabled { background: #aeb5c8; cursor: not-allowed; }
+.secondary-button { background: #263452; }
+.audio-player { width: 100%; margin-top: auto; }
+.audio-preview { min-height: 300px; display: flex; flex-direction: column; gap: 10px; justify-content: center; align-items: center; text-align: center; padding: 24px; }
+.audio-preview strong { color: #36425b; overflow-wrap: anywhere; }
+.audio-preview span { color: #79849a; }
 .resize-error { margin: 0; color: #b42332; font-size: 13px; }
 .resize-preview { min-height: 430px; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
 .preview-heading { display: flex; justify-content: space-between; gap: 12px; color: #36425b; font-size: 14px; }

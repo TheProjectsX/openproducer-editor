@@ -23,6 +23,14 @@
 - Build result: Vite 8.3.8 and React Router 8.5.1 compiled successfully; React Router prerendered `/` to `build/client/index.html` and emitted the SPA fallback.
 - Commit: pending.
 
+## 2026-11-14 — M0 audio trim prototype
+
+- Added a pre-rendered `/tools/audio/trim` route and made it available from the home page.
+- Implemented local audio decoding, exact custom start/end times, selected-range preview, and PCM 16-bit WAV export that preserves sample rate and channel count.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/audio/trim`.
+- Limitation: this prototype decodes the complete input into memory and does not yet persist an editable project; derive safe file limits and move large jobs to workers during feasibility work.
+- Commit: pending.
+
 ## 2026-11-14 — M0 image resize prototype
 
 - Added a pre-rendered `/tools/image/resize` tool page and linked it from the home page.

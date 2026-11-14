@@ -3,4 +3,5 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 export default [
   index("routes/home.tsx"),
   route("tools/image/resize", "routes/image-resize.tsx"),
+  route("tools/audio/trim", "routes/audio-trim.tsx"),
 ] satisfies RouteConfig;

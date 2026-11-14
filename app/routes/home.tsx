@@ -21,7 +21,7 @@ export default function Home() {
       </section>
       <section className="resize-workspace" aria-label="Available tools">
         <a className="tool-card" href="/tools/image/resize"><span className="eyebrow">IMAGE</span><strong>Resize image pixels</strong><span>Set exact width and height without cropping.</span><span className="tool-link">Open image resize →</span></a>
-        <article className="tool-card coming-soon"><span className="eyebrow">AUDIO</span><strong>Audio tools</strong><span>Trim, split, merge, clean, and change speed.</span><span className="tool-link">Coming next</span></article>
+        <a className="tool-card" href="/tools/audio/trim"><span className="eyebrow">AUDIO</span><strong>Trim audio</strong><span>Choose exact start and end times and export WAV.</span><span className="tool-link">Open audio trim →</span></a>
         <article className="tool-card coming-soon"><span className="eyebrow">VIDEO</span><strong>Video studio</strong><span>Build edits on a multitrack timeline.</span><span className="tool-link">Coming later</span></article>
       </section>
     </main>
