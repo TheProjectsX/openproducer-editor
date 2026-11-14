@@ -100,6 +100,10 @@ a { color: inherit; }
 .bin-item { display: flex; flex-direction: column; gap: 5px; padding: 10px; text-align: left; border: 1px solid #e1e5ee; border-radius: 9px; background: #fff; cursor: pointer; }
 .bin-item strong { overflow-wrap: anywhere; font-size: 12px; }
 .bin-item small { color: #79849a; }
+.title-create { border-color: #bbc5ff; background: #f3f5ff; }
+.title-inspector { display: flex; flex-direction: column; gap: 10px; }
+.title-inspector textarea { width: 100%; resize: vertical; border: 1px solid #d9deea; border-radius: 9px; padding: 10px; font: inherit; color: #172033; }
+.title-inspector input[type="color"] { width: 100%; height: 36px; border: 1px solid #d9deea; border-radius: 8px; padding: 2px; background: #fff; }
 .editor-preview { display: flex; flex-direction: column; gap: 10px; }
 .editor-stage { min-height: 240px; display: grid; place-items: center; overflow: hidden; background: #10131b; border-radius: 10px; }
 .editor-stage video, .editor-stage img { display: block; width: 100%; max-height: 54vh; object-fit: contain; }
@@ -133,6 +137,7 @@ a { color: inherit; }
 .timeline-clip { position: absolute; top: 7px; height: 40px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding: 4px 7px; border: 1px solid #8ca0f5; border-radius: 6px; background: #e5eaff; color: #384a9b; text-align: left; cursor: grab; }
 .timeline-clip.audio { border-color: #69b69c; background: #e1f4ec; color: #286f56; }
 .timeline-clip.image { border-color: #d0a559; background: #fff3d9; color: #7b5717; }
+.timeline-clip.text { border-color: #9e7be3; background: #f0e8ff; color: #56328f; }
 .timeline-clip.selected { outline: 2px solid #4e5fd0; outline-offset: 1px; }
 .timeline-clip strong, .timeline-clip small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .timeline-clip strong { font-size: 10px; }

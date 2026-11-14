@@ -16,6 +16,21 @@ export function drawVideoComposition(
   const clips = timeline.clips.filter((clip) => clip.track >= 0 && time >= clip.start && time < clip.start + getClipLength(clip)).sort((a, b) => a.track - b.track);
   for (const clip of clips) {
     const asset = assets.find((item) => item.id === clip.assetId);
+    if (asset?.kind === "text" && asset.textSettings) {
+      const transform = clip.transform ?? { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 };
+      const settings = asset.textSettings;
+      const fontSize = Math.max(8, Math.min(512, settings.fontSize * transform.scale));
+      const lines = settings.text.split("\n");
+      context.save(); context.globalAlpha = Math.max(0, Math.min(1, transform.opacity));
+      context.translate(canvas.width / 2 + transform.x, canvas.height / 2 + transform.y);
+      context.rotate(transform.rotation * Math.PI / 180);
+      context.font = `700 ${fontSize}px system-ui, sans-serif`; context.textAlign = "center"; context.textBaseline = "middle";
+      const lineHeight = fontSize * 1.2; const widest = Math.max(0, ...lines.map((line) => context.measureText(line).width));
+      if (settings.showBackground) { context.fillStyle = settings.backgroundColor; context.fillRect(-widest / 2 - fontSize * 0.35, -lines.length * lineHeight / 2 - fontSize * 0.2, widest + fontSize * 0.7, lines.length * lineHeight + fontSize * 0.4); }
+      context.fillStyle = settings.color;
+      lines.forEach((line, index) => context.fillText(line, 0, (index - (lines.length - 1) / 2) * lineHeight));
+      context.restore(); continue;
+    }
     const source: CanvasImageSource | undefined = asset?.kind === "video" ? media.videos[clip.id] : media.images[clip.assetId];
     const width = source instanceof HTMLVideoElement ? source.videoWidth : source instanceof HTMLImageElement ? source.naturalWidth : 0;
     const height = source instanceof HTMLVideoElement ? source.videoHeight : source instanceof HTMLImageElement ? source.naturalHeight : 0;

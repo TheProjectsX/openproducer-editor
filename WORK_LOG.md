@@ -256,6 +256,15 @@
 - Added custom per-clip X/Y position, scale, rotation, and opacity controls for video/image clips. Defaults preserve the existing centered fit; controls write into the saved clip model.
 - Updated the shared compositor so preview and export apply transforms around the canvas center in the same order; legacy clips without transform settings keep identity values.
 - Updated editor capability and data model notes.
-- Verification: pending typecheck and production build.
-- Limitation: no keyframe animation, transform interpolation, text overlays, or per-clip transform presets yet.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/studio/video`.
+- Limitation: no keyframe animation, transform interpolation, or per-clip transform presets yet.
+- Commit: `f5b2a82 feat: add video clip transform controls`.
+
+## 2026-11-14 — M6 editable text titles
+
+- Added an “Add text title” action that creates a 5-second overlay clip on the top video lane. Title text, font size, text color, optional background color, and timeline duration are editable.
+- Stores title instructions as a zero-byte versioned local project asset and renders them through the same canvas compositor used for timeline preview and video export.
+- Updated editor status and local-project data notes.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/studio/video`; `git diff --check` passed.
+- Limitation: one system sans-serif style is available; text tracks do not yet include fonts, borders, shadows, animations, or keyframes.
 - Commit: pending.
