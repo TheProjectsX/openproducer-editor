@@ -9,7 +9,7 @@ Install only the packages needed by the milestone being implemented. Pin compati
 | App and routing | React, React DOM, `react-router`, `@react-router/dev`, TypeScript, Vite | One static web build; pre-render all declared routes. |
 | Offline | Workbox build/precaching/routing packages | One custom service worker generated after the static build; keep AI models outside the core precache. |
 | Containers and encoding | `mediabunny`, native WebCodecs | Lazy-load on editor routes and probe exact codec support. |
-| Audio | Native Web Audio; browser time-stretch candidate selected at M0 | A licensed, pinned processor must support pitch-preserved preview and offline render; validate 0.1×–16× quality. |
+| Audio | Native Web Audio; `bungee-web` 0.1.2 for pitch-preserved speed preview and prototype export | WASM + AudioWorklet; preserve its MIT and MPL-2.0 notices and Bungee/PFFFT third-party notices. |
 | Image | `fabric` and native Canvas/OffscreenCanvas | Lazy-load in image editor; app-owned serialized project format. |
 | Persistence | IndexedDB with Dexie; native OPFS | Metadata and bytes stored separately; schema migrations and recovery tests. |
 | AI | `onnxruntime-web`; pinned local model files | Optional downloaded assets with checksums, size display, and cache versioning. |
@@ -29,7 +29,7 @@ Publish the generated HTML/CSS/JS, manifest, icons, sitemap, robots file, servic
 - Review the chosen vocal separation model's weights and conversion repository separately. A code repository's license does not automatically settle every model-weight distribution question. Start feasibility with the documented browser Demucs ONNX example. [Demucs browser guide](https://github.com/StemSplit/demucs-onnx/blob/main/docs/browser.md)
 - Review RNNoise code, pretrained weights, and the selected browser port separately before shipping enhanced speech cleanup. [RNNoise project](https://github.com/xiph/rnnoise)
 - Review Real-ESRGAN code, original weights, and any ONNX conversion used for image upscaling. Start with the smaller general-image model as a performance candidate. [Real-ESRGAN models](https://github.com/xinntao/Real-ESRGAN/blob/master/docs/model_zoo.md)
-- A time-stretch package must be selected and pinned after M0 audio-quality and license checks. SoundTouchJS and Bungee Web are candidates, not automatic dependencies; their current and historical distribution terms differ. [SoundTouchJS](https://github.com/cutterbl/SoundTouchJS), [Bungee Web](https://github.com/JeffreyCA/bungee-web)
+- Bungee Web 0.1.2 is now the prototype time-stretch engine. Its package declares MIT and MPL-2.0 code plus third-party notices; include those notices. Keep quality/performance validation open for long files and the 0.1×–16× range. [Bungee Web](https://github.com/JeffreyCA/bungee-web)
 
 ## Main risks and responses
 

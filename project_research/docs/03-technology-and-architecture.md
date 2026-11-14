@@ -4,7 +4,7 @@
 
 At handoff on 2026-11-14, use the current stable, compatible patches in the React 19, React Router 8, and Vite 8 lines, TypeScript, npm, and a single static build. The scaffold uses `package-lock.json`; use npm because pnpm's native executable is blocked by Device Guard in this Windows environment. React Router **Framework Mode** with `ssr: false` and pre-rendered paths supplies real HTML for SEO pages and a client-side editing app without a runtime server. Avoid a plain SPA for public pages and avoid a Next.js runtime dependency.
 
-Recommended libraries: Workbox for a custom service worker; Mediabunny for container reading/writing and conversion; native WebCodecs for supported codecs; Web Audio for playback and effects; Fabric.js for image objects/collage; IndexedDB via Dexie for metadata; OPFS for media bytes; ONNX Runtime Web for downloaded AI models. Use a small client state store (Zustand is suitable) only for transient editor UI; persistence lives in the project package. Use Vitest and Playwright for tests. Check current package compatibility and license before installation.
+Recommended libraries: Workbox for a custom service worker; Mediabunny for container reading/writing and conversion; native WebCodecs for supported codecs; Web Audio for playback and effects; Bungee Web for pitch-preserving variable audio speed; Fabric.js for image objects/collage; IndexedDB via Dexie for metadata; OPFS for media bytes; ONNX Runtime Web for downloaded AI models. Use a small client state store (Zustand is suitable) only for transient editor UI; persistence lives in the project package. Use Vitest and Playwright for tests. Check current package compatibility and license before installation.
 
 ## Package responsibilities
 

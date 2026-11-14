@@ -44,6 +44,12 @@ a { color: inherit; }
 .dimension-fields label span { color: #8992a4; font-weight: 500; }
 .dimension-fields input { grid-column: 1 / -1; width: 100%; border: 1px solid #d9deea; border-radius: 9px; padding: 12px 10px; color: #172033; font: inherit; font-size: 16px; }
 .dimension-fields input:focus { outline: 3px solid #dfe3ff; border-color: #6574db; }
+.speed-field { display: grid; grid-template-columns: 1fr auto; gap: 8px 4px; color: #505d75; font-size: 13px; font-weight: 700; }
+.speed-field span { color: #8992a4; font-weight: 500; }
+.speed-field input { grid-column: 1 / -1; width: 100%; border: 1px solid #d9deea; border-radius: 9px; padding: 12px 10px; color: #172033; font: inherit; font-size: 18px; }
+.speed-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.speed-presets button { padding: 8px 12px; border: 1px solid #d9deea; border-radius: 8px; background: white; color: #47536a; font: inherit; cursor: pointer; }
+.speed-presets button:hover { border-color: #6574db; color: #3949b5; }
 .ratio-toggle { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 650; }
 .ratio-toggle input { width: 17px; height: 17px; accent-color: #5364d7; }
 .export-button { margin-top: auto; min-height: 48px; border: 0; border-radius: 11px; background: #4e5fd0; color: white; font: inherit; font-weight: 750; cursor: pointer; }

@@ -31,6 +31,15 @@
 - Limitation: this prototype decodes the complete input into memory and does not yet persist an editable project; derive safe file limits and move large jobs to workers during feasibility work.
 - Commit: pending.
 
+## 2026-11-14 — M0 custom audio speed prototype
+
+- Added `/tools/audio/speed` with typed 0.1×–16× input, shortcut buttons, pitch-preserved preview, estimated new duration, and WAV export.
+- Added `bungee-web` 0.1.2 (MIT/MPL-2.0 plus bundled third-party notices) for WebAssembly/AudioWorklet time stretching; updated the technical choice and attribution guidance.
+- Export estimates output size and disables rendering above a 512 MB prototype limit to avoid predictable memory exhaustion.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/audio/speed`, including the local WASM and worklet assets.
+- Limitation: large-source decode and export still use in-memory audio buffers; benchmark quality and memory across the speed range before calling the M0 audio gate complete.
+- Commit: pending.
+
 ## 2026-11-14 — M0 image resize prototype
 
 - Added a pre-rendered `/tools/image/resize` tool page and linked it from the home page.

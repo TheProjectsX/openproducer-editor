@@ -15,6 +15,7 @@
 | SEO/routes | React Router Framework Mode static pre-rendering for public pages; fixed studio routes with query-based local project IDs; no runtime server. |
 | Deployment | Static Cloudflare Pages by default, with tested headers and one origin for critical assets. |
 | Naming | Local Studio is the provisional working name; availability is unverified. |
+| Audio speed prototype | `bungee-web` 0.1.2 for pitch-preserving speed preview and WAV rendering; the app caps estimated output at 512 MB during feasibility. |
 
 ## Measurements and records M0 must add here
 
@@ -38,6 +39,7 @@ These are implementation evidence, not invitations to redesign the product: refe
 - [MDN WebCodecs](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API), [video encoder support checks](https://developer.mozilla.org/en-US/docs/Web/API/VideoEncoder/isConfigSupported_static), and [video container concepts](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API/Video_processing_concepts)
 - [Mediabunny conversion](https://mediabunny.dev/guide/converting-media-files), [reading](https://mediabunny.dev/guide/reading-media-files), and [supported formats](https://mediabunny.dev/guide/supported-formats-and-codecs)
 - [MDN OfflineAudioContext](https://developer.mozilla.org/en-US/docs/Web/API/OfflineAudioContext) and [playback-rate behavior](https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/playbackRate)
+- [Bungee Web](https://github.com/JeffreyCA/bungee-web) for WASM time stretching with fixed pitch and offline `Transport` rendering.
 - [Fabric.js canvas objects and filters](https://www.fabricjs.com/docs/core-concepts/)
 - [ONNX Runtime Web](https://onnxruntime.ai/docs/tutorials/web/) and [browser support matrix](https://onnxruntime.ai/docs/get-started/with-javascript/web.html)
 - [Demucs ONNX browser guide](https://github.com/StemSplit/demucs-onnx/blob/main/docs/browser.md), [RNNoise](https://github.com/xiph/rnnoise), and [Real-ESRGAN models](https://github.com/xinntao/Real-ESRGAN/blob/master/docs/model_zoo.md)
