@@ -107,4 +107,12 @@
 - Image workspaces created from `/projects` now open the saved image editor; the route is prerendered and marked noindex. Audio/video workspace records remain metadata-only.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/studio/image`; the generated offline worker includes 23 static assets and 9 HTML routes.
 - Limitation: OPFS/browser quota errors can still prevent project media saves; there is no quota dashboard or storage cleanup UI yet.
+- Commit: `9b4a028 feat: persist local image project edits`.
+
+## 2026-11-14 — M0 video audio extraction
+
+- Added `/tools/video/extract-audio` with local video preview, primary audio track extraction, progress, and 48 kHz stereo 16-bit WAV export.
+- Uses Mediabunny browser-side conversion and predicts PCM output size before export; input and output are capped at 512 MiB.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/video/extract-audio`; the lazy Mediabunny bundle is now 614.01 kB minified and triggers Vite's chunk-size warning.
+- Limitation: this exports only the primary audio track and depends on browser decoding/encoding support; broader audio format selection and streaming writes remain future improvements.
 - Commit: pending.
