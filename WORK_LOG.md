@@ -316,4 +316,42 @@
 - Added configurable snapping during clip drag/drop to same-lane clip starts/ends, current playhead, and nearest whole second. Users can turn snapping off or enter a custom tolerance.
 - Updated the feature matrix to reflect the behavior.
 - Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
-- Commit: pending.
+- Commit: `8c5d53a feat: add configurable video timeline snapping`.
+
+## Session handoff — 2026-11-14
+
+### Current repository state
+
+- Single project repository on `main`, root Git only; no nested repository. Latest implementation commit: `8c5d53a`.
+- Working tree was clean after the timeline snapping commit.
+- Current work follows the M6 section in `project_research/docs/07-implementation-roadmap.md`. Do not start M7 until M6's real-media, save/reopen, offline, and output-file verification gate is met.
+
+### Built and committed in this session
+
+- Video clip transforms (position, scale, rotation, opacity) shared by preview/export: `f5b2a82`.
+- Editable text title clips, color/background/font size, timeline overlay, shared rendering: `4470ef6`.
+- Custom visual fade-in/fade-out: `3979b03`.
+- Clip-relative transform/volume keyframes with linear interpolation: `bd2786a`.
+- Per-clip brightness/contrast/saturation/grayscale filters: `ae2e594`.
+- Audio fade envelopes and overlapping audio crossfades: `848f32e`.
+- Keyframe markers and remove-at-playhead controls: `b5657c5`.
+- Selected-video primary audio extraction into a local WAV clip: `6c5707e`.
+- Configurable drag/drop snapping to same-lane clip edges, playhead, and whole seconds: `8c5d53a`.
+- Every feature above passed `npm run typecheck` and `npm run build`; production builds prerender the declared routes and generate the offline service worker. No unit/browser media tests were run.
+
+### Next work (in order)
+
+1. **Finish the M6 gate with real files and browsers:** verify import, title/transform/filter/fade/keyframe preview, detached audio, saved-project reopen, MP4/WebM export playback outside the app, and offline direct route behavior on the declared Chrome/Edge targets. Record device, media fixtures, format/codec, duration, output playability, timing, and failures in `project_research/docs/10-decisions-and-sources.md` and the browser matrix. The current compile/build check does not establish media fidelity.
+2. **Fix gaps exposed by those checks before expanding features.** In particular verify detachment WAV duration/range against video audio streams, export memory behavior, canvas filter browser support, preview/export sync and transitions, offline asset caching, and storage quota recovery.
+3. **Complete remaining Core video controls** per the feature matrix: transition UI for an explicit dissolve between visual clips (current fades cover edge opacity and audio overlap); implement if M6 verification and actual renderer behavior support it. Add any missing track/clip controls from real use without broadening unsupported claims. Embedded source audio is not mixed automatically; users must detach it.
+4. **Audit Core image and audio requirements** in `project_research/docs/02-feature-matrix.md` against working implementations. Image editor layers/text/shapes/project persistence and audio waveform/normalization/stronger basic noise reduction/WAV projects may remain incomplete. Finish each as a narrow, saved/exportable/offline slice and log/commit it.
+5. **Only after the Core gates:** plan M7 model downloads and offline inference for vocal/instrument separation, stronger speech cleanup, and tiled AI image upscaling; record model provenance, license, checksums, resource limits, and benchmark evidence. The current image upscaler is browser resampling, not AI.
+6. **Release hardening (M8):** browser/codec support matrix, accessibility/SEO, install/update/offline checks on deployment, storage recovery, CSP/headers, performance budgets, and honest feature labels. Build size still warns that a minified bundle exceeds 500 kB, largely due to the media stack.
+
+### Important implementation limits
+
+- Video export is browser-memory-backed, capped at 120 seconds, 4 megapixels per frame, 180 seconds of unique source audio, and 512 MiB output. Large projects can exceed practical device memory before reaching every nominal cap.
+- Video render/export has compile/build verification only so far. Test actual output; don't treat “build passed” as a playable-file or preview-parity check.
+- Source-video audio extraction is user-triggered and creates a separate WAV. It is not automatically mixed from video clips.
+- Keyframe values interpolate linearly and are clip-relative. Undo history is in memory and resets after reload.
+- AI operations and claims are not implemented; no backend, upload, account, or runtime service should be introduced.
