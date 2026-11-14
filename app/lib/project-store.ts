@@ -20,6 +20,8 @@ export type ImageProjectSettings = {
   brightness: string;
   contrast: string;
   saturation: string;
+  rotation?: string;
+  flipHorizontal?: boolean;
 };
 
 const DATABASE_NAME = "local-studio-projects";

@@ -171,4 +171,12 @@
 - Fades use sample-level linear envelopes and validate their combined duration against the source; output preserves sample rate and channel count.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/audio/volume`; the generated worker contains 32 assets and 17 routes.
 - Limitation: this prototype renders full buffers in memory and clamps boosted samples if the selected gain clips; production export needs metering and workers.
+- Commit: `20b6906 feat: add custom audio gain and fades`.
+
+## 2026-11-14 — M0 image rotation and flip
+
+- Added arbitrary −180° to 180° rotation and horizontal flip to the image editor; the renderer expands canvas bounds to keep the complete rotated image visible.
+- Added rotated-size output limits, custom degree input, preview dimensions, PNG naming, and project auto-save/restore for transform settings.
+- Verification: `npm run typecheck` passed. `npm run build` passed with all routes prerendered and the offline worker regenerated; its route/asset count remains 17/32.
+- Limitation: no arbitrary-angle drag control, vertical flip, rotation interpolation modes, or nondestructive transform stack yet.
 - Commit: pending.

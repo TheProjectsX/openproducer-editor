@@ -29,6 +29,8 @@ export function ImageResizeTool() {
   const [brightness, setBrightness] = useState("100");
   const [contrast, setContrast] = useState("100");
   const [saturation, setSaturation] = useState("100");
+  const [rotation, setRotation] = useState("0");
+  const [flipHorizontal, setFlipHorizontal] = useState(false);
   const [error, setError] = useState("");
   const [projectTitle, setProjectTitle] = useState("");
   const [projectStatus, setProjectStatus] = useState("");
@@ -39,8 +41,14 @@ export function ImageResizeTool() {
       : ratioMode === "custom" ? Number(customRatioWidth) / Number(customRatioHeight)
         : Number(ratioMode.split(":")[0]) / Number(ratioMode.split(":")[1]);
   const ratio = selectedRatio !== null && Number.isFinite(selectedRatio) && selectedRatio > 0 ? selectedRatio : null;
+  const degrees = Number(rotation), radians = degrees * Math.PI / 180;
+  const sin = Math.abs(Math.sin(radians)) < 1e-10 ? 0 : Math.abs(Math.sin(radians));
+  const cos = Math.abs(Math.cos(radians)) < 1e-10 ? 0 : Math.abs(Math.cos(radians));
+  const rotatedWidth = Math.ceil(Math.abs(width * cos) + Math.abs(height * sin));
+  const rotatedHeight = Math.ceil(Math.abs(width * sin) + Math.abs(height * cos));
   const outputValid = Number.isInteger(width) && width > 0 && Number.isInteger(height) && height > 0
-    && width <= 32768 && height <= 32768 && width * height <= 100_000_000;
+    && Number.isFinite(degrees) && degrees >= -180 && degrees <= 180
+    && rotatedWidth <= 32768 && rotatedHeight <= 32768 && rotatedWidth * rotatedHeight <= 100_000_000;
   const ratioText = useMemo(
     () => (source ? `${source.width} × ${source.height}` : "No image selected"),
     [source],
@@ -57,8 +65,8 @@ export function ImageResizeTool() {
     if (!source || !canvas || !outputValid) return;
     const image = new Image();
     image.onload = () => {
-      canvas.width = width;
-      canvas.height = height;
+      canvas.width = rotatedWidth;
+      canvas.height = rotatedHeight;
       const context = canvas.getContext("2d");
       if (!context) {
         setError("This browser could not create an image canvas.");
@@ -67,14 +75,17 @@ export function ImageResizeTool() {
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = "high";
       const amount = (value: string) => value.trim() && Number.isFinite(Number(value)) ? Math.min(300, Math.max(0, Number(value))) : 100;
+      context.translate(rotatedWidth / 2, rotatedHeight / 2);
+      context.rotate(radians);
+      if (flipHorizontal) context.scale(-1, 1);
       context.filter = `brightness(${amount(brightness)}%) contrast(${amount(contrast)}%) saturate(${amount(saturation)}%)`;
-      context.drawImage(image, 0, 0, width, height);
+      context.drawImage(image, -width / 2, -height / 2, width, height);
       context.filter = "none";
       setError("");
     };
     image.onerror = () => setError("The selected image could not be decoded.");
     image.src = source.url;
-  }, [source, width, height, outputValid, brightness, contrast, saturation]);
+  }, [source, width, height, rotatedWidth, rotatedHeight, radians, flipHorizontal, outputValid, brightness, contrast, saturation]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -98,18 +109,19 @@ export function ImageResizeTool() {
 
   useEffect(() => {
     if (!projectId || !source) return;
-    const settings: ImageProjectSettings = { width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation };
+    const settings: ImageProjectSettings = { width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation, rotation, flipHorizontal };
     const timeout = window.setTimeout(() => {
       void saveImageSettings(projectId, settings).then(() => setProjectStatus("Project changes saved on this device."))
         .catch((cause: unknown) => setProjectStatus(cause instanceof Error ? cause.message : "Could not save project changes."));
     }, 400);
     return () => window.clearTimeout(timeout);
-  }, [projectId, source, width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation]);
+  }, [projectId, source, width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation, rotation, flipHorizontal]);
 
   function applySettings(settings: ImageProjectSettings) {
     setWidth(settings.width); setHeight(settings.height); setRatioMode(settings.ratioMode);
     setCustomRatioWidth(settings.customRatioWidth); setCustomRatioHeight(settings.customRatioHeight);
     setBrightness(settings.brightness); setContrast(settings.contrast); setSaturation(settings.saturation);
+    setRotation(settings.rotation ?? "0"); setFlipHorizontal(settings.flipHorizontal ?? false);
   }
 
   function importImage(file?: File, restoring = false, settings?: ImageProjectSettings) {
@@ -173,7 +185,7 @@ export function ImageResizeTool() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${source.file.name.replace(/\.[^.]+$/, "")}-${width}x${height}.png`;
+      anchor.download = `${source.file.name.replace(/\.[^.]+$/, "")}-${rotatedWidth}x${rotatedHeight}.png`;
       anchor.click();
       URL.revokeObjectURL(url);
     }, "image/png");
@@ -210,11 +222,13 @@ export function ImageResizeTool() {
             <label>Contrast <span>0–300%</span><input type="number" min="0" max="300" step="any" value={contrast} onChange={(event) => setContrast(event.currentTarget.value)} /></label>
             <label>Saturation <span>0–300%</span><input type="number" min="0" max="300" step="any" value={saturation} onChange={(event) => setSaturation(event.currentTarget.value)} /></label>
           </div>
+          <label className="speed-field">Rotation <span>custom degrees · −180 to 180</span><input type="number" min="-180" max="180" step="any" value={rotation} onChange={(event) => setRotation(event.currentTarget.value)} /></label>
+          <label className="ratio-toggle"><input type="checkbox" checked={flipHorizontal} onChange={(event) => setFlipHorizontal(event.currentTarget.checked)} /> Flip horizontally</label>
           <button className="export-button" type="button" disabled={!source || !outputValid} onClick={download}>Download PNG</button>
           {error && <p className="resize-error" role="alert">{error}</p>}
         </div>
         <div className="resize-preview">
-          <div className="preview-heading"><strong>Output preview</strong><span>{source && outputValid ? `${width} × ${height} px` : "Choose an image to begin"}</span></div>
+          <div className="preview-heading"><strong>Output preview</strong><span>{source && outputValid ? `${rotatedWidth} × ${rotatedHeight} px` : "Choose an image to begin"}</span></div>
           {!source && <div className="empty-preview">Your image preview will appear here.</div>}
           <canvas ref={canvasRef} className={source ? "preview-canvas" : "preview-canvas hidden"} aria-label="Resized image preview" />
         </div>
