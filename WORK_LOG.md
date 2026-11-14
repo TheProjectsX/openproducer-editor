@@ -289,4 +289,11 @@
 - Added custom brightness, contrast, saturation, and grayscale controls for video and image clips. Filters are saved as clip instructions and applied by the shared canvas preview/export compositor.
 - Updated the feature matrix and implementation decisions with the browser canvas-filter caveat.
 - Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
+- Commit: `ae2e594 feat: add local video clip color filters`.
+
+## 2026-11-14 — M6 audio fade transitions
+
+- Extended per-clip custom fade-in/fade-out from visual clips to audio clips. Live audio preview and rendered PCM apply the same linear envelope; overlapping clips on audio lanes can now crossfade.
+- Updated the feature matrix and implementation decisions. Curved fades and source-video embedded-audio extraction in the timeline remain outstanding.
+- Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
 - Commit: pending.

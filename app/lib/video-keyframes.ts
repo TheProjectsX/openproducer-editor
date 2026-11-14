@@ -27,3 +27,12 @@ export function upsertClipKeyframe(clip: VideoTimelineClip, frame: VideoClipKeyf
   const next = exact < 0 ? [...frames, frame] : frames.map((item, index) => index === exact ? frame : item);
   return next.sort((a, b) => a.time - b.time);
 }
+
+export function evaluateClipTransition(clip: VideoTimelineClip, time: number) {
+  const duration = Math.max(0, (clip.sourceEnd - clip.sourceStart) / clip.speed);
+  const fadeIn = Math.max(0, Math.min(duration, clip.transitions?.fadeIn ?? 0));
+  const fadeOut = Math.max(0, Math.min(duration, clip.transitions?.fadeOut ?? 0));
+  const fadeInAlpha = fadeIn > 0 ? Math.min(1, Math.max(0, time) / fadeIn) : 1;
+  const fadeOutAlpha = fadeOut > 0 ? Math.min(1, (duration - time) / fadeOut) : 1;
+  return Math.max(0, Math.min(1, Math.min(fadeInAlpha, fadeOutAlpha)));
+}

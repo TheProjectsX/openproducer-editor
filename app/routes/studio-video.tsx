@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router";
 import type { Route } from "./+types/studio-video";
 import { getProject, readVideoAsset, saveVideoTimeline, type VideoTimelineAsset, type VideoTimelineClip, type VideoTimelineProject } from "../lib/project-store";
 import { drawVideoComposition, getClipLength } from "../lib/video-composition";
-import { evaluateClipKeyframes, upsertClipKeyframe } from "../lib/video-keyframes";
+import { evaluateClipKeyframes, evaluateClipTransition, upsertClipKeyframe } from "../lib/video-keyframes";
 import { renderTimelineAudio } from "../lib/audio-timeline-render";
 import wasmUrl from "bungee-web/bungee.wasm?url";
 
@@ -112,7 +112,8 @@ export default function VideoStudio() {
       const expected = clip.sourceStart + (current.playhead - clip.start) * clip.speed;
       if (Math.abs(audio.currentTime - expected) > 0.35) audio.currentTime = expected;
       audio.playbackRate = clip.speed; audio.preservesPitch = true;
-      audio.volume = Math.max(0, Math.min(1, evaluateClipKeyframes(clip, Math.max(0, current.playhead - clip.start)).volume)); audio.muted = clip.muted;
+      const localTime = Math.max(0, current.playhead - clip.start);
+      audio.volume = Math.max(0, Math.min(1, evaluateClipKeyframes(clip, localTime).volume * evaluateClipTransition(clip, localTime))); audio.muted = clip.muted;
       if (playing && audio.paused) void audio.play().catch(() => setError("Audio preview was blocked by this browser. Press Play again to allow local audio preview."));
       if (!playing && !audio.paused) audio.pause();
     }
@@ -266,7 +267,8 @@ export default function VideoStudio() {
       const audio = audioRefs.current[clip.id];
       if (!audio) continue;
       audio.currentTime = clip.sourceStart + (timeline.playhead - clip.start) * clip.speed;
-      audio.playbackRate = clip.speed; audio.preservesPitch = true; audio.volume = Math.max(0, Math.min(1, evaluateClipKeyframes(clip, Math.max(0, timeline.playhead - clip.start)).volume)); audio.muted = clip.muted;
+      const localTime = Math.max(0, timeline.playhead - clip.start);
+      audio.playbackRate = clip.speed; audio.preservesPitch = true; audio.volume = Math.max(0, Math.min(1, evaluateClipKeyframes(clip, localTime).volume * evaluateClipTransition(clip, localTime))); audio.muted = clip.muted;
       void audio.play().catch(() => setError("Audio preview was blocked by this browser. Press Play again to allow local audio preview."));
     }
     setPlaying(true);
@@ -389,10 +391,10 @@ export default function VideoStudio() {
             <div className="filter-fields two-column"><label>Text color <input type="color" value={selectedAsset.textSettings.color} onChange={(event) => editTitleAsset(selectedAsset.id, { ...selectedAsset.textSettings!, color: event.currentTarget.value })} /></label><label>Background <input type="color" value={selectedAsset.textSettings.backgroundColor} disabled={!selectedAsset.textSettings.showBackground} onChange={(event) => editTitleAsset(selectedAsset.id, { ...selectedAsset.textSettings!, backgroundColor: event.currentTarget.value })} /></label></div>
             <label className="ratio-toggle"><input type="checkbox" checked={selectedAsset.textSettings.showBackground} onChange={(event) => editTitleAsset(selectedAsset.id, { ...selectedAsset.textSettings!, showBackground: event.currentTarget.checked })} />Show title background</label>
           </div>}
-          {selectedClip.track >= 0 && <div className="filter-fields two-column transform-fields">
+          <div className="filter-fields two-column transform-fields">
             <label>Fade in <span>custom seconds</span><input type="number" min="0" max={clipLength(selectedClip)} step="any" value={selectedClip.transitions?.fadeIn ?? 0} onChange={(event) => editClip(selectedClip.id, { transitions: { fadeIn: Math.max(0, Math.min(clipLength(selectedClip), Number(event.currentTarget.value) || 0)), fadeOut: selectedClip.transitions?.fadeOut ?? 0 } })} /></label>
             <label>Fade out <span>custom seconds</span><input type="number" min="0" max={clipLength(selectedClip)} step="any" value={selectedClip.transitions?.fadeOut ?? 0} onChange={(event) => editClip(selectedClip.id, { transitions: { fadeIn: selectedClip.transitions?.fadeIn ?? 0, fadeOut: Math.max(0, Math.min(clipLength(selectedClip), Number(event.currentTarget.value) || 0)) } })} /></label>
-          </div>}
+          </div>
           {selectedClip.track >= 0 && selectedAsset?.kind !== "text" && <div className="filter-fields two-column transform-fields">
             <label>Brightness <span>custom percent</span><input type="number" min="0" max="300" step="any" value={selectedClip.effects?.brightness ?? 100} onChange={(event) => editClip(selectedClip.id, { effects: { brightness: Math.max(0, Math.min(300, Number(event.currentTarget.value) || 0)), contrast: selectedClip.effects?.contrast ?? 100, saturation: selectedClip.effects?.saturation ?? 100, grayscale: selectedClip.effects?.grayscale ?? 0 } })} /></label>
             <label>Contrast <span>custom percent</span><input type="number" min="0" max="300" step="any" value={selectedClip.effects?.contrast ?? 100} onChange={(event) => editClip(selectedClip.id, { effects: { brightness: selectedClip.effects?.brightness ?? 100, contrast: Math.max(0, Math.min(300, Number(event.currentTarget.value) || 0)), saturation: selectedClip.effects?.saturation ?? 100, grayscale: selectedClip.effects?.grayscale ?? 0 } })} /></label>

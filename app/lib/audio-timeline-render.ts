@@ -1,6 +1,7 @@
 import { BungeeStretcher, compileBungee, instantiateBungee, Transport } from "bungee-web";
 import wasmUrl from "bungee-web/bungee.wasm?url";
 import type { VideoTimelineAsset, VideoTimelineClip } from "./project-store";
+import { evaluateClipTransition } from "./video-keyframes";
 
 const OUTPUT_SAMPLE_RATE = 48_000;
 const MAX_SOURCE_AUDIO_SECONDS = 180;
@@ -62,7 +63,7 @@ export async function renderTimelineAudio(
             while (keyframeIndex < keyframes.length - 2 && keyframes[keyframeIndex + 1].time < localTime) keyframeIndex++;
             const left = keyframes[keyframeIndex]; const right = keyframes[keyframeIndex + 1];
             const animatedGain = !left ? clip.volume : !right ? left.volume : left.volume + (right.volume - left.volume) * Math.max(0, Math.min(1, (localTime - left.time) / Math.max(0.001, right.time - left.time)));
-            const gain = clip.muted ? 0 : keyframes.length ? animatedGain : clip.volume;
+            const gain = clip.muted ? 0 : (keyframes.length ? animatedGain : clip.volume) * evaluateClipTransition(clip, localTime);
             mixedLeft[destination + offset + sample] += blockLeft[sample] * gain;
             mixedRight[destination + offset + sample] += blockRight[sample] * gain;
           }

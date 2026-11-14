@@ -1,5 +1,5 @@
 import type { VideoTimelineAsset, VideoTimelineClip, VideoTimelineProject } from "./project-store";
-import { evaluateClipKeyframes } from "./video-keyframes";
+import { evaluateClipKeyframes, evaluateClipTransition } from "./video-keyframes";
 
 export type VideoMediaElements = { videos: Record<string, HTMLVideoElement>; images: Record<string, HTMLImageElement> };
 
@@ -18,12 +18,7 @@ export function drawVideoComposition(
   for (const clip of clips) {
     const asset = assets.find((item) => item.id === clip.assetId);
     const clipTime = time - clip.start;
-    const clipDuration = getClipLength(clip);
-    const fadeIn = Math.max(0, Math.min(clipDuration, clip.transitions?.fadeIn ?? 0));
-    const fadeOut = Math.max(0, Math.min(clipDuration, clip.transitions?.fadeOut ?? 0));
-    const fadeInAlpha = fadeIn > 0 ? Math.min(1, clipTime / fadeIn) : 1;
-    const fadeOutAlpha = fadeOut > 0 ? Math.min(1, (clipDuration - clipTime) / fadeOut) : 1;
-    const transitionAlpha = Math.min(fadeInAlpha, fadeOutAlpha);
+    const transitionAlpha = evaluateClipTransition(clip, clipTime);
     if (asset?.kind === "text" && asset.textSettings) {
       const transform = evaluateClipKeyframes(clip, clipTime).transform;
       const settings = asset.textSettings;
