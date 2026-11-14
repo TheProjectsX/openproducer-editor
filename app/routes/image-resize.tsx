@@ -22,6 +22,9 @@ export default function ImageResize() {
   const [ratioMode, setRatioMode] = useState("free");
   const [customRatioWidth, setCustomRatioWidth] = useState("1");
   const [customRatioHeight, setCustomRatioHeight] = useState("1");
+  const [brightness, setBrightness] = useState("100");
+  const [contrast, setContrast] = useState("100");
+  const [saturation, setSaturation] = useState("100");
   const [error, setError] = useState("");
 
   const originalRatio = source ? source.width / source.height : 1;
@@ -57,12 +60,15 @@ export default function ImageResize() {
       }
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = "high";
+      const amount = (value: string) => value.trim() && Number.isFinite(Number(value)) ? Math.min(300, Math.max(0, Number(value))) : 100;
+      context.filter = `brightness(${amount(brightness)}%) contrast(${amount(contrast)}%) saturate(${amount(saturation)}%)`;
       context.drawImage(image, 0, 0, width, height);
+      context.filter = "none";
       setError("");
     };
     image.onerror = () => setError("The selected image could not be decoded.");
     image.src = source.url;
-  }, [source, width, height, outputValid]);
+  }, [source, width, height, outputValid, brightness, contrast, saturation]);
 
   function importImage(file?: File) {
     if (!file) return;
@@ -134,8 +140,8 @@ export default function ImageResize() {
       </header>
       <section className="resize-intro">
         <p className="eyebrow">IMAGE TOOL · PRIVATE BY DESIGN</p>
-        <h1>Resize to the pixels you need.</h1>
-        <p>Set an exact output size. Your image stays in this browser and is never uploaded.</p>
+        <h1>Resize and adjust your image.</h1>
+        <p>Set exact output pixels and tune brightness, contrast, and saturation. Your image stays in this browser.</p>
       </section>
       <section className="resize-workspace" aria-label="Image resizing workspace">
         <div className="resize-controls">
@@ -151,6 +157,11 @@ export default function ImageResize() {
           <label className="ratio-field">Aspect ratio<select value={ratioMode} onChange={(event) => chooseRatio(event.currentTarget.value)}><option value="free">Custom dimensions (stretch)</option><option value="original">Original ratio</option><option value="1:1">1:1 · Square</option><option value="4:3">4:3</option><option value="3:2">3:2</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="custom">Custom ratio</option></select></label>
           {ratioMode === "custom" && <div className="dimension-fields"><label>Ratio width<input type="number" min="1" step="any" value={customRatioWidth} onChange={(event) => { setCustomRatioWidth(event.currentTarget.value); if (Number(event.currentTarget.value) > 0) setHeight(Math.max(1, Math.round(width * Number(customRatioHeight) / Number(event.currentTarget.value)))); }} /></label><label>Ratio height<input type="number" min="1" step="any" value={customRatioHeight} onChange={(event) => { setCustomRatioHeight(event.currentTarget.value); if (Number(event.currentTarget.value) > 0) setHeight(Math.max(1, Math.round(width * Number(event.currentTarget.value) / Number(customRatioWidth)))); }} /></label></div>}
           <p className="resize-note">{ratio ? "Changing either dimension keeps the selected ratio. The full image is stretched to fit; no crop or padding is added." : "Custom dimensions resize the full image without cropping or padding."} Exports are limited to 100 megapixels and 32,768 px per side.</p>
+          <div className="filter-fields" aria-label="Image adjustments">
+            <label>Brightness <span>0–300%</span><input type="number" min="0" max="300" step="any" value={brightness} onChange={(event) => setBrightness(event.currentTarget.value)} /></label>
+            <label>Contrast <span>0–300%</span><input type="number" min="0" max="300" step="any" value={contrast} onChange={(event) => setContrast(event.currentTarget.value)} /></label>
+            <label>Saturation <span>0–300%</span><input type="number" min="0" max="300" step="any" value={saturation} onChange={(event) => setSaturation(event.currentTarget.value)} /></label>
+          </div>
           <button className="export-button" type="button" disabled={!source || !outputValid} onClick={download}>Download PNG</button>
           {error && <p className="resize-error" role="alert">{error}</p>}
         </div>

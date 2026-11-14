@@ -54,6 +54,10 @@ a { color: inherit; }
 .ratio-toggle input { width: 17px; height: 17px; accent-color: #5364d7; }
 .ratio-field { display: flex; flex-direction: column; gap: 8px; color: #505d75; font-size: 13px; font-weight: 700; }
 .ratio-field select { width: 100%; border: 1px solid #d9deea; border-radius: 9px; padding: 12px 10px; background: #fff; color: #172033; font: inherit; font-size: 15px; }
+.filter-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.filter-fields label { display: grid; gap: 7px; color: #505d75; font-size: 12px; font-weight: 700; }
+.filter-fields label span { color: #8992a4; font-weight: 500; }
+.filter-fields input { width: 100%; min-width: 0; border: 1px solid #d9deea; border-radius: 9px; padding: 10px 7px; color: #172033; font: inherit; font-size: 14px; }
 .export-button { margin-top: auto; min-height: 48px; border: 0; border-radius: 11px; background: #4e5fd0; color: white; font: inherit; font-weight: 750; cursor: pointer; }
 .export-button:disabled { background: #aeb5c8; cursor: not-allowed; }
 .secondary-button { background: #263452; }
