@@ -21,6 +21,7 @@ export default function Home() {
       </section>
       <section className="resize-workspace" aria-label="Available tools">
         <a className="tool-card" href="/tools/image/resize"><span className="eyebrow">IMAGE</span><strong>Resize image pixels</strong><span>Set exact width and height without cropping.</span><span className="tool-link">Open image resize →</span></a>
+        <a className="tool-card" href="/tools/image/upscale"><span className="eyebrow">IMAGE</span><strong>Upscale image</strong><span>Set a custom multiplier or exact output dimensions.</span><span className="tool-link">Open image upscaler →</span></a>
         <a className="tool-card" href="/tools/audio/trim"><span className="eyebrow">AUDIO</span><strong>Trim audio</strong><span>Choose exact start and end times and export WAV.</span><span className="tool-link">Open audio trim →</span></a>
         <a className="tool-card" href="/tools/audio/speed"><span className="eyebrow">AUDIO</span><strong>Change audio speed</strong><span>Set a custom speed while keeping pitch steady.</span><span className="tool-link">Open audio speed →</span></a>
         <a className="tool-card" href="/tools/audio/merge"><span className="eyebrow">AUDIO</span><strong>Merge audio files</strong><span>Arrange multiple files, add a custom gap, and export one WAV.</span><span className="tool-link">Open audio merge →</span></a>

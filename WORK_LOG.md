@@ -131,4 +131,12 @@
 - Uses envelope-following gain reduction with a soft knee, preserving the source sample rate and channel count.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/audio/noise-gate`; the generated offline worker includes 27 static assets and 12 HTML routes.
 - Limitation: this is a broadband gate for quieter noise, not neural or spectral denoising; voice quality and threshold tuning need sample-based browser evaluation. Audio processing currently runs on the UI thread.
+- Commit: `9df2245 feat: add local audio noise gate`.
+
+## 2026-11-14 — M0 image upscaling prototype
+
+- Added `/tools/image/upscale` with custom 1×–8× multipliers, exact target dimensions, optional aspect matching, preview, output estimates, and PNG download.
+- Uses high-quality browser canvas resampling with 100-megapixel and 32,768-pixel side limits. The interface explicitly states that this enlarges/interpolates pixels and does not invent details with AI.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/image/upscale`; the generated worker includes 28 static assets and 13 HTML routes.
+- Limitation: the requested AI super-resolution model, optional offline model download, tiling/progress, and before/after zoom comparison remain future work.
 - Commit: pending.
