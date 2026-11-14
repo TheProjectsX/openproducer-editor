@@ -28,6 +28,8 @@ export default function VideoStudio() {
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState("60");
   const [exporting, setExporting] = useState(false);
+  const [extractingAudio, setExtractingAudio] = useState(false);
+  const [extractProgress, setExtractProgress] = useState(0);
   const [exportProgress, setExportProgress] = useState(0);
   const [resultUrl, setResultUrl] = useState("");
   const [resultType, setResultType] = useState("");
@@ -38,6 +40,7 @@ export default function VideoStudio() {
   const [heightDraft, setHeightDraft] = useState("1080");
   const cancelExportRef = useRef(false);
   const cancelOutputRef = useRef<(() => void) | null>(null);
+  const audioConversionRef = useRef<import("mediabunny").Conversion | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement>>({});
   const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
@@ -190,6 +193,43 @@ export default function VideoStudio() {
     const values = evaluateClipKeyframes(selectedClip, time);
     editClip(selectedClip.id, { keyframes: upsertClipKeyframe(selectedClip, { time, ...values }) });
     setStatus(`Keyframe set at ${time.toFixed(2)} seconds in the selected clip.`);
+  }
+  async function detachVideoAudio() {
+    if (!projectId || !selectedClip || selectedAsset?.kind !== "video") return;
+    const videoFile = files[selectedAsset.id];
+    if (!videoFile) { setError("The video source is missing. Re-import it before detaching audio."); return; }
+    if (timeline.assets.some((asset) => asset.kind === "audio" && asset.derivedFromAssetId === selectedAsset.id)) { setError("Audio has already been detached from this source. Remove its audio asset before detaching again."); return; }
+    setExtractingAudio(true); setExtractProgress(0); setError("");
+    let input: import("mediabunny").Input | undefined;
+    try {
+      const { ALL_FORMATS, BlobSource, BufferTarget, Conversion, Input, Output, WavOutputFormat } = await import("mediabunny");
+      input = new Input({ source: new BlobSource(videoFile), formats: ALL_FORMATS });
+      const target = new BufferTarget();
+      const output = new Output({ format: new WavOutputFormat(), target });
+      const conversion = await Conversion.init({ input, output, tracks: "primary", video: { discard: true }, audio: { numberOfChannels: 2, sampleRate: 48_000, sampleFormat: "s16" } });
+      audioConversionRef.current = conversion;
+      if (!conversion.isValid || !conversion.utilizedTracks.length) throw new Error("This video has no primary audio track that the browser can detach.");
+      conversion.onProgress = (value) => setExtractProgress(Math.round(value * 100));
+      await conversion.execute();
+      if (!target.buffer || target.buffer.byteLength > 512 * 1024 * 1024) throw new Error("The detached audio exceeds the 512 MiB project limit.");
+      const audioFile = new File([target.buffer], `Audio - ${selectedAsset.name.replace(/\.[^.]+$/, "")}.wav`, { type: "audio/wav" });
+      if (timelineRef.current.assets.reduce((total, asset) => total + asset.size, audioFile.size) > 512 * 1024 * 1024) throw new Error("Detaching this audio would exceed the 512 MiB total project media limit.");
+      const audioId = crypto.randomUUID();
+      const audioDuration = Math.max(0.01, (target.buffer.byteLength - 44) / (48_000 * 2 * 2));
+      const audioAsset: VideoTimelineAsset = { id: audioId, name: audioFile.name, type: audioFile.type, size: audioFile.size, duration: audioDuration, kind: "audio", derivedFromAssetId: selectedAsset.id };
+      const sourceEnd = Math.min(selectedClip.sourceEnd, audioDuration);
+      if (sourceEnd <= selectedClip.sourceStart) throw new Error("The extracted audio track does not cover this video clip's selected source range.");
+      const audioClip: VideoTimelineClip = { id: crypto.randomUUID(), assetId: audioId, track: -1, start: selectedClip.start, sourceStart: selectedClip.sourceStart, sourceEnd, speed: selectedClip.speed, volume: selectedClip.volume, muted: false };
+      const current = timelineRef.current;
+      const updated = { ...current, assets: [...current.assets, audioAsset], clips: [...current.clips, audioClip], duration: Math.max(current.duration, audioClip.start + clipLength(audioClip)) };
+      await saveVideoTimeline(projectId, updated, [{ id: audioId, file: audioFile }]);
+      setFiles((previous) => ({ ...previous, [audioId]: audioFile }));
+      applyTimelineEdit(() => updated); setSelected(audioClip.id); setStatus("Source audio detached into Audio 1 as a local editable WAV clip.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not detach the video's audio track."); }
+    finally { audioConversionRef.current = null; setExtractingAudio(false); setExtractProgress(0); }
+  }
+  async function cancelAudioExtraction() {
+    if (audioConversionRef.current) await audioConversionRef.current.cancel().catch(() => undefined);
   }
   function removeKeyframeAtPlayhead() {
     if (!selectedClip?.keyframes?.length) return;
@@ -376,7 +416,8 @@ export default function VideoStudio() {
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav><a href="/projects">Projects</a></nav><span role="status">{status}</span></header>
     <div className="video-studio-top"><section><p className="eyebrow">LOCAL VIDEO STUDIO · TIMELINE FOUNDATION</p><h1>Video Studio</h1><p>Arrange local video, image, and audio clips on independent tracks. Project edits and imported assets stay in this browser.</p></section><label className="file-picker"><span>{projectId ? "Import video, audio, or images" : "Open a project to import media"}<input type="file" multiple accept="video/*,audio/*,image/*" disabled={!projectId || exporting} onChange={(event) => void importFiles(event.currentTarget.files)} /></span></label></div>
     {error && <p className="resize-error" role="alert">{error}</p>}
-    <section className="video-editor-layout" inert={exporting}>
+    {extractingAudio && <p className="source-info" role="status">Detaching source audio: {extractProgress}% <button className="editor-action danger" onClick={() => void cancelAudioExtraction()}>Cancel</button></p>}
+    <section className="video-editor-layout" inert={exporting || extractingAudio}>
       <aside className="video-bin"><div className="preview-heading"><strong>Media bin</strong><span>{timeline.assets.length} items</span></div>{timeline.assets.map((asset) => <button key={asset.id} className="bin-item" onClick={() => setSelected(timeline.clips.find((clip) => clip.assetId === asset.id)?.id ?? "")}><strong>{asset.name}</strong><small>{asset.kind} · {asset.duration.toFixed(2)} s · {(asset.size / 1048576).toFixed(1)} MiB</small></button>)}{!timeline.assets.length && <p className="resize-note">Import media to build your timeline.</p>}</aside>
       <section className="editor-preview"><div className="preview-heading"><strong>Composite preview</strong><span>{previewAsset?.name ?? "Nothing at playhead"} · {timeline.playhead.toFixed(2)} s · {timeline.width}×{timeline.height}</span></div><div className="editor-stage"><canvas ref={canvasRef} aria-label="Composited video timeline preview" /><div className="media-sources" aria-hidden="true">{timeline.assets.filter((asset) => asset.kind === "image").map((asset) => <img key={asset.id} ref={(el) => { if (el) imageRefs.current[asset.id] = el; else delete imageRefs.current[asset.id]; }} src={assetUrls[asset.id]} alt="" onLoad={() => setMediaRevision((n) => n + 1)} />)}{timeline.clips.filter((clip) => timeline.assets.find((asset) => asset.id === clip.assetId)?.kind === "video").map((clip) => <video key={clip.id} ref={(el) => { if (el) videoRefs.current[clip.id] = el; else delete videoRefs.current[clip.id]; }} src={assetUrls[clip.assetId]} muted playsInline preload="auto" onLoadedData={() => setMediaRevision((n) => n + 1)} />)}{timeline.clips.filter((clip) => clip.track < 0).map((clip) => <audio key={clip.id} ref={(el) => { if (el) audioRefs.current[clip.id] = el; else delete audioRefs.current[clip.id]; }} src={assetUrls[clip.assetId]} preload="auto" />)}</div></div><div className="editor-transport"><button onClick={togglePlayback}>{playing ? "Pause" : "Play"}</button><button onClick={() => setTimeline((current) => ({ ...current, playhead: 0 }))}>Start</button><label>Playhead (s)<input type="number" min="0" max={timeline.duration} step="any" value={timeline.playhead.toFixed(2)} onChange={(event) => setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, Number(event.currentTarget.value) || 0)) }))} /></label></div></section>
       <aside className="video-inspector">
@@ -388,6 +429,7 @@ export default function VideoStudio() {
           <label className="speed-field">Source out <span>seconds</span><input type="number" min="0.01" max={selectedAsset?.duration} step="any" value={selectedClip.sourceEnd} onChange={(event) => editClip(selectedClip.id, { sourceEnd: Math.min(selectedAsset?.duration ?? selectedClip.sourceEnd, Math.max(selectedClip.sourceStart + 0.01, Number(event.currentTarget.value) || 0)) })} /></label>
           <label className="speed-field">Speed <span>custom 0.1-16x</span><input type="number" min="0.1" max="16" step="any" value={selectedClip.speed} onChange={(event) => editClip(selectedClip.id, { speed: Math.max(0.1, Math.min(16, Number(event.currentTarget.value) || 1)) })} /></label>
           <label className="speed-field">Volume <span>custom 0-1x</span><input type="number" min="0" max="1" step="any" value={selectedValues?.volume ?? selectedClip.volume} onChange={(event) => editClip(selectedClip.id, { volume: Math.max(0, Math.min(1, Number(event.currentTarget.value) || 0)) })} /></label>
+          {selectedAsset?.kind === "video" && <button className="secondary-button editor-action" disabled={extractingAudio} onClick={() => void detachVideoAudio()}>Detach source audio to Audio 1</button>}
           <button className="secondary-button editor-action" onClick={addOrUpdateKeyframe}>Add/update keyframe at playhead</button>
           {selectedClip.keyframes?.some((frame) => Math.abs(frame.time - Math.max(0, Math.min(clipLength(selectedClip), timeline.playhead - selectedClip.start))) < 0.05) && <button className="editor-action" onClick={removeKeyframeAtPlayhead}>Remove keyframe at playhead</button>}
           <p className="resize-note">{selectedClip.keyframes?.length ?? 0} keyframe(s). Values interpolate linearly between keys in clip-relative seconds.</p>

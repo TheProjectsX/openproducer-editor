@@ -13,7 +13,7 @@ export type LocalProject = {
 };
 
 export type VideoTextSettings = { text: string; fontSize: number; color: string; backgroundColor: string; showBackground: boolean };
-export type VideoTimelineAsset = { id: string; name: string; type: string; size: number; duration: number; kind: "video" | "audio" | "image" | "text"; textSettings?: VideoTextSettings };
+export type VideoTimelineAsset = { id: string; name: string; type: string; size: number; duration: number; kind: "video" | "audio" | "image" | "text"; derivedFromAssetId?: string; textSettings?: VideoTextSettings };
 export type VideoClipTransform = { x: number; y: number; scale: number; rotation: number; opacity: number };
 export type VideoClipTransitions = { fadeIn: number; fadeOut: number };
 export type VideoClipKeyframe = { time: number; transform: VideoClipTransform; volume: number };

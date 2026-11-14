@@ -294,7 +294,7 @@
 ## 2026-11-14 — M6 audio fade transitions
 
 - Extended per-clip custom fade-in/fade-out from visual clips to audio clips. Live audio preview and rendered PCM apply the same linear envelope; overlapping clips on audio lanes can now crossfade.
-- Updated the feature matrix and implementation decisions. Curved fades and source-video embedded-audio extraction in the timeline remain outstanding.
+- Updated the feature matrix and implementation decisions. Curved fades remain outstanding.
 - Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
 - Commit: `848f32e feat: add audio timeline fade transitions`.
 
@@ -302,4 +302,11 @@
 
 - Added visible keyframe markers on clip blocks and a control for removing the key at the playhead, completing basic key placement and cleanup affordances.
 - Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
+- Commit: `b5657c5 feat: add timeline keyframe markers and removal`.
+
+## 2026-11-14 — M6 source audio detachment
+
+- Added a cancellable local WAV extraction action for the selected video clip. The extracted audio is stored as a normal local project asset and placed on Audio 1 with the clip's timeline start, source trim, and speed; the video source itself remains untouched.
+- Enforced the existing 512 MiB project media limit and added duplicate-detachment detection. Updated the known behavior: source audio is available through explicit detachment, not auto-mixed from video clips.
+- Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker. Typecheck required workspace write permission for generated React Router route types.
 - Commit: pending.
