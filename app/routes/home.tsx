@@ -35,6 +35,7 @@ export default function Home() {
         <a className="tool-card" href="/tools/video/extract-audio"><span className="eyebrow">VIDEO</span><strong>Extract video audio</strong><span>Export the primary audio track as a local WAV.</span><span className="tool-link">Open audio extractor →</span></a>
         <a className="tool-card" href="/tools/video/speed"><span className="eyebrow">VIDEO</span><strong>Custom video speed</strong><span>Record local playback at a custom rate with browser-supported audio pitch control.</span><span className="tool-link">Open video speed →</span></a>
         <a className="tool-card" href="/tools/video/remove-audio"><span className="eyebrow">VIDEO</span><strong>Remove video audio</strong><span>Discard the main audio track and export a muted local MP4.</span><span className="tool-link">Open audio remover →</span></a>
+        <a className="tool-card" href="/tools/video/replace-audio"><span className="eyebrow">VIDEO</span><strong>Replace video audio</strong><span>Add a local soundtrack with a custom start offset.</span><span className="tool-link">Open audio replacement →</span></a>
         <article className="tool-card coming-soon"><span className="eyebrow">VIDEO</span><strong>Multitrack video studio</strong><span>Build edits on a CapCut-style timeline.</span><span className="tool-link">Planned</span></article>
       </section>
     </main>

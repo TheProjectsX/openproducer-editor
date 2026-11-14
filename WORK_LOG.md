@@ -179,7 +179,7 @@
 - Added rotated-size output limits, custom degree input, preview dimensions, PNG naming, and project auto-save/restore for transform settings.
 - Verification: `npm run typecheck` passed. `npm run build` passed with all routes prerendered and the offline worker regenerated; its route/asset count remains 17/32.
 - Limitation: no arbitrary-angle drag control, vertical flip, rotation interpolation modes, or nondestructive transform stack yet.
-- Commit: pending.
+- Commit: `a2e660d feat: add image rotation and flip controls`.
 
 ## 2026-11-14 — M0 custom video speed prototype
 
@@ -195,4 +195,12 @@
 - Limits input and buffered output to 512 MiB; video packet copying is preferred by Mediabunny where supported, with conversion fallback.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/video/remove-audio`; the generated worker contains 34 assets and 19 routes.
 - Limitation: this removes the primary audio track only; multiple audio tracks, container choice, and streaming output remain future work.
+- Commit: `9be1af1 feat: add local video audio removal`.
+
+## 2026-11-14 — M0 video audio replacement
+
+- Added `/tools/video/replace-audio` to compose a local video track and replacement audio track into MP4, with a custom 0–600 second start offset and synchronized progress.
+- Uses Mediabunny composable conversions, trims new audio to the remaining video duration, and caps each source/output at 512 MiB.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/video/replace-audio`; the generated worker now includes 35 assets and 20 routes.
+- Limitation: output requires supported video/audio browser codecs; no custom gain/fades, waveform alignment, multiple audio tracks, or streaming target yet.
 - Commit: pending.
