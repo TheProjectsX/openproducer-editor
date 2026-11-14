@@ -16,6 +16,7 @@ export default [
   route("tools/video/trim", "routes/video-trim.tsx"),
   route("tools/video/extract-audio", "routes/video-extract-audio.tsx"),
   route("tools/video/speed", "routes/video-speed.tsx"),
+  route("tools/video/remove-audio", "routes/video-remove-audio.tsx"),
   route("projects", "routes/projects.tsx"),
   route("studio/image", "routes/studio-image.tsx"),
 ] satisfies RouteConfig;

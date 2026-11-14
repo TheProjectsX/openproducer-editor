@@ -187,4 +187,12 @@
 - Uses `HTMLMediaElement.captureStream` and `MediaRecorder` only when the browser reports a compatible capture/recording path; the output container/extension is selected from supported MIME types.
 - Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/video/speed`; the generated worker contains 33 assets and 18 routes.
 - Limitation: export runs in real time, browser codecs and captured audio behavior vary, and output is WebM in browsers without MP4 MediaRecorder support. User must inspect output, especially at extreme speeds where browsers may mute audio.
+- Commit: `886cfd1 feat: add custom local video speed recording`.
+
+## 2026-11-14 — M0 video audio removal
+
+- Added `/tools/video/remove-audio` with local preview, primary audio discard, Mediabunny conversion progress, and muted MP4 export.
+- Limits input and buffered output to 512 MiB; video packet copying is preferred by Mediabunny where supported, with conversion fallback.
+- Verification: `npm run typecheck` passed. `npm run build` passed and prerendered `/tools/video/remove-audio`; the generated worker contains 34 assets and 19 routes.
+- Limitation: this removes the primary audio track only; multiple audio tracks, container choice, and streaming output remain future work.
 - Commit: pending.
