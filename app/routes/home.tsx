@@ -23,7 +23,8 @@ export default function Home() {
         <a className="tool-card" href="/tools/image/resize"><span className="eyebrow">IMAGE</span><strong>Resize image pixels</strong><span>Set exact width and height without cropping.</span><span className="tool-link">Open image resize →</span></a>
         <a className="tool-card" href="/tools/audio/trim"><span className="eyebrow">AUDIO</span><strong>Trim audio</strong><span>Choose exact start and end times and export WAV.</span><span className="tool-link">Open audio trim →</span></a>
         <a className="tool-card" href="/tools/audio/speed"><span className="eyebrow">AUDIO</span><strong>Change audio speed</strong><span>Set a custom speed while keeping pitch steady.</span><span className="tool-link">Open audio speed →</span></a>
-        <article className="tool-card coming-soon"><span className="eyebrow">VIDEO</span><strong>Video studio</strong><span>Build edits on a multitrack timeline.</span><span className="tool-link">Coming later</span></article>
+        <a className="tool-card" href="/tools/video/trim"><span className="eyebrow">VIDEO</span><strong>Trim video</strong><span>Choose a precise range and export a local MP4.</span><span className="tool-link">Open video trim →</span></a>
+        <article className="tool-card coming-soon"><span className="eyebrow">VIDEO</span><strong>Multitrack video studio</strong><span>Build edits on a CapCut-style timeline.</span><span className="tool-link">Planned</span></article>
       </section>
     </main>
   );
