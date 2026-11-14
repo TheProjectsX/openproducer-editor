@@ -282,4 +282,11 @@
 - Added linear interpolation shared by the video compositor, live audio preview, and exported audio mix. The model remains backward compatible for clips without keyframes.
 - Updated the feature matrix and implementation decisions.
 - Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
+- Commit: `bd2786a feat: add interpolated video timeline keyframes`.
+
+## 2026-11-14 — M6 visual clip filters
+
+- Added custom brightness, contrast, saturation, and grayscale controls for video and image clips. Filters are saved as clip instructions and applied by the shared canvas preview/export compositor.
+- Updated the feature matrix and implementation decisions with the browser canvas-filter caveat.
+- Verification: `npm run typecheck` passed, `git diff --check` passed. `npm run build` passed and prerendered `/studio/video` plus generated the offline service worker.
 - Commit: pending.

@@ -46,8 +46,10 @@ export function drawVideoComposition(
     const fitScale = Math.min(canvas.width / width, canvas.height / height);
     const transform = evaluateClipKeyframes(clip, clipTime).transform;
     const drawWidth = width * fitScale * transform.scale; const drawHeight = height * fitScale * transform.scale;
+    const effects = clip.effects ?? { brightness: 100, contrast: 100, saturation: 100, grayscale: 0 };
     context.save();
     context.globalAlpha = Math.max(0, Math.min(1, transform.opacity * transitionAlpha));
+    context.filter = `brightness(${effects.brightness}%) contrast(${effects.contrast}%) saturate(${effects.saturation}%) grayscale(${effects.grayscale}%)`;
     context.translate(canvas.width / 2 + transform.x, canvas.height / 2 + transform.y);
     context.rotate(transform.rotation * Math.PI / 180);
     context.drawImage(source, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
