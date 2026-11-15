@@ -21,6 +21,8 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("project");
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const interactionCanvasRef = useRef<HTMLCanvasElement>(null);
+  const layerGestureRef = useRef<{ id: string; pointerId: number; startX: number; startY: number; layer: ImageLayer; last: ImageLayer; mode: "move" | "resize" } | null>(null);
   const [source, setSource] = useState<SourceImage | null>(null);
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
@@ -104,6 +106,28 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
   }, [source, width, height, rotatedWidth, rotatedHeight, radians, flipHorizontal, outputValid, brightness, contrast, saturation, layers]);
 
   useEffect(() => {
+    const canvas = canvasRef.current, overlay = interactionCanvasRef.current;
+    const context = overlay?.getContext("2d");
+    if (!canvas || !overlay || !context || !source || !outputValid) return;
+    overlay.width = canvas.width; overlay.height = canvas.height;
+    context.clearRect(0, 0, overlay.width, overlay.height);
+    const selected = layers.find((layer) => layer.id === selectedLayerId && layer.visible);
+    if (!selected) return;
+    const point = (x: number, y: number) => {
+      let dx = x - width / 2, dy = y - height / 2;
+      if (flipHorizontal) dx *= -1;
+      return { x: rotatedWidth / 2 + dx * Math.cos(radians) - dy * Math.sin(radians), y: rotatedHeight / 2 + dx * Math.sin(radians) + dy * Math.cos(radians) };
+    };
+    const corners = [point(selected.x, selected.y), point(selected.x + selected.width, selected.y), point(selected.x + selected.width, selected.y + selected.height), point(selected.x, selected.y + selected.height)];
+    context.beginPath(); context.moveTo(corners[0].x, corners[0].y);
+    for (const corner of corners.slice(1)) context.lineTo(corner.x, corner.y);
+    context.closePath(); context.strokeStyle = "#a7c8ff"; context.lineWidth = Math.max(1, overlay.width / 900); context.setLineDash([7, 4]); context.stroke(); context.setLineDash([]);
+    const handle = corners[2], radius = Math.max(5, overlay.width / 110);
+    context.fillStyle = "#dceaff"; context.strokeStyle = "#3979e6"; context.lineWidth = Math.max(2, overlay.width / 500);
+    context.beginPath(); context.rect(handle.x - radius, handle.y - radius, radius * 2, radius * 2); context.fill(); context.stroke();
+  }, [source, width, height, rotatedWidth, rotatedHeight, radians, flipHorizontal, outputValid, layers, selectedLayerId]);
+
+  useEffect(() => {
     if (!projectId) return;
     let cancelled = false;
     void (async () => {
@@ -135,6 +159,7 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
 
   useEffect(() => {
     if (!source) return;
+    if (layerGestureRef.current) return;
     const snapshot = getSettingsSnapshot();
     if (recordImageEdit(historyRef.current, source.file, snapshot)) refreshHistory((version) => version + 1);
   }, [source, width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation, rotation, flipHorizontal, layers, exportFormat, jpegQuality]);
@@ -194,6 +219,49 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
   }
   function updateLayer(id: string, values: Partial<ImageLayer>) {
     updateLayers(layers.map((layer) => layer.id === id ? { ...layer, ...values } : layer));
+  }
+  function imagePointFromPointer(event: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current, overlay = interactionCanvasRef.current;
+    if (!canvas || !overlay) return null;
+    const bounds = overlay.getBoundingClientRect();
+    const outputX = (event.clientX - bounds.left) * overlay.width / bounds.width - rotatedWidth / 2;
+    const outputY = (event.clientY - bounds.top) * overlay.height / bounds.height - rotatedHeight / 2;
+    let x = outputX * Math.cos(radians) + outputY * Math.sin(radians);
+    const y = -outputX * Math.sin(radians) + outputY * Math.cos(radians);
+    if (flipHorizontal) x *= -1;
+    return { x: x + width / 2, y: y + height / 2 };
+  }
+  function beginLayerGesture(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (!source || !outputValid) return;
+    const point = imagePointFromPointer(event); if (!point) return;
+    const hit = [...layers].reverse().find((layer) => layer.visible && point.x >= layer.x && point.x <= layer.x + layer.width && point.y >= layer.y && point.y <= layer.y + layer.height);
+    if (!hit) { setSelectedLayerId(""); return; }
+    setSelectedLayerId(hit.id);
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const tolerance = 14 * event.currentTarget.width / Math.max(1, bounds.width);
+    const mode = hit.id === selectedLayerId && Math.abs(point.x - hit.x - hit.width) <= tolerance && Math.abs(point.y - hit.y - hit.height) <= tolerance ? "resize" : "move";
+    layerGestureRef.current = { id: hit.id, pointerId: event.pointerId, startX: point.x, startY: point.y, layer: hit, last: hit, mode };
+    event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault();
+  }
+  function moveLayerGesture(event: React.PointerEvent<HTMLCanvasElement>) {
+    const gesture = layerGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const point = imagePointFromPointer(event); if (!point) return;
+    const dx = point.x - gesture.startX, dy = point.y - gesture.startY;
+    const updated = gesture.mode === "move"
+      ? { ...gesture.layer, x: gesture.layer.x + dx, y: gesture.layer.y + dy }
+      : { ...gesture.layer, width: Math.max(1, gesture.layer.width + dx), height: Math.max(1, gesture.layer.height + dy) };
+    gesture.last = updated;
+    setLayers((current) => current.map((layer) => layer.id === gesture.id ? updated : layer));
+  }
+  function endLayerGesture(event: React.PointerEvent<HTMLCanvasElement>) {
+    const gesture = layerGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    layerGestureRef.current = null;
+    const finalLayers = layers.map((layer) => layer.id === gesture.id ? gesture.last : layer);
+    setLayers(finalLayers);
+    const snapshot = structuredClone({ width, height, ratioMode, customRatioWidth, customRatioHeight, brightness, contrast, saturation, rotation, flipHorizontal, layers: finalLayers, exportFormat, jpegQuality });
+    if (recordImageEdit(historyRef.current, source?.file, snapshot)) refreshHistory((version) => version + 1);
   }
   function reorderLayer(id: string, direction: -1 | 1) {
     const index = layers.findIndex((layer) => layer.id === id), nextIndex = index + direction;
@@ -318,7 +386,11 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
         <div className="resize-preview">
           <div className="preview-heading"><strong>Output preview</strong><span>{source && outputValid ? `${rotatedWidth} × ${rotatedHeight} px` : "Choose an image to begin"}</span></div>
           {!source && <div className="empty-preview">Your image preview will appear here.</div>}
-          <canvas ref={canvasRef} className={source ? "preview-canvas" : "preview-canvas hidden"} aria-label="Resized image preview" />
+          <div className={`image-editor-canvas-stage${source ? "" : " hidden"}`}>
+            <canvas ref={canvasRef} className="preview-canvas" aria-label="Resized image preview" />
+            {source && <canvas ref={interactionCanvasRef} className="image-layer-interaction" aria-label="Image overlay layers. Drag a selected layer to move it or drag its corner to resize." onPointerDown={beginLayerGesture} onPointerMove={moveLayerGesture} onPointerUp={endLayerGesture} onPointerCancel={endLayerGesture} />}
+          </div>
+          {!source && <div className="empty-preview">Your image preview will appear here.</div>}
         </div>
       </section>
     </main>

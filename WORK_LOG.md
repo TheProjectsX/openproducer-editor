@@ -9,6 +9,12 @@
 - Verification: `npm.cmd run typecheck` passed. `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable). The generated service worker includes 94 assets, including the bundled font files. The known ~643 kB processing chunk and Bungee dynamic-import warning remain. Visual browser review is pending because this session still does not expose direct Chrome controls; the localhost preview has been queued in the Codex browser panel.
 - Commit is pending for this slice.
 
+## 2026-11-15 — Interactive image overlay canvas
+
+- Added a separate transparent interaction canvas over Image Resize's export canvas. Users can select a visible overlay by clicking it, drag it to reposition, and drag the selected lower-right handle to resize it. Pointer coordinates are mapped back through preview scaling, image rotation, and horizontal flip.
+- Selection outlines and handles are rendered on the interaction canvas and therefore do not appear in exported PNG/JPEG output. Existing numeric position/size inputs remain available for precise values. A pointer gesture is recorded as one undo history action.
+- Verification: typecheck and production build passed (27 prerendered routes, 94 cached assets). Visual drag, transformed-image hit testing, export cleanliness, and single-step undo need browser interaction review.
+
 ## 2026-11-14 — Repository foundation
 
 - Initialized an empty Git repository in the project workspace.
