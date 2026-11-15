@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/video-trim";
 import { MediaImportScreen } from "../components/media-import-screen";
 import { ProcessingProgress } from "../components/processing-progress";
+import { CustomMediaPreview } from "../components/custom-media-preview";
 
 const MAX_INPUT_BYTES = 512 * 1024 * 1024;
 
@@ -29,10 +30,9 @@ export default function VideoTrim() {
   const [playhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
 
-  useEffect(() => () => {
-    if (sourceUrl) URL.revokeObjectURL(sourceUrl);
-    if (resultUrl) URL.revokeObjectURL(resultUrl);
-  }, [sourceUrl, resultUrl]);
+  useEffect(() => () => { if (sourceUrl) URL.revokeObjectURL(sourceUrl); }, [sourceUrl]);
+  useEffect(() => () => { if (resultUrl) URL.revokeObjectURL(resultUrl); }, [resultUrl]);
+  useEffect(() => { setResultUrl(""); setResultName(""); }, [start, end]);
 
   function selectFile(next: File | undefined) {
     setError(""); setProgress(null); setDuration(0); setEnd(""); setPlayhead(0); setPlaying(false);
@@ -122,11 +122,12 @@ export default function VideoTrim() {
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={resultName}>Download {resultName}</a>}
       </div>
       <div className="resize-preview video-trim-preview">
-        <div className="preview-heading"><strong>Video preview</strong><span>{duration ? `${playhead.toFixed(3)} / ${duration.toFixed(3)} s` : "Loading video metadata…"}</span></div>
-        <div className="trim-video-stage">{sourceUrl && <video ref={videoRef} className="trim-video-surface" src={sourceUrl} playsInline preload="metadata" onLoadedMetadata={(event) => { const length = event.currentTarget.duration; if (Number.isFinite(length)) { setDuration(length); setEnd(precise(length)); } }} onTimeUpdate={(event) => { const time = event.currentTarget.currentTime; setPlayhead(time); if (stopAtRef.current !== null && time >= stopAtRef.current) { event.currentTarget.pause(); stopAtRef.current = null; setPlaying(false); } }} onPause={() => { setPlaying(false); }} onEnded={() => setPlaying(false)} />}</div>
+        <div className="preview-heading"><strong>{resultUrl ? "Trimmed video result" : "Video preview"}</strong><span>{resultUrl ? `${(to - from).toFixed(3)} s · updated selection` : duration ? `${playhead.toFixed(3)} / ${duration.toFixed(3)} s` : "Loading video metadata…"}</span></div>
+        {resultUrl ? <><CustomMediaPreview kind="video" src={resultUrl} label="Trimmed video result" /><button type="button" className="editor-action" onClick={() => { setResultUrl(""); setResultName(""); }}>Edit selection</button></> : <><div className="trim-video-stage">{sourceUrl && <video ref={videoRef} className="trim-video-surface" src={sourceUrl} playsInline preload="metadata" onLoadedMetadata={(event) => { const length = event.currentTarget.duration; if (Number.isFinite(length)) { setDuration(length); setEnd(precise(length)); } }} onTimeUpdate={(event) => { const time = event.currentTarget.currentTime; setPlayhead(time); if (stopAtRef.current !== null && time >= stopAtRef.current) { event.currentTarget.pause(); stopAtRef.current = null; setPlaying(false); } }} onPause={() => { setPlaying(false); }} onEnded={() => setPlaying(false)} />}</div>
         {duration > 0 && <><div className="video-trim-ruler"><span>0.000 s</span><span>{duration.toFixed(3)} s</span></div><div className="video-trim-timeline" role="group" aria-label="Video trim timeline. Drag the range edges to trim, drag inside the range to move it, or drag outside to create a new selection." onPointerDown={beginTimeline} onPointerMove={moveTimeline} onPointerUp={(event) => { if (timelineGesture.current?.pointerId === event.pointerId) timelineGesture.current = null; }} onPointerCancel={(event) => { if (timelineGesture.current?.pointerId === event.pointerId) timelineGesture.current = null; }}>
           <div className="video-trim-track" /><div className="video-trim-selected" style={{ left: `${Math.max(0, from / duration * 100)}%`, width: `${Math.max(0, (to - from) / duration * 100)}%` }} /><span className="video-range-handle start" style={{ left: `${Math.max(0, Math.min(100, from / duration * 100))}%` }} /><span className="video-range-handle end" style={{ left: `${Math.max(0, Math.min(100, to / duration * 100))}%` }} /><span className="video-trim-playhead" style={{ left: `${Math.max(0, Math.min(100, playhead / duration * 100))}%` }} />
         </div><div className="video-custom-transport"><button type="button" className="transport-play" onClick={togglePlayback} aria-label={playing ? "Pause video preview" : "Play video preview"}>{playing ? "Ⅱ" : "▶"}</button><button type="button" className="transport-step" onClick={() => seekTo(playhead - 1 / 30)} aria-label="Step back one frame">−1f</button><button type="button" className="transport-step" onClick={() => seekTo(playhead + 1 / 30)} aria-label="Step forward one frame">+1f</button><input className="transport-scrub" type="range" min="0" max={duration} step="0.001" value={playhead} aria-label="Video preview playhead" onChange={(event) => seekTo(event.currentTarget.valueAsNumber)} /></div></>}
+        </>}
       </div>
     </section>}
   </main>;

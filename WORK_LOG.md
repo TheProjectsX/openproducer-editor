@@ -641,3 +641,9 @@
 - Corrected export so enabled lanes are actually rendered together into one AAC audio track instead of being muxed as separate selectable tracks. A light compressor reduces clipping; AAC encoder capability is checked before work. Export result replaces the source video in the custom preview. Processing UI communicates the mix render stages.
 - Added memory limits: eight added tracks, 128 MiB aggregate added audio, eight-minute source duration, and 192 MiB PCM output buffer. Documented the current constraints and Mediabunny API sources in the feature matrix and decision log.
 - Verification: `npm.cmd run typecheck` passed. `npm.cmd run build` passed and verified 27 prerendered routes with 106 service-worker assets. Listening, real-world source combinations, output file playback, AAC capability failures, and memory use remain pending browser validation.
+
+## 2026-11-15 — Video Trim result preview
+
+- After exporting a trim, Video Trim now switches its preview panel to the actual trimmed file and offers an Edit selection action to return to the source timeline. Changing either range endpoint clears the old output preview so it cannot be mistaken for the current selection.
+- Fixed the source/result object URL cleanup effects so replacing a result does not revoke the still-loaded source video URL.
+- Verification: `npm.cmd run typecheck` and `git diff --check` passed. Production build and playback review are pending.
