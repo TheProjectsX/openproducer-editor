@@ -397,9 +397,24 @@ export default function VideoStudio() {
   }
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "z") return;
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
-      event.preventDefault(); if (event.shiftKey) redo(); else undo();
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable)) return;
+      const actionControl = target instanceof HTMLElement && target.closest("button, a, [role=button]");
+      if (actionControl && !event.ctrlKey && !event.metaKey && event.key !== "Delete" && event.key !== "Backspace") return;
+      if (event.ctrlKey || event.metaKey) {
+        if (event.key.toLowerCase() === "z") { event.preventDefault(); if (event.shiftKey) redo(); else undo(); }
+        else if (event.key.toLowerCase() === "y") { event.preventDefault(); redo(); }
+        return;
+      }
+      if (event.code === "Space") { event.preventDefault(); togglePlayback(); }
+      else if (event.key === "Delete" || event.key === "Backspace") { if (selected) { event.preventDefault(); removeClip(selected); } }
+      else if (event.key.toLowerCase() === "s") { event.preventDefault(); splitSelected(); }
+      else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        const step = event.shiftKey ? 1 : 1 / Math.max(1, timelineRef.current.fps);
+        const direction = event.key === "ArrowLeft" ? -1 : 1;
+        setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, current.playhead + step * direction)) }));
+      } else if (event.key === "Home") { event.preventDefault(); setTimeline((current) => ({ ...current, playhead: 0 })); }
     }
     window.addEventListener("keydown", onKeyDown); return () => window.removeEventListener("keydown", onKeyDown);
   });

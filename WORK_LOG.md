@@ -461,4 +461,12 @@
 - Added the “Ripple edits on Video 1” switch, enabled by default. Changes to source-in, source-out, or speed shift later clips on Video 1 by the clip end-time delta; overlay and audio lanes are not moved. One drag gesture creates one undo entry and the preview/autosave follows the trim.
 - Updated interaction and feature documentation. Direct trim/ripple interaction checks remain open; the production build and static route verifier do not prove pointer behavior.
 - Verification: `npm.cmd run typecheck`, `npm.cmd run build` (27 routes verified, 22 indexable, service worker generated), and `git diff --check` passed. The core test suite was not run in this slice.
+- Commit: `c5e626f feat: add video timeline trim and ripple editing`.
+
+## 2026-11-15 — M6 video editor keyboard shortcuts
+
+- Added Space play/pause, frame-step Left/Right, Shift+Left/Right one-second seek, Home to start, S split, Delete/Backspace remove, Ctrl/Cmd+Z undo, and Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y redo.
+- Kept text and numeric input behavior intact and avoided intercepting normal Space behavior on focused buttons and links.
+- Updated the interaction specification and feature matrix. Cross-browser keyboard and screen-reader behavior still needs direct accessibility review.
+- Verification: `npm.cmd run typecheck`, production build (27 routes verified, 22 indexable, service worker generated), and `git diff --check` passed. Cross-browser key testing was not performed.
 - Commit: pending.
