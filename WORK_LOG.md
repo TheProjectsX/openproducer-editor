@@ -477,4 +477,4 @@
 - If the selected video placement has a detached primary-audio WAV, the replacement action mutes that matching detached clip while preserving other audio clips and assets.
 - Updated the interaction spec and feature matrix. Runtime interaction, save/reopen, and export sync checks remain open.
 - Verification: `npm.cmd run typecheck`, production build (27 routes verified, 22 indexable, service worker generated), and `git diff --check` passed. Runtime interaction and output sync were not verified.
-- Commit: pending.
+- Commit: `4acdc15 feat: add timeline source audio replacement`.

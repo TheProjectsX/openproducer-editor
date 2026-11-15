@@ -3,7 +3,7 @@
 **Checkpoint date:** 2026-11-15 (Asia/Dhaka)  
 **Goal status:** Resumed by the user on 2026-11-15. Continue the same Core objective.
 **Repository:** `C:\Users\Modasser Hasan\Contents\openproducer-editor`
-**Branch/commit:** `main`; resumed work added drag-trim/ripple (`c5e626f`) and keyboard shortcuts (`6529d85`). Imported-audio replacement is the current slice.
+**Branch/commit:** `main`, latest `4acdc15` (`feat: add timeline source audio replacement`). Resumed work added drag-trim/ripple (`c5e626f`), keyboard shortcuts (`6529d85`), and imported-audio replacement (`4acdc15`).
 
 ## Objective and guardrails
 
