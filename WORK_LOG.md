@@ -667,3 +667,9 @@
 - Tightened the Replace Audio export limits to four-minute videos and added an eight-minute combined decoded-audio budget across source audio and enabled lanes. Tracks must report their duration before export; over-budget exports are blocked with an actionable message instead of being decoded until the tab runs out of memory.
 - Updated the current feature matrix and implementation decision note with the actual memory limits.
 - Verification: `npm.cmd run typecheck` passed; `git diff --check` passed; `npm.cmd run build` passed and verified 27 prerendered routes with 106 cached assets. Runtime memory measurements remain pending browser validation.
+
+## 2026-11-15 — Session handoff for unresolved user requests
+
+- Updated `SESSION_HANDOFF.md` with the current `main` checkpoint and a clear statement that the redesign/functionality work is not fully verified or complete.
+- Added the user's remaining problem list: browser visual review; CapCut-like studio polish; listening checks for volume/noise reduction; edited-result preview audit; real-file video trim/extract/speed/mute/mix checks; Replace Audio memory/codec limits; image design/upscaler/collage review; custom-input/drag audit; and processing progress/error behavior.
+- Recorded that typecheck/build passed, while this session did not run the test suite or manually verify browser media behavior. Left the two status-only projects/storage route entries untouched.

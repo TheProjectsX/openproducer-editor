@@ -3,7 +3,43 @@
 **Checkpoint date:** 2026-11-15 (Asia/Dhaka)  
 **Goal status:** Resumed by the user on 2026-11-15. Continue the same Core objective.
 **Repository:** `C:\Users\Modasser Hasan\Contents\openproducer-editor`
-**Branch/commit:** `main`, latest `07da27c` (`fix: explain detached audio speed behavior`). Resumed work added drag-trim/ripple (`c5e626f`), keyboard shortcuts (`6529d85`), imported-audio replacement (`4acdc15`), and detached-audio relationship guidance (`07da27c`).
+**Branch/commit:** `main`, latest `82f2d2c` (`fix: guard replace audio mix memory`).
+
+## Latest session handoff — 2026-11-15
+
+**This section is the current status and supersedes older implementation-status claims below. The project is not finished: several problems from the user's design/functionality list still need real-browser review and may need additional fixes.**
+
+Recent feature commits on `main` include `e546e41` (Replace Audio multitrack mix), `1e56456` (Video Trim result preview), `9ff55da` (interactive collage cells and image reference research), and `82f2d2c` (Replace Audio memory guard). Earlier in this session, separate commits also updated the homepage hierarchy, navigation, audio trim/preview, compact editor layouts, drag ordering, video output previews, and the offline upscaler. `WORK_LOG.md` records the changes.
+
+### Implemented, awaiting user-facing review
+
+- Homepage category cards are at the top, with supporting content below. Audio, Video, and Image have their own tool lists; Video Studio is a separate Creative Studio entry. Dark surfaces and local Ubuntu/Inter fonts are applied.
+- Tool pages use clickable breadcrumbs and category menus. Media tools generally ask for a source before opening their editor. Simple audio/video layouts are compact and centered after import.
+- Audio Trim has Keep only/Remove only modes. Audio time displays use three decimals; range controls and custom app transports are present. Volume/Fades creates an edited preview as settings change; Merge supports drag ordering and refreshes its preview.
+- Video Trim synchronizes the selection timeline and playhead, then switches to the exported clip preview. Extract Audio shows the extracted waveform/player. Speed and Remove Audio show their generated result previews. Replace Audio has source and added-track waveforms, draggable offsets, per-track levels, and a single mixed AAC output.
+- Noise Reduction uses worker-based spectral profile reduction from a selected noise sample. It remains a basic steady-noise reducer; it has not been accepted by the user as solving the “useless noise remover” complaint.
+- Image Resize supports draggable edit layers. Image Upscale uses bundled Real-ESRGAN ONNX assets. Collage supports row ordering and direct canvas dragging to reposition each cell image; the canvas selection outline is kept out of export. iLoveIMG/BeFunky references are recorded in `project_research/docs/10-decisions-and-sources.md`.
+- Animated processing feedback is present on the processing flows updated so far.
+
+### Open problems and next-session checks from the user's list
+
+1. **Do not mark the redesign done based only on a successful build.** The current session did not visually inspect the running app in Chrome. Review the homepage, tool lists, breadcrumbs/menus, simple editor spacing, timeline synchronization, and mobile layouts. Fix any remaining cheap-looking, oversized, empty, or misaligned areas.
+2. **Video Studio / CapCut-like editor:** inspect `/studio/video` directly and continue polishing the multitrack layout for a clean, dense editing workspace. It was moved out of Video Tools, but this session did not perform a new design review of it.
+3. **Audio quality and previews:** listen to the actual Volume/Fades output and verify positive gain works. Listen to Noise Reduction on representative noisy speech/music; compare it to the user's expectation and improve or clearly constrain the claim if it still sounds ineffective. Check that adjusted results appear in the custom preview after changes.
+4. **Audio/video result preview rule:** walk through each changed tool (trim, speed, volume, merge, crop/extract, mute/remove, replace). Confirm the preview shows the edited output after processing and is not left on a stale original. The implementation was not manually exercised with representative user files this session.
+5. **Video operations:** test extraction and its waveform, muted-video export, custom video speed, trim/range/playhead sync, and Replace Audio mixing with real local MP4/WebM files. Confirm output plays with sound in the app and an external player; test multiple simultaneous tracks, timing, gains, and source-audio on/off.
+6. **Replace Audio limits:** the current implementation intentionally blocks video longer than 4 minutes, more than 8 added tracks, more than 128 MiB aggregate added audio, or more than 8 minutes combined decoded audio. Decide from actual user needs and device memory whether to keep or redesign these limits. AAC encoding and the mix/export path are typechecked/built but not runtime-verified.
+7. **Image tools:** inspect the Image category and editor against the requested iLoveIMG/BeFunky-inspired organization. Verify canvas drag positioning, selection, export, project save/reopen, and collage appearance. Test Real-ESRGAN on WebGPU and CPU, transparency edges, quality, memory, and offline-installed use. If the upscaler still fails or looks poor, investigate an alternate model/inference strategy.
+8. **Custom inputs and interaction audit:** audit dynamic settings for typed custom values, and confirm drag/drop works wherever the UI suggests reordering or moving. Retain keyboard-operable alternatives.
+9. **Progress feedback:** ensure long processing actually updates progress and can recover from codec/memory errors; check that spinners/animations do not stall or block the page.
+
+### Validation state at handoff
+
+- The latest sequential `npm.cmd run typecheck` and `npm.cmd run build` passed. The static build verified 27 prerendered routes and generated a service worker with 106 cached assets.
+- This session did **not** run the test suite or a real-browser interaction/listening review. Typecheck/build success does not establish that the listed tool problems are solved.
+- The upscaler runtime adds a sizable offline cache payload. Browser model inference and PWA install/offline use remain to verify.
+- Git is on `main`. `git status` still shows `app/routes/projects.tsx` and `app/routes/storage-settings.tsx` as modified, although `git diff` shows no text diff; these were deliberately left untouched. Check them before changing or committing anything.
+- Preserve the roadmap order and existing work; do not reset or clean files. Update this handoff and `WORK_LOG.md` when the next session changes status.
 
 ## Objective and guardrails
 
