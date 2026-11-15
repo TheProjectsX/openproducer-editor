@@ -490,5 +490,6 @@
 - In an isolated production preview on Chrome 157.0.8103.79, imported the H.264/AAC MP4 and VP9/Opus WebM fixtures. Dragged the first right trim handle by 30 px at 60 px/s: its duration changed 4.0→3.5 s and the following Video 1 clip rippled 4.0→3.5 s. One Ctrl+Z restored both clips.
 - Dragged the first left trim handle 30 px right: timeline start changed to 0.5 s, duration became 3.5 s, the prior end stayed at 4.0 s, and the following clip stayed at 4.0 s. Refresh restored this state without a route alert.
 - Confirmed the production service worker controlled the project page. With network emulation offline, a forced reload of the direct project URL restored both clips without a route alert.
+- An online render completed and the app's video element reported MP4, 1920×1080, 8.033 s, 3,478,536 bytes. The file was not inspected outside the app. The automated attempt to alter output dimensions did not update the controlled input state, so these are the saved project defaults.
 - An offline export attempt disconnected the isolated browser before a resulting file could be checked; no offline-export pass is claimed. See `project_research/docs/10-decisions-and-sources.md` for environment and measured positions.
 - Commit: `07da27c fix: explain detached audio speed behavior`.
