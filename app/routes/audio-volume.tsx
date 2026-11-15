@@ -77,21 +77,24 @@ export default function AudioVolume() {
     && numericOut >= 0 && numericOut <= (source?.duration ?? 0) && numericIn + numericOut <= (source?.duration ?? 0);
 
   function update(setter: (value: string) => void, value: string) {
-    setter(value); if (resultUrl) URL.revokeObjectURL(resultUrl); setResultUrl("");
+    setter(value); setResultUrl("");
   }
 
-  function render() {
-    if (!source || !valid) return;
+  useEffect(() => {
+    if (!source || !valid) { setBusy(false); setResultUrl(""); return; }
+    let cancelled = false;
     setBusy(true); setError("");
-    window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       try {
         const result = applyVolume(source, numericGain, numericIn, numericOut), blob = encodeWav(result);
         if (blob.size > MAX_BYTES) throw new Error("The WAV export exceeds the 512 MiB output limit.");
-        setResultUrl(URL.createObjectURL(blob));
+        const nextUrl = URL.createObjectURL(blob);
+        if (cancelled) URL.revokeObjectURL(nextUrl); else setResultUrl(nextUrl);
       } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not process this audio."); }
-      finally { setBusy(false); }
-    }, 20);
-  }
+      finally { if (!cancelled) setBusy(false); }
+    }, 80);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [source, numericGain, numericIn, numericOut, valid]);
 
   return <main className={`resize-page${source ? " has-media" : ""}`}>
     <ToolPageHeader />
@@ -99,19 +102,19 @@ export default function AudioVolume() {
     {!source ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void chooseFile(event.currentTarget.files?.[0])} /></span></label>
-        {source && <p className="source-info">{file?.name} · {source.duration.toFixed(2)} s · {source.sampleRate} Hz · {source.numberOfChannels} channel(s)</p>}
-        {source && <div className="audio-tool-timeline"><div className="preview-heading"><strong>Fade placement</strong><span>{numericIn.toFixed(2)} s in · {numericOut.toFixed(2)} s out</span></div><AudioRangeTimeline audio={source} start={Math.min(source.duration, numericIn)} end={Math.max(numericIn, source.duration - numericOut)} label="Fade placement" onChange={(start, end) => { update(setFadeIn, String(start)); update(setFadeOut, String(Math.max(0, source.duration - end))); }} /></div>}
+        {source && <p className="source-info">{file?.name} · {source.duration.toFixed(3)} s · {source.sampleRate} Hz · {source.numberOfChannels} channel(s)</p>}
+        {source && <div className="audio-tool-timeline"><div className="preview-heading"><strong>Fade placement</strong><span>{numericIn.toFixed(3)} s in · {numericOut.toFixed(3)} s out</span></div><AudioRangeTimeline audio={source} start={Math.min(source.duration, numericIn)} end={Math.max(numericIn, source.duration - numericOut)} label="Fade placement" onChange={(start, end) => { update(setFadeIn, String(start)); update(setFadeOut, String(Math.max(0, source.duration - end))); }} /></div>}
         <div className="filter-fields two-column">
           <label>Gain <span>−60 to +24 dB</span><input type="number" min="-60" max="24" step="any" value={gain} onChange={(event) => update(setGain, event.currentTarget.value)} /></label>
           <label>Fade in <span>custom seconds</span><input type="number" min="0" max={source?.duration ?? 0} step="any" value={fadeIn} onChange={(event) => update(setFadeIn, event.currentTarget.value)} /></label>
           <label>Fade out <span>custom seconds</span><input type="number" min="0" max={source?.duration ?? 0} step="any" value={fadeOut} onChange={(event) => update(setFadeOut, event.currentTarget.value)} /></label>
         </div>
-        <p className="resize-note">The two fades must fit within the audio duration. Gain above 0 dB can clip; export clamps samples to WAV’s supported range.</p>
+        <p className="resize-note">Positive gain raises the signal. Gain above 0 dB can clip; export clamps samples to WAV’s supported range. Preview updates automatically after each change.</p>
         {!valid && source && <p className="resize-error" role="alert">Enter valid gain and fade values within the source duration.</p>}{error && <p className="resize-error" role="alert">{error}</p>}
-        <button className="export-button" disabled={!valid || busy} onClick={render}>{busy ? "Processing…" : "Preview volume and fades"}</button>
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-volume-fades.wav`}>Download WAV</a>}
+        {busy && <p className="processing-indicator" role="status"><span className="processing-spinner" />Building preview from your settings…</p>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Audio comparison</strong><span>{resultUrl ? "Original and processed" : "Original"}</span></div>{source ? <div className="audio-preview"><strong>{file?.name}</strong><span>Original audio</span><CustomMediaPreview kind="audio" src={sourceUrl} label="Original audio" />{resultUrl && <><span>Gain and fades</span><CustomMediaPreview kind="audio" src={resultUrl} label="Volume adjusted audio" /></>}</div> : <div className="empty-preview">Choose audio to begin.</div>}</div>
+      <div className="resize-preview"><div className="preview-heading"><strong>Adjusted audio preview</strong><span>{resultUrl ? `${numericGain > 0 ? "+" : ""}${numericGain} dB · ${source?.duration.toFixed(3)} s` : "Preparing adjusted audio"}</span></div>{resultUrl ? <div className="audio-preview"><strong>{file?.name}</strong><span>Processed locally · gain and fades applied</span><CustomMediaPreview kind="audio" src={resultUrl} label="Adjusted audio" /></div> : <div className="empty-preview">{busy ? <span className="processing-inline"><span className="processing-spinner" />Processing audio preview…</span> : "Choose audio and enter valid settings."}</div>}</div>
     </section>}
   </main>;
 }

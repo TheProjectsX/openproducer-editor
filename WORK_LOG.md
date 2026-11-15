@@ -601,3 +601,10 @@
 - The edited WAV preview refreshes when the selection or mode changes and has its own app transport and seek control. The source waveform indicates the selected region as kept or removed.
 - Time fields, waveform labels, status, and preview transport now display three decimal places; time fields use a 1 ms step.
 - Verification: `npm.cmd run typecheck` and `git diff --check` passed. Playback and export interaction review remains pending.
+
+## 2026-11-15 — Audio Volume and video extraction previews
+
+- Volume and Fades now builds the processed WAV preview automatically after import and after each valid gain/fade change. The preview is the edited output and has a working custom transport; removed the extra manual preview action and original-player comparison that obscured the result.
+- Added a reusable local WAV waveform renderer and placed the extracted-audio waveform and custom player beneath the source video after extraction. The extraction route now also releases replaced result URLs and reports source duration to three decimals.
+- Added a reusable animated processing spinner for local preview work.
+- Verification: `npm.cmd run typecheck` and `git diff --check` passed. Audio-level listening and video-file extraction/export checks remain pending.
