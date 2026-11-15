@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router";
 import type { Route } from "./+types/image-collage";
 import { createProject, getProject, readVideoAsset, saveCollageProject } from "../lib/project-store";
 
-type ImageFile = { id: string; file: File };
+type ImageFile = { id: string; file: File; cellFit: "global" | "contain" | "cover"; cellScale: string; cellOffsetX: string; cellOffsetY: string };
 const MAX_SOURCE_BYTES = 512 * 1024 * 1024;
 const MAX_OUTPUT_PIXELS = 100_000_000;
 
@@ -19,6 +19,7 @@ export default function ImageCollage() {
   const projectId = searchParams.get("project") ?? "";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [images, setImages] = useState<ImageFile[]>([]);
+  const [selectedImageId, setSelectedImageId] = useState("");
   const [projectTitle, setProjectTitle] = useState("Untitled collage");
   const [projectLoaded, setProjectLoaded] = useState(false);
   const [projectStatus, setProjectStatus] = useState("");
@@ -32,6 +33,7 @@ export default function ImageCollage() {
   const [captionSize, setCaptionSize] = useState("48");
   const [captionColor, setCaptionColor] = useState("#111827");
   const [error, setError] = useState("");
+  const selectedImage = images.find((image) => image.id === selectedImageId) ?? images[0] ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -44,10 +46,10 @@ export default function ImageCollage() {
         const restored = await Promise.all(project.collageDocument.assets.map(async (asset) => {
           const file = await readVideoAsset(asset.id);
           if (!file) throw new Error(`The saved collage source “${asset.name}” is missing.`);
-          return { id: asset.id, file };
+          return { id: asset.id, file, cellFit: asset.cellFit ?? "global", cellScale: asset.cellScale ?? "1", cellOffsetX: asset.cellOffsetX ?? "0", cellOffsetY: asset.cellOffsetY ?? "0" };
         }));
         if (cancelled) return;
-        setImages(restored); setProjectTitle(project.title);
+        setImages(restored); setSelectedImageId(restored[0]?.id ?? ""); setProjectTitle(project.title);
         setWidth(project.collageDocument.width); setHeight(project.collageDocument.height); setColumns(project.collageDocument.columns);
         setGap(project.collageDocument.gap); setBackground(project.collageDocument.background); setFit(project.collageDocument.fit);
         setCaption(project.collageDocument.caption); setCaptionSize(project.collageDocument.captionSize); setCaptionColor(project.collageDocument.captionColor);
@@ -75,11 +77,13 @@ export default function ImageCollage() {
   const layout = useMemo(() => {
     const columnCount = Number(columns), gapSize = Number(gap), outputWidth = Number(width), outputHeight = Number(height);
     const rows = columnCount > 0 ? Math.ceil(images.length / columnCount) : 0;
+    const cellsValid = images.every((image) => image.cellScale.trim() !== "" && Number.isFinite(Number(image.cellScale)) && Number(image.cellScale) >= 0.25 && Number(image.cellScale) <= 4
+      && [image.cellOffsetX, image.cellOffsetY].every((value) => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= -100 && Number(value) <= 100));
     const valid = Number.isInteger(columnCount) && columnCount >= 1 && columnCount <= 10
       && Number.isInteger(gapSize) && gapSize >= 0 && gapSize <= 256
       && Number.isInteger(outputWidth) && outputWidth > 0 && Number.isInteger(outputHeight) && outputHeight > 0
       && outputWidth <= 32768 && outputHeight <= 32768 && outputWidth * outputHeight <= MAX_OUTPUT_PIXELS
-      && (!caption || (Number.isFinite(Number(captionSize)) && Number(captionSize) >= 8 && Number(captionSize) <= 512));
+      && (!caption || (Number.isFinite(Number(captionSize)) && Number(captionSize) >= 8 && Number(captionSize) <= 512)) && cellsValid;
     return { columnCount, gapSize, outputWidth, outputHeight, rows, valid };
   }, [columns, gap, width, height, images.length, caption, captionSize]);
 
@@ -105,17 +109,16 @@ export default function ImageCollage() {
           const column = index % layout.columnCount, row = Math.floor(index / layout.columnCount);
           const x = layout.gapSize + column * (cellWidth + layout.gapSize);
           const y = layout.gapSize + row * (cellHeight + layout.gapSize);
-          if (fit === "contain") {
-            const scale = Math.min(cellWidth / bitmap.width, cellHeight / bitmap.height);
-            const drawWidth = bitmap.width * scale, drawHeight = bitmap.height * scale;
-            context.drawImage(bitmap, x + (cellWidth - drawWidth) / 2, y + (cellHeight - drawHeight) / 2, drawWidth, drawHeight);
-          } else {
-            const sourceAspect = bitmap.width / bitmap.height, cellAspect = cellWidth / cellHeight;
-            let sx = 0, sy = 0, sw = bitmap.width, sh = bitmap.height;
-            if (sourceAspect > cellAspect) { sw = bitmap.height * cellAspect; sx = (bitmap.width - sw) / 2; }
-            else { sh = bitmap.width / cellAspect; sy = (bitmap.height - sh) / 2; }
-            context.drawImage(bitmap, sx, sy, sw, sh, x, y, cellWidth, cellHeight);
-          }
+          const image = images[index];
+          const cellFit = image.cellFit === "global" ? fit : image.cellFit;
+          const baseScale = cellFit === "contain" ? Math.min(cellWidth / bitmap.width, cellHeight / bitmap.height) : Math.max(cellWidth / bitmap.width, cellHeight / bitmap.height);
+          const zoom = Math.max(0.25, Math.min(4, Number(image.cellScale) || 1));
+          const offsetX = Math.max(-100, Math.min(100, Number(image.cellOffsetX) || 0)) / 100 * cellWidth;
+          const offsetY = Math.max(-100, Math.min(100, Number(image.cellOffsetY) || 0)) / 100 * cellHeight;
+          const drawWidth = bitmap.width * baseScale * zoom, drawHeight = bitmap.height * baseScale * zoom;
+          context.save(); context.beginPath(); context.rect(x, y, cellWidth, cellHeight); context.clip();
+          context.drawImage(bitmap, x + (cellWidth - drawWidth) / 2 + offsetX, y + (cellHeight - drawHeight) / 2 + offsetY, drawWidth, drawHeight);
+          context.restore();
         });
         if (caption) {
           context.fillStyle = captionColor; context.font = `${captionSize}px system-ui, sans-serif`;
@@ -131,13 +134,17 @@ export default function ImageCollage() {
 
   function addFiles(files: FileList | null) {
     if (!files?.length) return;
-    const next = Array.from(files).filter((file) => file.type.startsWith("image/")).map((file) => ({ id: crypto.randomUUID(), file }));
+    const next: ImageFile[] = Array.from(files).filter((file) => file.type.startsWith("image/")).map((file) => ({ id: crypto.randomUUID(), file, cellFit: "global", cellScale: "1", cellOffsetX: "0", cellOffsetY: "0" }));
     const invalidCount = files.length - next.length;
     const merged = [...images, ...next];
     const totalSize = merged.reduce((sum, image) => sum + image.file.size, 0);
     if (merged.length > 20) { setError("A collage supports up to 20 images."); return; }
     if (totalSize > MAX_SOURCE_BYTES) { setError("Combined image files exceed the 512 MiB prototype limit."); return; }
-    setImages(merged); setError(invalidCount ? "Some files were skipped because they are not images." : "");
+    setImages(merged); setSelectedImageId((current) => current || next[0]?.id || ""); setError(invalidCount ? "Some files were skipped because they are not images." : "");
+  }
+
+  function updateCell(id: string, patch: Partial<Pick<ImageFile, "cellFit" | "cellScale" | "cellOffsetX" | "cellOffsetY">>) {
+    setImages((current) => current.map((image) => image.id === id ? { ...image, ...patch } : image));
   }
 
   function move(index: number, direction: -1 | 1) {
@@ -153,7 +160,7 @@ export default function ImageCollage() {
       if (!id) id = (await createProject(projectTitle.trim(), "image")).id;
       const document = {
         version: 1 as const, width, height, columns, gap, background, fit, caption, captionSize, captionColor,
-        assets: images.map(({ id: assetId, file }) => ({ id: assetId, name: file.name, type: file.type, size: file.size })),
+        assets: images.map(({ id: assetId, file, cellFit, cellScale, cellOffsetX, cellOffsetY }) => ({ id: assetId, name: file.name, type: file.type, size: file.size, cellFit, cellScale, cellOffsetX, cellOffsetY })),
       };
       await saveCollageProject(id, document, images.map(({ id: assetId, file }) => ({ id: assetId, file })), projectTitle);
       setProjectStatus("Collage project saved on this device."); setError("");
@@ -186,6 +193,7 @@ export default function ImageCollage() {
         <label className="ratio-field">Collage text<input value={caption} maxLength={240} onChange={(event) => setCaption(event.currentTarget.value)} placeholder="Optional caption" /></label>
         <div className="dimension-fields"><label>Text size <span>px</span><input type="number" min="8" max="512" step="any" value={captionSize} onChange={(event) => setCaptionSize(event.currentTarget.value)} /></label><label>Text color<input type="color" value={captionColor} onChange={(event) => setCaptionColor(event.currentTarget.value)} /></label></div>
         <p className="resize-note">{images.length} image(s) · {layout.rows} row(s) · {layout.valid ? `${(layout.outputWidth * layout.outputHeight / 1_000_000).toFixed(1)} megapixels` : "Invalid canvas settings"}. Maximum 20 source files and 100 megapixels.</p>
+        {!layout.valid && images.length > 0 && <p className="resize-error" role="alert">Enter valid canvas, caption, and cell values within their listed ranges.</p>}
         {error && <p className="resize-error" role="alert">{error}</p>}
         {projectStatus && <p className="source-info" role="status">{projectStatus}</p>}
         <button className="secondary-button export-button" disabled={!projectLoaded || !images.length || !layout.valid || !projectTitle.trim()} onClick={() => void saveProject()}>Save editable collage</button>
@@ -193,6 +201,8 @@ export default function ImageCollage() {
       </div>
       <div className="resize-preview"><div className="preview-heading"><strong>Collage preview</strong><span>{images.length ? `${layout.outputWidth} × ${layout.outputHeight} px` : "Add images to begin"}</span></div>{images.length ? <canvas ref={canvasRef} className="preview-canvas" aria-label="Image collage preview" /> : <div className="empty-preview">Add two or more images to start a collage.</div>}</div>
     </section>
-    <section className="resize-preview image-order"><div className="preview-heading"><strong>Image order</strong><span>Reorder or remove source images</span></div>{images.length ? <ol className="clip-list">{images.map((image, index) => <li key={image.id}><span><strong>{index + 1}. {image.file.name}</strong><small>{(image.file.size / 1024 / 1024).toFixed(1)} MiB</small></span><div><button type="button" aria-label={`Move ${image.file.name} up`} disabled={index === 0} onClick={() => move(index, -1)}>↑</button><button type="button" aria-label={`Move ${image.file.name} down`} disabled={index === images.length - 1} onClick={() => move(index, 1)}>↓</button><button type="button" aria-label={`Remove ${image.file.name}`} onClick={() => setImages(images.filter((_, imageIndex) => imageIndex !== index))}>×</button></div></li>)}</ol> : <p className="resize-note">No images added.</p>}</section>
+    <section className="resize-preview image-order"><div className="preview-heading"><strong>Image order</strong><span>Reorder, edit cells, or remove source images</span></div>{images.length ? <ol className="clip-list">{images.map((image, index) => <li key={image.id} className={selectedImage?.id === image.id ? "selected" : ""}><button type="button" className="image-layer-select" aria-pressed={selectedImage?.id === image.id} onClick={() => setSelectedImageId(image.id)}><strong>{index + 1}. {image.file.name}</strong><small>{(image.file.size / 1024 / 1024).toFixed(1)} MiB</small></button><div><button type="button" aria-label={`Move ${image.file.name} up`} disabled={index === 0} onClick={() => move(index, -1)}>↑</button><button type="button" aria-label={`Move ${image.file.name} down`} disabled={index === images.length - 1} onClick={() => move(index, 1)}>↓</button><button type="button" aria-label={`Remove ${image.file.name}`} onClick={() => { const next = images.filter((item) => item.id !== image.id); setImages(next); if (selectedImage?.id === image.id) setSelectedImageId(next[0]?.id ?? ""); }}>×</button></div></li>)}</ol> : <p className="resize-note">No images added.</p>}
+      {selectedImage && <div className="filter-fields two-column transform-fields" aria-label={`Edit collage cell for ${selectedImage.file.name}`}><strong>Cell: {selectedImage.file.name}</strong><label>Cell fit<select value={selectedImage.cellFit} onChange={(event) => updateCell(selectedImage.id, { cellFit: event.currentTarget.value as ImageFile["cellFit"] })}><option value="global">Use collage default</option><option value="contain">Contain</option><option value="cover">Cover</option></select></label><label>Cell scale <span>custom 0.25–4×</span><input type="number" min="0.25" max="4" step="any" value={selectedImage.cellScale} onChange={(event) => updateCell(selectedImage.id, { cellScale: event.currentTarget.value })} /></label><label>Cell position X <span>custom −100–100%</span><input type="number" min="-100" max="100" step="any" value={selectedImage.cellOffsetX} onChange={(event) => updateCell(selectedImage.id, { cellOffsetX: event.currentTarget.value })} /></label><label>Cell position Y <span>custom −100–100%</span><input type="number" min="-100" max="100" step="any" value={selectedImage.cellOffsetY} onChange={(event) => updateCell(selectedImage.id, { cellOffsetY: event.currentTarget.value })} /></label><p className="resize-note">Scale and position adjust this image within its clipped cell. Other collage cells keep their own settings.</p></div>}
+    </section>
   </main>;
 }

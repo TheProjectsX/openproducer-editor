@@ -492,4 +492,11 @@
 - Confirmed the production service worker controlled the project page. With network emulation offline, a forced reload of the direct project URL restored both clips without a route alert.
 - An online render completed and the app's video element reported MP4, 1920×1080, 8.033 s, 3,478,536 bytes. The file was not inspected outside the app. The automated attempt to alter output dimensions did not update the controlled input state, so these are the saved project defaults.
 - An offline export attempt disconnected the isolated browser before a resulting file could be checked; no offline-export pass is claimed. See `project_research/docs/10-decisions-and-sources.md` for environment and measured positions.
+
+## 2026-11-15 — M4 per-cell collage editing and browser gate
+
+- Added per-image `global`/`contain`/`cover` fit, 0.25×–4× scale, and typed X/Y pan controls. The preview/export clips each independently transformed image to its cell. Settings save as optional fields in the version-1 collage document; old records default to the global fit, 1×, and centered placement.
+- Added validation for each per-cell numeric value and updated the data-pipeline and feature-matrix guidance.
+- Production browser verification: exact 400×340→300×300 resize output, PNG alpha retained, original aspect mode recalculated 300×255; two-image collage changed one cell to cover/2×/35% X, saved and refreshed with the settings intact, then reloaded offline and exported 1200×900 PNG while offline.
+- `npm.cmd run typecheck` and `npm.cmd run build` passed. Build verified 27 static routes (22 indexable) and generated the service worker. External viewer/color inspection and the image-studio layer/undo/save path remain open.
 - Commit: `07da27c fix: explain detached audio speed behavior`.

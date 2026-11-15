@@ -27,7 +27,7 @@ export type CollageProjectDocument = {
   caption: string;
   captionSize: string;
   captionColor: string;
-  assets: { id: string; name: string; type: string; size: number }[];
+  assets: { id: string; name: string; type: string; size: number; cellFit?: "global" | "contain" | "cover"; cellScale?: string; cellOffsetX?: string; cellOffsetY?: string }[];
 };
 
 export type AudioProjectDocument = {
