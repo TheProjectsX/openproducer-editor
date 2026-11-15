@@ -2,6 +2,7 @@ import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/video-trim";
 import { MediaImportScreen } from "../components/media-import-screen";
+import { ProcessingProgress } from "../components/processing-progress";
 
 const MAX_INPUT_BYTES = 512 * 1024 * 1024;
 
@@ -116,7 +117,7 @@ export default function VideoTrim() {
         <div className="dimension-fields"><label>Start time <span>seconds</span><input type="number" min="0" max={duration || undefined} step="0.001" value={start} onBlur={() => { const value = Number(start); if (Number.isFinite(value)) setStart(precise(value)); }} onChange={(event) => setStart(event.currentTarget.value)} /></label><label>End time <span>seconds</span><input type="number" min="0" max={duration || undefined} step="0.001" value={end} placeholder={duration ? duration.toFixed(3) : "Video duration"} onBlur={() => { const value = Number(end); if (Number.isFinite(value)) setEnd(precise(value)); }} onChange={(event) => setEnd(event.currentTarget.value)} /></label></div>
         <p className="resize-note">MP4 output. The timeline handles and exact time fields edit the same selection. Long renders use in-memory output in this prototype.</p>
         {error && <p className="resize-error" role="alert">{error}</p>}
-        {progress !== null && <><p className="source-info" role="status">Exporting video: {progress}%</p><progress max="100" value={progress} aria-label="Video export progress" /></>}
+        {progress !== null && <ProcessingProgress label="Exporting trimmed video" value={progress} />}
         <button className="export-button" disabled={!duration || progress !== null || file.size > MAX_INPUT_BYTES || !Number.isFinite(from) || !Number.isFinite(to) || to <= from || to > duration} onClick={exportTrim}>{progress !== null ? "Exporting…" : "Export trimmed MP4"}</button>
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={resultName}>Download {resultName}</a>}
       </div>

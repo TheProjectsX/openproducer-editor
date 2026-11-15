@@ -365,6 +365,9 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .processing-indicator, .processing-inline { display: inline-flex; align-items: center; gap: 9px; color: #a9c3eb; font-size: 12px; }
 .processing-inline { justify-content: center; }.processing-spinner { width: 15px; height: 15px; flex: 0 0 auto; border: 2px solid #364c6e; border-top-color: #8db2ff; border-radius: 50%; animation: local-studio-spin .8s linear infinite; }
 @keyframes local-studio-spin { to { transform: rotate(360deg); } }
+.processing-progress-wrap { display: grid; gap: 7px; min-width: 150px; }.processing-progress-label { display: flex; justify-content: space-between; gap: 12px; color: #a9bad0; font-size: 11px; }.processing-progress-label strong { color: #cbdcff; font-variant-numeric: tabular-nums; }
+.processing-progress-track { height: 6px; overflow: hidden; border-radius: 999px; background: #26354a; }.processing-progress-track > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #477bd5, #70d2c4); transition: width .18s ease; }.processing-progress-track.indeterminate > span { width: 35%; animation: local-studio-progress 1.25s ease-in-out infinite; }
+@keyframes local-studio-progress { from { transform: translateX(-120%); } to { transform: translateX(310%); } }
 .extracted-audio-preview { display: grid; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #2a3c54; }
 .audio-waveform-preview { min-width: 0; }.audio-waveform-preview canvas { display: block; width: 100%; height: 96px; border: 1px solid #293d56; border-radius: 8px; background: #0b1422; }
 .merge-timeline-clip { cursor: grab; }.merge-timeline-clip:active, .clip-list li[draggable="true"]:active { cursor: grabbing; }.clip-drag-handle { flex: 0 0 auto; color: #87a0c3; cursor: grab; font-size: 18px; }

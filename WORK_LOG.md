@@ -621,3 +621,9 @@
 - Audio Merge now supports dragging clips in both the proportional timeline and its order list. Its WAV preview is regenerated after clip order or gap changes, and the same preview is used for download.
 - Image Collage image rows can be reordered by drag and drop with keyboard-friendly move buttons retained. Added a dedicated collage page class, clipped the canvas preview to its panel, and kept the image order area below the editor without allowing the canvas to paint over it.
 - Verification: `npm.cmd run typecheck` and `git diff --check` passed. Drag/drop and image canvas visual review remain pending.
+
+## 2026-11-15 — Video export result previews and progress feedback
+
+- Video Speed now switches its preview panel to the completed speed-adjusted WebM/MP4 after recording, and exposes a custom playback/seek transport for the actual output.
+- Remove Audio now previews the muted export and includes Mediabunny's track-discard reasons in compatibility errors. Video Trim, Extract Audio, Remove Audio, and Speed show an animated progress bar with a percentage during processing.
+- Verification: `npm.cmd run typecheck` and `git diff --check` passed. Actual source-file conversion behavior still requires browser interaction with representative MP4/WebM files.

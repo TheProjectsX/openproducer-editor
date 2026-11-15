@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { Route } from "./+types/video-remove-audio";
 import { MediaImportScreen } from "../components/media-import-screen";
 import { CustomMediaPreview } from "../components/custom-media-preview";
+import { ProcessingProgress } from "../components/processing-progress";
 
 const MAX_BYTES = 512 * 1024 * 1024;
 
@@ -40,7 +41,10 @@ export default function VideoRemoveAudio() {
       const target = new BufferTarget();
       const output = new Output({ format: new Mp4OutputFormat(), target });
       const conversion = await Conversion.init({ input, output, tracks: "primary", audio: { discard: true } });
-      if (!conversion.isValid || conversion.utilizedTracks.length === 0) throw new Error("No compatible video track is available to export.");
+      if (!conversion.isValid || conversion.utilizedTracks.length === 0) {
+        const reasons = conversion.discardedTracks.map(({ track, reason }) => `${track.type}: ${reason}`).join("; ");
+        throw new Error(`No compatible video track is available to export${reasons ? ` (${reasons})` : ""}.`);
+      }
       conversion.onProgress = (value) => setProgress(Math.round(value * 100));
       await conversion.execute();
       if (!target.buffer) throw new Error("Conversion finished without producing a video file.");
@@ -61,11 +65,11 @@ export default function VideoRemoveAudio() {
         {file && <p className="source-info">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MiB{duration ? ` · ${duration.toFixed(3)} s` : ""}</p>}
         <p className="resize-note">The primary audio track is discarded. Video packets are copied when the source/container combination supports it; other cases may transcode. Input and output memory limits are 512 MiB.</p>
         {error && <p className="resize-error" role="alert">{error}</p>}
-        {progress !== null && <p className="source-info" role="status">Processing video: {progress}%</p>}
+        {progress !== null && <ProcessingProgress label="Removing audio and writing video" value={progress} />}
         <button className="export-button" disabled={!file || progress !== null} onClick={() => void removeAudio()}>{progress !== null ? "Processing…" : "Remove audio and export MP4"}</button>
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-muted.mp4`}>Download muted MP4</a>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Video preview</strong><span>{file ? "Original" : "No video selected"}</span></div>{url ? <CustomMediaPreview kind="video" src={url} label="Original video preview" onDuration={setDuration} /> : <div className="empty-preview">Choose a video to begin.</div>}</div>
+      <div className="resize-preview"><div className="preview-heading"><strong>Video preview</strong><span>{resultUrl ? "Muted export ready" : file ? "Original source" : "No video selected"}</span></div>{resultUrl ? <CustomMediaPreview kind="video" src={resultUrl} label="Muted video result preview" /> : url ? <CustomMediaPreview kind="video" src={url} label="Original video preview" onDuration={setDuration} /> : <div className="empty-preview">Choose a video to begin.</div>}</div>
     </section>}
   </main>;
 }

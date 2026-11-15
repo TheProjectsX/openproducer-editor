@@ -4,6 +4,7 @@ import type { Route } from "./+types/video-extract-audio";
 import { MediaImportScreen } from "../components/media-import-screen";
 import { CustomMediaPreview } from "../components/custom-media-preview";
 import { AudioWaveformPreview } from "../components/audio-waveform-preview";
+import { ProcessingProgress } from "../components/processing-progress";
 
 const MAX_INPUT_BYTES = 512 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 512 * 1024 * 1024;
@@ -73,7 +74,7 @@ export default function VideoExtractAudio() {
         {file && <p className="source-info">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MiB{duration ? ` · ${duration.toFixed(3)} s` : " · Reading duration…"}</p>}
         <p className="resize-note">Output: 16-bit PCM WAV, 48 kHz, stereo. Large files can use substantial browser memory. Maximum input and output size: 512 MiB.</p>
         {error && <p className="resize-error" role="alert">{error}</p>}
-        {progress !== null && <p className="source-info" role="status">Extracting audio: {progress}%</p>}
+        {progress !== null && <ProcessingProgress label="Extracting the primary audio track" value={progress} />}
         <button className="export-button" disabled={!file || !duration || progress !== null || file.size > MAX_INPUT_BYTES || Boolean(error)} onClick={extract}>{progress !== null ? "Extracting…" : "Extract and export WAV"}</button>
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-audio.wav`}>Download extracted WAV</a>}
       </div>
