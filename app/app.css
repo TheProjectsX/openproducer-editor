@@ -413,6 +413,13 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .audio-split-marker::before { position: absolute; top: 8px; bottom: 8px; left: 8px; width: 2px; border-radius: 2px; background: #ff8091; box-shadow: 0 0 9px #ff5269aa; content: ""; }
 .audio-split-marker i { position: absolute; top: 1px; left: 4px; width: 10px; height: 15px; border: 1px solid #ffc2ca; border-radius: 4px; background: #e45167; }
 .import-loading { min-height: calc(100dvh - 64px); border: 0; background: transparent; color: #92a5bf; }
+.audio-merge-timeline { min-height: 83px; display: flex; align-items: center; gap: 5px; padding: 16px 10px; overflow-x: auto; border: 1px solid #263950; border-radius: 9px; background: repeating-linear-gradient(90deg, #111f2e 0 1px, transparent 1px 54px), #0b1320; }
+.merge-timeline-clip { min-width: 92px; height: 48px; display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; padding: 6px 9px; border: 1px solid #4d8f86; border-radius: 6px; background: linear-gradient(120deg, #194a48, #17374c); color: #ddfff7; }
+.merge-timeline-clip strong, .merge-timeline-clip small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.merge-timeline-clip strong { font-size: 11px; }.merge-timeline-clip small { color: #9bc6c1; font-size: 9px; }
+.replace-audio-timeline { display: grid; gap: 10px; padding-top: 4px; }
+.replace-lane { position: relative; height: 52px; overflow: hidden; border: 1px solid #2b405a; border-radius: 7px; background: #0b1320; }
+.replace-video-lane { position: absolute; inset: 5px; display: flex; align-items: start; padding: 4px 6px; border: 1px solid #3e5b80; border-radius: 4px; color: #93b4e6; font-size: 8px; font-weight: 700; letter-spacing: .12em; }
+.replace-audio-lane { position: absolute; top: 19px; bottom: 5px; z-index: 1; display: flex; align-items: center; overflow: hidden; padding: 0 7px; border: 1px solid #4a9a86; border-radius: 4px; background: linear-gradient(90deg, #205e55, #246e79); color: #d8fff5; font-size: 8px; font-weight: 700; letter-spacing: .12em; white-space: nowrap; }
 
 /* Keep focused editors on the available screen after a source is loaded. */
 .resize-page.has-media { height: 100dvh; min-height: 0; display: flex; flex-direction: column; overflow: auto; padding-bottom: 10px; }

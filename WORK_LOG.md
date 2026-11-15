@@ -6,8 +6,8 @@
 - Added a shared dark charcoal/navy palette, blue/cyan/violet accents, a responsive editorial landing layout, and dark full-width styling for existing tool and video-studio shells.
 - Added locally bundled Ubuntu 400/500/700 and Inter Variable fonts so typography does not depend on a network font service. General text uses Ubuntu; headings use Inter.
 - Updated route metadata and feature/design notes. Later design slices below add editor onboarding, time-selection timelines, custom players, direct-manipulation image layers, and workspace-level fit/scroll behavior; manual visual review is still pending.
-- Verification: `npm.cmd run typecheck` passed. `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable). The generated service worker includes 94 assets, including the bundled font files. The known ~643 kB processing chunk and Bungee dynamic-import warning remain. Visual browser review is pending because this session still does not expose direct Chrome controls; the localhost preview has been queued in the Codex browser panel.
-- Commit is pending for this slice.
+- Verification: `npm.cmd run typecheck` passed. `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable). The generated service worker includes local font files. The known ~643 kB processing chunk and Bungee dynamic-import warning remain. Visual browser review is pending because this session still does not expose direct Chrome controls; the localhost preview has been queued in the Codex browser panel.
+- Commit: `e456214 feat: redesign dark media workspaces`.
 
 ## 2026-11-15 — Interactive image overlay canvas
 
@@ -558,4 +558,10 @@
 - Added a shared waveform range timeline with direct edge trim, selection move, and drag-to-create behavior. Noise Reduction uses it to choose a noise-only sample; Volume/Fades uses it to place fade boundaries; Audio Studio uses it to select source in/out points.
 - Audio Studio records one undo-history entry per waveform gesture while keeping its typed source range fields synchronized. Added an interactive split timeline that creates cut points on the track and lets users drag them; the comma-separated custom input and segment list stay synchronized.
 - Updated the feature matrix. Browser interaction, accessibility, and narrow viewport review are still pending.
-- Verification: `npm.cmd run typecheck` passed. Production build and static route verification are pending for this slice.
+- Verification: `npm.cmd run typecheck` passed; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable), with 97 service-worker assets. Browser interaction, accessibility, and narrow viewport review are still pending.
+- Commit: `90e7ae2 feat: add interactive audio timelines`.
+# 2026-11-15 — Design: merge and replacement-audio timelines
+
+- Added a proportional audio merge sequence above its existing reorder list so users can see clip order and relative duration at a glance.
+- Added a video/audio placement lane to Video Replace Audio. Dragging its scrub input updates the same custom offset value used by the typed field; audio length is read from local metadata when available.
+- Verification: `npm.cmd run typecheck` passed; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable), with 97 service-worker assets. Browser interaction remains pending.
