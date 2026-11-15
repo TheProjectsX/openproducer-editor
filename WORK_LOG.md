@@ -522,3 +522,10 @@
 - Routed the local audio element through a lazily created Web Audio gain node. Playback schedules the selected gain and fade envelope against the current source position and custom speed; the audio source remains local and no edit is applied to the original file.
 - Updated the feature matrix and phase status. Project save/reopen, preview/export listening parity, speed boundary cases, and WAV external-player checks remain open.
 - Verification: `npm.cmd run typecheck` passed; `npm.cmd run test:core` passed 18/18; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable) and 51 cached assets. The existing ~643 kB bundle warning and Bungee WASM dynamic-import notice remain. Browser listening and project reopen checks are still pending.
+
+## 2026-11-15 — Audio Studio settings undo and redo
+
+- Added a bounded 50-step history for Audio Studio edit settings, reset when a new source is imported. Undo/redo buttons are available in the workspace; Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, and Ctrl/Cmd+Y work outside editable fields so native text editing remains intact.
+- Undo/redo restores the full saved edit document, so autosave continues to persist the selected range, speed/pitch mode, gain, and fades together.
+- Updated Audio Studio feature and gate notes. Route-level history and save/reopen checks are pending.
+- Verification: `npm.cmd run typecheck` passed; `npm.cmd run test:core` passed 18/18; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable) and 51 cached assets. The existing ~643 kB bundle warning and Bungee WASM dynamic-import notice remain. Route-level history and save/reopen interaction checks remain pending.

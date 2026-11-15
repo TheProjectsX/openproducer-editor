@@ -35,6 +35,8 @@ export default function AudioStudio() {
   const previewSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const cancelRef = useRef(false);
   const [document, setDocument] = useState<AudioProjectDocument>(EMPTY);
+  const [past, setPast] = useState<AudioProjectDocument[]>([]);
+  const [future, setFuture] = useState<AudioProjectDocument[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
@@ -126,6 +128,7 @@ export default function AudioStudio() {
       if (decoded.length * decoded.numberOfChannels * 4 > MAX_BUFFER_BYTES) throw new Error("Decoded audio exceeds the 512 MiB working-memory limit.");
       const nextDocument: AudioProjectDocument = { ...EMPTY, sourceAssetId: projectId, sourceName: next.name, sourceType: next.type, sourceDuration: decoded.duration, sourceEnd: decoded.duration };
       await saveAudioProject(projectId, nextDocument, next);
+      setPast([]); setFuture([]);
       setFile(next); setBuffer(decoded); setSourceUrl(URL.createObjectURL(next)); setDocument(nextDocument); setLoaded(true);
       setStatus(`Audio imported and saved locally. ${inspection.container}, ${inspection.tracks.filter((track) => track.kind === "audio").map((track) => track.codec).join(", ")} decoder support confirmed.`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "This browser could not decode the audio file."); }
@@ -133,8 +136,38 @@ export default function AudioStudio() {
   }
 
   function update<K extends keyof AudioProjectDocument>(key: K, value: AudioProjectDocument[K]) {
+    setPast((history) => [...history, document].slice(-50));
+    setFuture([]);
     setDocument((current) => ({ ...current, [key]: value })); setResultUrl("");
   }
+
+  function undo() {
+    if (!past.length) return;
+    setFuture((history) => [document, ...history].slice(0, 50));
+    setDocument(past[past.length - 1]);
+    setPast((history) => history.slice(0, -1));
+    setResultUrl("");
+  }
+
+  function redo() {
+    if (!future.length) return;
+    setPast((history) => [...history, document].slice(-50));
+    setDocument(future[0]);
+    setFuture((history) => history.slice(1));
+    setResultUrl("");
+  }
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || !["z", "y"].includes(event.key.toLowerCase())) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || target.closest("input, textarea, select"))) return;
+      event.preventDefault();
+      if (event.key.toLowerCase() === "y" || event.shiftKey) redo(); else undo();
+    }
+    window.document.addEventListener("keydown", onKeyDown);
+    return () => window.document.removeEventListener("keydown", onKeyDown);
+  }, [document, future, past]);
 
   function ensurePreviewGraph(player: HTMLAudioElement) {
     let context = previewContextRef.current;
@@ -243,6 +276,7 @@ export default function AudioStudio() {
     <section className="resize-workspace" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void importAudio(event.dataTransfer.files?.[0]); }}>
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Import audio"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void importAudio(event.currentTarget.files?.[0])} /></span></label>
+        <div className="project-actions" aria-label="Audio edit history"><button type="button" className="editor-action" disabled={!past.length || busy} onClick={undo}>Undo</button><button type="button" className="editor-action" disabled={!future.length || busy} onClick={redo}>Redo</button></div>
         {file && <p className="source-info">{file.name} · {document.sourceDuration.toFixed(2)} s · {buffer?.sampleRate} Hz · {buffer?.numberOfChannels} channel(s)</p>}
         <div className="filter-fields two-column">
           <label>Start <span>source seconds</span><input type="number" min="0" max={document.sourceDuration} step="any" value={document.sourceStart} disabled={!buffer || busy} onChange={(event) => update("sourceStart", event.currentTarget.valueAsNumber)} /></label>
