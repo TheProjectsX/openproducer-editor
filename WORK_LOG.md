@@ -576,3 +576,8 @@
 - Replaced Audio Speed's static preview placeholder with a local audio surface and app play/pause/scrub controls. The timeline follows Bungee's pitch-preserved source-position reports and seeking operates in source frames.
 - Updated the interface status and removed the last decorative, fake waveform bars from generic audio preview cards; labels now identify each local audio preview.
 - Verification: `npm.cmd run typecheck` passed; `git diff --check` passed; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable), with 97 service-worker assets.
+
+## 2026-11-15 — Design: grouped Image Resize controls
+
+- Grouped Image Resize settings into canvas size, color adjustments, transform/export, and overlay-layer panels. Canvas size and adjustments start open; less frequent export and layer settings can be collapsed.
+- Updated the feature matrix. Verification: `npm.cmd run typecheck` and `git diff --check` passed; production build passed and verified 27 prerendered routes (22 indexable), with 97 service-worker assets.

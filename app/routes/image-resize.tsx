@@ -348,6 +348,7 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
           </label>
           {projectId && <p className="resize-note" role="status">Project: {projectTitle || "Loading…"}. {projectStatus}</p>}
           {source && <p className="source-info">Original: {ratioText} px</p>}
+          <details className="editor-control-group" open><summary>Canvas size <span>{source ? `${ratioText} px original` : ""}</span></summary><div className="editor-control-content">
           <div className="dimension-fields">
             <label>Width <span>px</span><input type="number" min="1" step="1" value={width || ""} onChange={(event) => changeWidth(event.currentTarget.valueAsNumber)} /></label>
             <label>Height <span>px</span><input type="number" min="1" step="1" value={height || ""} onChange={(event) => changeHeight(event.currentTarget.valueAsNumber)} /></label>
@@ -355,18 +356,22 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
           <label className="ratio-field">Aspect ratio<select value={ratioMode} onChange={(event) => chooseRatio(event.currentTarget.value)}><option value="free">Custom dimensions (stretch)</option><option value="original">Original ratio</option><option value="1:1">1:1 · Square</option><option value="4:3">4:3</option><option value="3:2">3:2</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="custom">Custom ratio</option></select></label>
           {ratioMode === "custom" && <div className="dimension-fields"><label>Ratio width<input type="number" min="1" step="any" value={customRatioWidth} onChange={(event) => { setCustomRatioWidth(event.currentTarget.value); if (Number(event.currentTarget.value) > 0) setHeight(Math.max(1, Math.round(width * Number(customRatioHeight) / Number(event.currentTarget.value)))); }} /></label><label>Ratio height<input type="number" min="1" step="any" value={customRatioHeight} onChange={(event) => { setCustomRatioHeight(event.currentTarget.value); if (Number(event.currentTarget.value) > 0) setHeight(Math.max(1, Math.round(width * Number(event.currentTarget.value) / Number(customRatioWidth)))); }} /></label></div>}
           <p className="resize-note">{ratio ? "Changing either dimension keeps the selected ratio. The full image is stretched to fit; no crop or padding is added." : "Custom dimensions resize the full image without cropping or padding."} Exports are limited to 100 megapixels and 32,768 px per side.</p>
-          <div className="filter-fields" aria-label="Image adjustments">
+          </div></details>
+          <details className="editor-control-group" open><summary>Color adjustments</summary><div className="editor-control-content"><div className="filter-fields" aria-label="Image adjustments">
             <label>Brightness <span>0–300%</span><input type="number" min="0" max="300" step="any" value={brightness} onChange={(event) => setBrightness(event.currentTarget.value)} /></label>
             <label>Contrast <span>0–300%</span><input type="number" min="0" max="300" step="any" value={contrast} onChange={(event) => setContrast(event.currentTarget.value)} /></label>
             <label>Saturation <span>0–300%</span><input type="number" min="0" max="300" step="any" value={saturation} onChange={(event) => setSaturation(event.currentTarget.value)} /></label>
           </div>
           <div className="speed-presets" aria-label="Common image filter presets"><button type="button" onClick={() => { setBrightness("100"); setContrast("100"); setSaturation("0"); }}>Grayscale</button><button type="button" onClick={() => { setBrightness("105"); setContrast("115"); setSaturation("135"); }}>Vivid</button><button type="button" onClick={() => { setBrightness("100"); setContrast("92"); setSaturation("75"); }}>Muted</button><button type="button" onClick={() => { setBrightness("100"); setContrast("100"); setSaturation("100"); }}>Reset filters</button></div>
+          </div></details>
+          <details className="editor-control-group"><summary>Transform & export</summary><div className="editor-control-content">
           <label className="speed-field">Rotation <span>custom degrees · −180 to 180</span><input type="number" min="-180" max="180" step="any" value={rotation} onChange={(event) => setRotation(event.currentTarget.value)} /></label>
           <label className="ratio-toggle"><input type="checkbox" checked={flipHorizontal} onChange={(event) => setFlipHorizontal(event.currentTarget.checked)} /> Flip horizontally</label>
           <label className="ratio-field">Export format<select value={exportFormat} onChange={(event) => setExportFormat(event.currentTarget.value as "png" | "jpeg")}><option value="png">PNG (lossless, transparency)</option><option value="jpeg">JPEG (white background)</option></select></label>
           {exportFormat === "jpeg" && <label className="speed-field">JPEG quality <span>custom value from 0 to 1</span><input type="number" min="0" max="1" step="any" value={jpegQuality} onChange={(event) => setJpegQuality(event.currentTarget.value)} /></label>}
-          <section className="image-layers" aria-label="Image layers">
-            <div className="preview-heading"><strong>Layers</strong><span>{layers.length}</span></div>
+          </div></details>
+          <details className="image-layers" open aria-label="Image layers">
+            <summary>Overlay layers <span>{layers.length} item(s)</span></summary>
             <div className="image-layer-actions"><button type="button" className="secondary-button" disabled={!source} onClick={() => addLayer("text")}>Add text</button><button type="button" className="secondary-button" disabled={!source} onClick={() => addLayer("rectangle")}>Add rectangle</button><button type="button" className="secondary-button" disabled={!source} onClick={() => addLayer("ellipse")}>Add ellipse</button></div>
             <div className="image-layer-list">{layers.map((layer, index) => <div className={`image-layer-row ${selectedLayerId === layer.id ? "selected" : ""}`} key={layer.id}><button type="button" className="image-layer-select" onClick={() => setSelectedLayerId(layer.id)}>{index + 1}. {layer.kind === "text" ? layer.text || "Text" : layer.kind}</button><button type="button" aria-label={`Move layer ${index + 1} up`} disabled={index === 0} onClick={() => reorderLayer(layer.id, -1)}>↑</button><button type="button" aria-label={`Move layer ${index + 1} down`} disabled={index === layers.length - 1} onClick={() => reorderLayer(layer.id, 1)}>↓</button><button type="button" aria-label={`Remove layer ${index + 1}`} onClick={() => { updateLayers(layers.filter((item) => item.id !== layer.id)); if (selectedLayerId === layer.id) setSelectedLayerId(""); }}>×</button></div>)}</div>
             {selectedLayer && <div className="filter-fields two-column transform-fields">
@@ -380,7 +385,7 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
               <label className="ratio-toggle"><input type="checkbox" checked={selectedLayer.visible} onChange={(event) => updateLayer(selectedLayer.id, { visible: event.currentTarget.checked })} />Show layer</label>
             </div>}
             <div className="image-layer-actions"><button type="button" className="secondary-button" disabled={historyRef.current.undo.length === 0} onClick={undoEdit}>Undo</button><button type="button" className="secondary-button" disabled={historyRef.current.redo.length === 0} onClick={redoEdit}>Redo</button></div>
-          </section>
+          </details>
           <button className="export-button" type="button" disabled={!source || !outputValid} onClick={download}>Download {exportFormat.toUpperCase()}</button>
           {error && <p className="resize-error" role="alert">{error}</p>}
         </div>
