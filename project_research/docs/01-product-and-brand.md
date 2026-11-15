@@ -8,19 +8,19 @@ The first release prioritizes desktop editing. Mobile layouts must allow browsin
 
 ## Navigation and journeys
 
-Top navigation: **Home · Audio · Video · Image · Projects**. The home page provides a short privacy/offline explanation, recent local projects, and tool cards. Each category page groups tools by task and leads to an editor with an imported file or new project. The Projects page lists local projects with open, duplicate, delete, and storage actions.
+Top navigation: **Home · Audio · Video · Image · Projects**. Home puts exactly three media category cards near the top, then the separate Creative Studio entry, then the privacy/offline explanation and other supporting information. Each category page lists only tools for that media type. The Projects page lists local projects with open, duplicate, delete, and storage actions.
 
 Core journeys:
 
 1. Open a tool page from search → understand input/output and offline status → launch the editor → import → adjust → preview → export or save.
 2. Install the app → go offline → reopen a local project → edit and export without a connection.
 3. Open Video Studio → import media → arrange tracks → add text and transitions → adjust custom speed/keyframes → preview → export.
-4. Open Image Resize → enter exact width and height → optionally match aspect ratio → compare → export. AI Upscale is a separate tool with a one-time model download.
-5. Open Vocal Remover → download the model once → extract vocal and instrumental tracks locally → export either or both.
+4. Open Image Resize → enter exact width and height → optionally match aspect ratio → preview → export. AI Upscale is a separate on-device Real-ESRGAN tool with bundled model assets.
+5. Open Vocal Reducer → adjust the stereo center cancellation → preview locally → export. It is a quick stereo effect, not AI stem separation.
 
 ## Visual direction
 
-Use a clean, calm workspace: dark neutral editing canvas, clear contrast, large preview, compact tool panels, visible units, and strong progress states. Public pages can use a lighter presentation while sharing brand colors and typography. Avoid a visual clone of CapCut or reliance on its logos, assets, or proprietary effects.
+Use a clean, calm workspace with a dark charcoal base and restrained navy/blue surfaces, clear contrast, focused previews, compact grouped controls, visible units, and animated progress states. Use Ubuntu for interface text and locally bundled Inter for headings and display text. Keep the site dark from marketing pages through the editors. Put the three category cards near the top of Home and place supporting product information below them. Category pages list only their own media tools. Use a clear editorial hierarchy with concise tool descriptions and grouped utility families; avoid duplicate grids and excess empty canvas. Avoid a visual clone of CapCut or reliance on its logos, assets, or proprietary effects; reproduce familiar editing patterns with our own layout and controls.
 
 ## Name candidates
 
@@ -28,7 +28,7 @@ Use a clean, calm workspace: dark neutral editing canvas, clear contrast, large 
 
 ## Distribution package
 
-The deliverable is a static HTTPS site and installable PWA, not a native installer. Provide a web manifest with name, short name, description, theme/background colors, start URL, standalone display, and 192/512-pixel icons. Provide maskable icons and desktop/mobile screenshots where supported. Install messaging must explain that core features work offline after initial loading and optional AI tools need a separate download. The app's About/Storage screen lists installed models, size, version, and removal control.
+The deliverable is a static HTTPS site and installable PWA, not a native installer. Provide a web manifest with name, short name, description, theme/background colors, start URL, standalone display, and 192/512-pixel icons. Provide maskable icons and desktop/mobile screenshots where supported. Install messaging must explain that core features and the bundled upscaler model are cached after initial installation; no model download service is required. The app's About/Storage screen lists installed models, size, and version.
 
 ## Product boundaries
 

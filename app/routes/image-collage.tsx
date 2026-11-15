@@ -20,6 +20,9 @@ export default function ImageCollage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const projectId = searchParams.get("project") ?? "";
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const selectionCanvasRef = useRef<HTMLCanvasElement>(null);
+  const bitmapCache = useRef(new Map<string, { file: File; bitmap: ImageBitmap }>());
+  const cellGesture = useRef<{ id: string; pointerId: number; clientX: number; clientY: number; startX: number; startY: number; cellWidth: number; cellHeight: number } | null>(null);
   const [images, setImages] = useState<ImageFile[]>([]);
   const [selectedImageId, setSelectedImageId] = useState("");
   const [projectTitle, setProjectTitle] = useState("Untitled collage");
@@ -36,6 +39,12 @@ export default function ImageCollage() {
   const [captionColor, setCaptionColor] = useState("#111827");
   const [error, setError] = useState("");
   const selectedImage = images.find((image) => image.id === selectedImageId) ?? images[0] ?? null;
+
+  useEffect(() => () => { bitmapCache.current.forEach(({ bitmap }) => bitmap.close()); bitmapCache.current.clear(); }, []);
+  useEffect(() => {
+    const liveIds = new Set(images.map((image) => image.id));
+    for (const [id, entry] of bitmapCache.current) if (!liveIds.has(id)) { entry.bitmap.close(); bitmapCache.current.delete(id); }
+  }, [images]);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,9 +102,15 @@ export default function ImageCollage() {
     if (!images.length || !layout.valid || !canvasRef.current) return;
     let cancelled = false;
     void (async () => {
-      let bitmaps: ImageBitmap[] = [];
       try {
-        bitmaps = await Promise.all(images.map(({ file }) => createImageBitmap(file)));
+        const bitmaps = await Promise.all(images.map(async ({ id, file }) => {
+          const existing = bitmapCache.current.get(id);
+          if (existing?.file === file) return existing.bitmap;
+          existing?.bitmap.close();
+          const bitmap = await createImageBitmap(file);
+          bitmapCache.current.set(id, { file, bitmap });
+          return bitmap;
+        }));
         if (cancelled) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -127,12 +142,24 @@ export default function ImageCollage() {
           context.textAlign = "center"; context.textBaseline = "bottom";
           context.fillText(caption, layout.outputWidth / 2, layout.outputHeight - layout.gapSize, layout.outputWidth - layout.gapSize * 2);
         }
+        const selectionCanvas = selectionCanvasRef.current;
+        const selectionContext = selectionCanvas?.getContext("2d");
+        if (selectionCanvas && selectionContext) {
+          selectionCanvas.width = canvas.width; selectionCanvas.height = canvas.height;
+          selectionContext.clearRect(0, 0, canvas.width, canvas.height);
+          const selectedIndex = images.findIndex((image) => image.id === selectedImageId);
+          if (selectedIndex >= 0) {
+            const column = selectedIndex % layout.columnCount, row = Math.floor(selectedIndex / layout.columnCount);
+            const x = layout.gapSize + column * (cellWidth + layout.gapSize), y = layout.gapSize + row * (cellHeight + layout.gapSize);
+            selectionContext.strokeStyle = "#94b9ff"; selectionContext.lineWidth = Math.max(2, Math.min(cellWidth, cellHeight) * 0.006);
+            selectionContext.strokeRect(x + 1, y + 1, cellWidth - 2, cellHeight - 2);
+          }
+        }
         setError("");
       } catch (cause) { setError(cause instanceof Error ? cause.message : "One or more images could not be decoded."); }
-      finally { bitmaps.forEach((bitmap) => bitmap.close()); }
     })();
     return () => { cancelled = true; };
-  }, [images, layout, background, fit, caption, captionSize, captionColor]);
+  }, [images, layout, background, fit, caption, captionSize, captionColor, selectedImageId]);
 
   function addFiles(files: FileList | File[] | null) {
     if (!files?.length) return;
@@ -154,6 +181,34 @@ export default function ImageCollage() {
     setImages((current) => { const next = [...current]; const [image] = next.splice(index, 1); next.splice(destination, 0, image); return next; });
   }
   function move(index: number, direction: -1 | 1) { moveTo(index, index + direction); }
+
+  function beginCellDrag(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (!layout.valid || !images.length) return;
+    const canvas = event.currentTarget, bounds = canvas.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    const x = (event.clientX - bounds.left) / bounds.width * layout.outputWidth;
+    const y = (event.clientY - bounds.top) / bounds.height * layout.outputHeight;
+    const cellWidth = (layout.outputWidth - layout.gapSize * (layout.columnCount + 1)) / layout.columnCount;
+    const cellHeight = (layout.outputHeight - layout.gapSize * (layout.rows + 1)) / layout.rows;
+    const column = Math.floor((x - layout.gapSize) / (cellWidth + layout.gapSize));
+    const row = Math.floor((y - layout.gapSize) / (cellHeight + layout.gapSize));
+    if (column < 0 || column >= layout.columnCount || row < 0 || row >= layout.rows) return;
+    const cellX = layout.gapSize + column * (cellWidth + layout.gapSize), cellY = layout.gapSize + row * (cellHeight + layout.gapSize);
+    if (x > cellX + cellWidth || y > cellY + cellHeight) return;
+    const image = images[row * layout.columnCount + column];
+    if (!image) return;
+    setSelectedImageId(image.id);
+    cellGesture.current = { id: image.id, pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, startX: Number(image.cellOffsetX) || 0, startY: Number(image.cellOffsetY) || 0, cellWidth, cellHeight };
+    canvas.setPointerCapture(event.pointerId); event.preventDefault();
+  }
+  function moveCellDrag(event: React.PointerEvent<HTMLCanvasElement>) {
+    const gesture = cellGesture.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const dx = (event.clientX - gesture.clientX) / bounds.width * layout.outputWidth / gesture.cellWidth * 100;
+    const dy = (event.clientY - gesture.clientY) / bounds.height * layout.outputHeight / gesture.cellHeight * 100;
+    updateCell(gesture.id, { cellOffsetX: String(Math.max(-100, Math.min(100, Math.round((gesture.startX + dx) * 100) / 100))), cellOffsetY: String(Math.max(-100, Math.min(100, Math.round((gesture.startY + dy) * 100) / 100))) });
+  }
 
   async function saveProject() {
     if (!projectLoaded || !images.length || !layout.valid || !projectTitle.trim()) return;
@@ -201,7 +256,7 @@ export default function ImageCollage() {
         <button className="secondary-button export-button" disabled={!projectLoaded || !images.length || !layout.valid || !projectTitle.trim()} onClick={() => void saveProject()}>Save editable collage</button>
         <button className="export-button" disabled={!images.length || !layout.valid} onClick={download}>Download collage PNG</button>
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Collage preview</strong><span>{images.length ? `${layout.outputWidth} × ${layout.outputHeight} px` : "Add images to begin"}</span></div>{images.length ? <canvas ref={canvasRef} className="preview-canvas" aria-label="Image collage preview" /> : <div className="empty-preview">Add two or more images to start a collage.</div>}</div>
+      <div className="resize-preview"><div className="preview-heading"><strong>Collage preview</strong><span>{images.length ? `${layout.outputWidth} × ${layout.outputHeight} px · drag a photo to position` : "Add images to begin"}</span></div>{images.length ? <div className="collage-canvas-stage"><canvas ref={canvasRef} className="preview-canvas collage-interactive-canvas" aria-label="Image collage preview. Click a cell to select its image and drag to reposition it." onPointerDown={beginCellDrag} onPointerMove={moveCellDrag} onPointerUp={(event) => { if (cellGesture.current?.pointerId === event.pointerId) cellGesture.current = null; }} onPointerCancel={() => { cellGesture.current = null; }} /><canvas ref={selectionCanvasRef} className="preview-canvas collage-selection-overlay" aria-hidden="true" /></div> : <div className="empty-preview">Add two or more images to start a collage.</div>}</div>
     </section>}
     {images.length > 0 && <section className="resize-preview image-order"><div className="preview-heading"><strong>Image order</strong><span>Drag to arrange · select a cell to edit</span></div><ol className="clip-list">{images.map((image, index) => <li key={image.id} draggable className={selectedImage?.id === image.id ? "selected" : ""} onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", image.id); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const draggedId = event.dataTransfer.getData("text/plain"); const sourceIndex = images.findIndex((entry) => entry.id === draggedId); if (sourceIndex >= 0) moveTo(sourceIndex, index); }}><span className="clip-drag-handle" aria-hidden="true">⠿</span><button type="button" className="image-layer-select" aria-pressed={selectedImage?.id === image.id} onClick={() => setSelectedImageId(image.id)}><strong>{index + 1}. {image.file.name}</strong><small>{(image.file.size / 1024 / 1024).toFixed(1)} MiB</small></button><div><button type="button" aria-label={`Move ${image.file.name} up`} disabled={index === 0} onClick={() => move(index, -1)}>↑</button><button type="button" aria-label={`Move ${image.file.name} down`} disabled={index === images.length - 1} onClick={() => move(index, 1)}>↓</button><button type="button" aria-label={`Remove ${image.file.name}`} onClick={() => { const next = images.filter((item) => item.id !== image.id); setImages(next); if (selectedImage?.id === image.id) setSelectedImageId(next[0]?.id ?? ""); }}>×</button></div></li>)}</ol>
       {selectedImage && <div className="filter-fields two-column transform-fields" aria-label={`Edit collage cell for ${selectedImage.file.name}`}><strong>Cell: {selectedImage.file.name}</strong><label>Cell fit<select value={selectedImage.cellFit} onChange={(event) => updateCell(selectedImage.id, { cellFit: event.currentTarget.value as ImageFile["cellFit"] })}><option value="global">Use collage default</option><option value="contain">Contain</option><option value="cover">Cover</option></select></label><label>Cell scale <span>custom 0.25–4×</span><input type="number" min="0.25" max="4" step="any" value={selectedImage.cellScale} onChange={(event) => updateCell(selectedImage.id, { cellScale: event.currentTarget.value })} /></label><label>Cell position X <span>custom −100–100%</span><input type="number" min="-100" max="100" step="any" value={selectedImage.cellOffsetX} onChange={(event) => updateCell(selectedImage.id, { cellOffsetX: event.currentTarget.value })} /></label><label>Cell position Y <span>custom −100–100%</span><input type="number" min="-100" max="100" step="any" value={selectedImage.cellOffsetY} onChange={(event) => updateCell(selectedImage.id, { cellOffsetY: event.currentTarget.value })} /></label><p className="resize-note">Scale and position adjust this image within its clipped cell. Other collage cells keep their own settings.</p></div>}

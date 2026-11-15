@@ -647,3 +647,17 @@
 - After exporting a trim, Video Trim now switches its preview panel to the actual trimmed file and offers an Edit selection action to return to the source timeline. Changing either range endpoint clears the old output preview so it cannot be mistaken for the current selection.
 - Fixed the source/result object URL cleanup effects so replacing a result does not revoke the still-loaded source video URL.
 - Verification: `npm.cmd run typecheck` and `git diff --check` passed. Production build and playback review are pending.
+
+## 2026-11-15 — Refresh image design and offline research notes
+
+- Checked the current iLoveIMG and BeFunky public tool catalogs. Updated the image UX research notes to reflect task-grouped image utilities and distinct, canvas-centered photo-editing and collage workspaces.
+- Corrected stale product documentation: the public site remains dark, Ubuntu/Inter are local fonts, the upscaler's pinned ONNX models are already bundled and precached, and Vocal Reducer is stereo center cancellation rather than downloaded AI stem separation.
+- Updated the current route and offline PWA notes to distinguish the multitrack video merger path from a standalone video-merge tool.
+- Verification: documentation source links were checked against the current public pages. Code changes were validated in the earlier typecheck/build; these documentation edits do not change the bundle.
+
+## 2026-11-15 — Collage canvas direct manipulation
+
+- Added click-to-select and drag-to-reposition behavior on the collage canvas so users can arrange each photo directly within its cell. A separate non-exported canvas draws the selected-cell outline, while numeric position controls remain available for exact placement.
+- Added a decoded `ImageBitmap` cache keyed by each local image asset so dragging and changing cell settings redraws from cached pixels rather than repeatedly decoding all source files.
+- Updated the feature matrix and image design notes to describe the canvas-centered collage interaction inspired by BeFunky's customizable layouts.
+- Verification: `npm.cmd run typecheck` and `git diff --check` passed. Production build, save/reopen, and drag interaction are pending.

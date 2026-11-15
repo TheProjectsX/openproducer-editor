@@ -374,6 +374,11 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .merge-output-preview { margin-top: 14px; padding-top: 12px; border-top: 1px solid #2a3c54; }.merge-output-preview .preview-heading { margin-bottom: 8px; }
 .clip-list li[draggable="true"] { cursor: grab; }.image-order .clip-list { display: grid; gap: 7px; }.image-order .clip-list li { gap: 10px; }
 .image-order .image-layer-select { min-width: 0; flex: 1; text-align: left; }.image-order .image-layer-select strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.collage-canvas-stage { position: relative; width: 100%; min-height: 0; display: grid; place-items: center; }
+.collage-canvas-stage > canvas { grid-area: 1 / 1; }
+.collage-interactive-canvas { cursor: grab; touch-action: none; }
+.collage-interactive-canvas:active { cursor: grabbing; }
+.collage-selection-overlay { pointer-events: none; }
 .image-layers, .transform-fields { border-color: #2d3e57; background: #111a28; }
 .image-layer-row { background: #172337; }.image-layer-row.selected { outline-color: #83a7f6; }
 .clip-list li, .project-list li, .bin-item { border-color: #2c3d55; background: #121d2d; color: var(--text); }
