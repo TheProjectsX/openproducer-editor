@@ -8,6 +8,7 @@ import { createImageHistory, recordImageEdit, redoImageEdit, undoImageEdit } fro
 import { renderNaturalSpeedChunk, shouldUsePitchPreservingStretcher, PITCH_PRESERVE_RENDER_CHUNK_FRAMES } from "../app/lib/audio-speed.ts";
 import { BungeeStretcher, Transport, compileBungee, instantiateBungee } from "bungee-web";
 import { readFile } from "node:fs/promises";
+import { createSpectralNoiseReductionJob } from "../app/lib/audio-denoise.ts";
 
 const transform = (x) => ({ x, y: 0, scale: 1, rotation: 0, opacity: 1 });
 const clip = (overrides = {}) => ({
@@ -113,6 +114,26 @@ test("pitch-preserved 3.7× export renders its full duration and retains a 440 H
     assert.ok(Math.abs(frequency - 440) < 8, `expected pitch near 440 Hz, received ${frequency.toFixed(2)} Hz`);
     assert.equal(transport.stats.underruns, 0);
   } finally { stretcher.destroy(); }
+});
+
+test("spectral noise reduction attenuates profiled noise while retaining a tone", () => {
+  const sampleRate = 48_000, frames = sampleRate * 2, source = new Float32Array(frames);
+  let seed = 0x12345678;
+  for (let frame = 0; frame < frames; frame++) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const noise = ((seed / 0x1_0000_0000) * 2 - 1) * 0.04;
+    source[frame] = noise + (frame >= sampleRate / 2 ? Math.sin(2 * Math.PI * 440 * frame / sampleRate) * 0.25 : 0);
+  }
+  const job = createSpectralNoiseReductionJob(source, 0, sampleRate / 2, 80);
+  while (!job.done) job.processNextFrame();
+  const output = job.getOutput();
+  const rms = (data, from, to) => Math.sqrt(data.slice(from, to).reduce((sum, value) => sum + value * value, 0) / (to - from));
+  const sourceNoise = rms(source, sampleRate / 10, sampleRate * 4 / 10);
+  const outputNoise = rms(output, sampleRate / 10, sampleRate * 4 / 10);
+  const sourceTone = rms(source, sampleRate, sampleRate * 3 / 2);
+  const outputTone = rms(output, sampleRate, sampleRate * 3 / 2);
+  assert.ok(outputNoise < sourceNoise * 0.65, `expected noise to drop, got ${sourceNoise.toFixed(4)}→${outputNoise.toFixed(4)}`);
+  assert.ok(outputTone > sourceTone * 0.8, `expected the tone to remain audible, got ${sourceTone.toFixed(4)}→${outputTone.toFixed(4)}`);
 });
 
 test("peak normalization gain reaches a custom dBFS target and leaves silence unchanged", () => {

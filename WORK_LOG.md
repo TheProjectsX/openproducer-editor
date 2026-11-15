@@ -506,4 +506,12 @@
 - Added a shared 2,048-frame constant and applied it to Audio Speed, Audio Studio, and Video Studio timeline audio. Added a regression test using the bundled Bungee WASM, a generated four-second 440 Hz signal, and the 3.7× setting.
 - Rebuilt the production app and repeated the Audio Speed export with network disabled. The resulting WAV had 51,892 stereo frames at 48 kHz (1.0811 s), active signal for 1.0811 s, and a measured pitch of 439.85 Hz. Typecheck passed, the Core suite passed 17/17, and build/static route verification passed (27 routes; 22 indexable; 50 cached assets).
 - Other M5 gates remain open: Audio Studio save/reopen, 0.1×/16× and 5×/6× output checks, pitch-mode listening comparison, merge boundaries/rates, noise-reduction quality, and external-player inspection.
+
+## 2026-11-15 — M5 profile-based noise reduction
+
+- Replaced the broadband threshold gate with a noise-profile spectral reduction tool. It accepts a custom noise-only source range and strength, keeps original and processed previews, and exports WAV.
+- Moved STFT analysis and WAV encoding to a module worker with progress, cancellation messages, chunked worker yields, and cleanup. Capped file input at 128 MiB and decoded audio at 64 MiB to bound memory use.
+- Added a deterministic CC0 noisy-tone fixture and a Core check that confirms background RMS reduction while retaining the 440 Hz tone.
+- Production browser check on Chrome 157: 4-second fixture produced a 4-second 48 kHz mono WAV; noise-only RMS fell to 3.9% of the source and tone-region RMS stayed at 88.4%. Repeated from a service-worker-controlled tab with the network offline and received the same-format WAV without an alert.
+- Typecheck passed, Core suite passed 18/18, and production build/static verification passed (27 routes, 22 indexable, 51 cached assets). Worker cancellation timing and external-listener quality review remain open.
 - Commit: `07da27c fix: explain detached audio speed behavior`.

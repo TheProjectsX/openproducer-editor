@@ -32,6 +32,8 @@ The current collage document is version 1 within the versioned project record an
 
 The focused peak normalizer decodes a bounded input on the main thread, then transfers 65,536-frame PCM chunks to a worker for peak analysis and WAV encoding. The editor shows progress and can cancel between chunks. This worker path is not yet the shared job manager required for all expensive operations.
 
+The basic noise-reduction tool asks the user for a noise-only source range and builds a per-channel spectral profile. A module worker applies a windowed 2,048-frame STFT gate, reports progress, accepts cancellation, and encodes the WAV output. The tool currently caps decoded source audio at 64 MiB to limit working memory; it is basic steady-noise reduction and can affect quiet speech or changing noise. A synthetic 48 kHz noise-plus-tone fixture showed a 96.1% RMS reduction in its noise-only range while retaining 88.4% of tone-region RMS in the tested production browser.
+
 ## Capability and failure contracts
 
 Probe browser APIs, actual track metadata, decoder/encoder configuration, available storage, and model readiness before enabling a job. Return typed errors such as unsupported codec, insufficient storage, corrupted source, cancelled, out of memory, model unavailable, and export failed. Keep the project editable after every failure. On successful export, verify the resulting blob/container metadata and make a user-controlled download available.
