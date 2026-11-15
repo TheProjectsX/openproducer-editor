@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Route } from "./+types/audio-noise-gate";
 import { MediaImportScreen } from "../components/media-import-screen";
 import { CustomMediaPreview } from "../components/custom-media-preview";
+import { AudioRangeTimeline } from "../components/audio-range-timeline";
 
 const MAX_FILE_BYTES = 128 * 1024 * 1024;
 const MAX_DECODED_BYTES = 64 * 1024 * 1024;
@@ -116,6 +117,7 @@ export default function AudioNoiseGate() {
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => { const next = event.currentTarget.files?.[0]; event.currentTarget.value = ""; void chooseFile(next); }} /></span></label>
         {source && <p className="source-info">{file?.name} · {source.duration.toFixed(2)} s · {source.sampleRate} Hz · {source.numberOfChannels} channel(s)</p>}
+        {source && <div className="audio-tool-timeline"><div className="preview-heading"><strong>Noise sample range</strong><span>{settings[0].toFixed(2)}–{settings[1].toFixed(2)} s</span></div><AudioRangeTimeline audio={source} start={settings[0]} end={settings[1]} label="Noise sample range" onChange={(start, end) => { setNoiseStart(String(start)); setNoiseEnd(String(end)); clearResult(); }} /></div>}
         <div className="filter-fields two-column">
           <label>Noise sample start <span>source seconds</span><input type="number" min="0" max={source?.duration ?? 0} step="any" value={noiseStart} disabled={!source || busy} onChange={(event) => updateControl(setNoiseStart, event.currentTarget.value)} /></label>
           <label>Noise sample end <span>source seconds</span><input type="number" min="0" max={source?.duration ?? 0} step="any" value={noiseEnd} disabled={!source || busy} onChange={(event) => updateControl(setNoiseEnd, event.currentTarget.value)} /></label>

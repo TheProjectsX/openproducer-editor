@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Route } from "./+types/audio-volume";
 import { MediaImportScreen } from "../components/media-import-screen";
 import { CustomMediaPreview } from "../components/custom-media-preview";
+import { AudioRangeTimeline } from "../components/audio-range-timeline";
 
 const MAX_BYTES = 512 * 1024 * 1024;
 
@@ -98,6 +99,7 @@ export default function AudioVolume() {
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void chooseFile(event.currentTarget.files?.[0])} /></span></label>
         {source && <p className="source-info">{file?.name} · {source.duration.toFixed(2)} s · {source.sampleRate} Hz · {source.numberOfChannels} channel(s)</p>}
+        {source && <div className="audio-tool-timeline"><div className="preview-heading"><strong>Fade placement</strong><span>{numericIn.toFixed(2)} s in · {numericOut.toFixed(2)} s out</span></div><AudioRangeTimeline audio={source} start={Math.min(source.duration, numericIn)} end={Math.max(numericIn, source.duration - numericOut)} label="Fade placement" onChange={(start, end) => { update(setFadeIn, String(start)); update(setFadeOut, String(Math.max(0, source.duration - end))); }} /></div>}
         <div className="filter-fields two-column">
           <label>Gain <span>−60 to +24 dB</span><input type="number" min="-60" max="24" step="any" value={gain} onChange={(event) => update(setGain, event.currentTarget.value)} /></label>
           <label>Fade in <span>custom seconds</span><input type="number" min="0" max={source?.duration ?? 0} step="any" value={fadeIn} onChange={(event) => update(setFadeIn, event.currentTarget.value)} /></label>

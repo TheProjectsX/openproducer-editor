@@ -6,6 +6,7 @@ import { inspectMediaFile } from "../lib/media-inspection";
 import { PITCH_PRESERVE_RENDER_CHUNK_FRAMES } from "../lib/audio-speed";
 import { MediaImportScreen } from "../components/media-import-screen";
 import { CustomMediaPreview } from "../components/custom-media-preview";
+import { AudioRangeTimeline } from "../components/audio-range-timeline";
 
 const MAX_SOURCE_BYTES = 256 * 1024 * 1024;
 const MAX_BUFFER_BYTES = 512 * 1024 * 1024;
@@ -30,7 +31,6 @@ function wavBlob(left: Float32Array, right: Float32Array, sampleRate: number) {
 export default function AudioStudio() {
   const [params] = useSearchParams();
   const projectId = params.get("project") ?? "";
-  const waveformRef = useRef<HTMLCanvasElement>(null);
   const playerRef = useRef<HTMLAudioElement>(null);
   const previewContextRef = useRef<AudioContext | null>(null);
   const previewGainRef = useRef<GainNode | null>(null);
@@ -80,26 +80,6 @@ export default function AudioStudio() {
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not save the audio project.")), 350);
     return () => window.clearTimeout(timeout);
   }, [document, loaded, projectId]);
-
-  useEffect(() => {
-    const canvas = waveformRef.current;
-    if (!canvas || !buffer) return;
-    const context = canvas.getContext("2d"); if (!context) return;
-    const width = Math.max(300, canvas.clientWidth * devicePixelRatio), height = 150;
-    canvas.width = width; canvas.height = height; context.fillStyle = "#111827"; context.fillRect(0, 0, width, height);
-    context.strokeStyle = "#7de3c5"; context.lineWidth = 1;
-    const samples = buffer.getChannelData(0), step = Math.max(1, Math.floor(samples.length / width));
-    context.beginPath();
-    for (let x = 0; x < width; x++) {
-      let peak = 0; const start = x * step;
-      for (let index = start; index < Math.min(samples.length, start + step); index++) peak = Math.max(peak, Math.abs(samples[index]));
-      const y = height / 2, amplitude = peak * height * 0.46; context.moveTo(x, y - amplitude); context.lineTo(x, y + amplitude);
-    }
-    context.stroke();
-    const start = buffer.duration ? document.sourceStart / buffer.duration * width : 0;
-    const end = buffer.duration ? document.sourceEnd / buffer.duration * width : width;
-    context.fillStyle = "rgba(245, 158, 11, 0.2)"; context.fillRect(0, 0, start, height); context.fillRect(end, 0, width - end, height);
-  }, [buffer, document.sourceStart, document.sourceEnd]);
 
   useEffect(() => () => { if (sourceUrl) URL.revokeObjectURL(sourceUrl); }, [sourceUrl]);
   useEffect(() => () => { if (resultUrl) URL.revokeObjectURL(resultUrl); }, [resultUrl]);
@@ -278,7 +258,7 @@ export default function AudioStudio() {
   return <main className={`resize-page${buffer ? " has-media" : ""}`}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/projects">Projects</a></nav><span role="status">{status}</span></header>
     <section className="resize-intro"><p className="eyebrow">LOCAL AUDIO STUDIO</p><h1>Audio Studio</h1><p>Trim and shape a local audio source. Edits and source audio are saved in this browser.</p></section>
-    {!buffer ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importAudio(next)} error={error} /> : <section className="resize-workspace" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void importAudio(event.dataTransfer.files?.[0]); }}>
+    {!buffer ? loaded ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importAudio(next)} error={error} /> : <div className="empty-preview import-loading" role="status">Opening audio project from this device…</div> : <section className="resize-workspace" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void importAudio(event.dataTransfer.files?.[0]); }}>
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Import audio"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void importAudio(event.currentTarget.files?.[0])} /></span></label>
         <div className="project-actions" aria-label="Audio edit history"><button type="button" className="editor-action" disabled={!past.length || busy} onClick={undo}>Undo</button><button type="button" className="editor-action" disabled={!future.length || busy} onClick={redo}>Redo</button></div>
@@ -301,7 +281,7 @@ export default function AudioStudio() {
         {sourceUrl && <audio ref={playerRef} className="media-source-hidden" src={sourceUrl} onPlay={() => { setPreviewPlaying(true); schedulePreviewEnvelope(); }} onPause={() => setPreviewPlaying(false)} onTimeUpdate={() => { if (playerRef.current) { setPreviewTime(playerRef.current.currentTime); if (playerRef.current.currentTime >= document.sourceEnd) playerRef.current.pause(); } }} />}
         {buffer && <div className="custom-media-transport studio-audio-transport"><button type="button" className="transport-play" aria-label={previewPlaying ? "Pause audio preview" : "Play selected audio"} onClick={() => { if (playerRef.current?.paused) preview(); else playerRef.current?.pause(); }}>{previewPlaying ? "Ⅱ" : "▶"}</button><span className="transport-time">{previewTime.toFixed(2)} / {buffer.duration.toFixed(2)} s</span><input className="transport-scrub" type="range" min="0" max={buffer.duration} step="any" value={Math.min(previewTime, buffer.duration)} aria-label="Audio preview timeline" onChange={(event) => { const time = event.currentTarget.valueAsNumber; setPreviewTime(time); if (playerRef.current) playerRef.current.currentTime = time; }} /></div>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Audio waveform</strong><span>{buffer ? `${buffer.duration.toFixed(2)} s` : "Import audio to begin"}</span></div>{buffer ? <canvas ref={waveformRef} className="audio-waveform" aria-label="Audio waveform and selected range" /> : <div className="empty-preview">The waveform and selected range will appear here.</div>}{resultUrl && <CustomMediaPreview kind="audio" src={resultUrl} label="Rendered audio preview" />}</div>
+      <div className="resize-preview"><div className="preview-heading"><strong>Audio waveform timeline</strong><span>{buffer ? `${buffer.duration.toFixed(2)} s · selected ${selectionLabel}` : "Import audio to begin"}</span></div>{buffer ? <AudioRangeTimeline audio={buffer} start={document.sourceStart} end={document.sourceEnd} playhead={previewTime} label="Audio Studio source selection" onGestureStart={() => { setPast((history) => [...history, document].slice(-50)); setFuture([]); setResultUrl(""); }} onChange={(start, end) => setDocument((current) => ({ ...current, sourceStart: start, sourceEnd: end }))} /> : <div className="empty-preview">The waveform and selected range will appear here.</div>}{resultUrl && <CustomMediaPreview kind="audio" src={resultUrl} label="Rendered audio preview" />}</div>
     </section>}
   </main>;
 }

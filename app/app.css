@@ -403,6 +403,16 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .custom-media-transport .transport-scrub { min-width: 0; accent-color: #6fd6c2; }
 .custom-media-transport .transport-play { border-color: #34766f; background: linear-gradient(140deg, #1a4443, #17323d); color: #cffff4; }
 .custom-media-transport .transport-play:hover { background: #205650; }
+.audio-range-timeline { min-width: 0; }
+.audio-range-waveform { display: block; width: 100%; height: 132px; border: 1px solid #2a405b; border-radius: 8px; background: #0b1320; cursor: ew-resize; touch-action: none; }
+.audio-tool-timeline { display: grid; gap: 9px; padding-top: 2px; }
+.audio-split-timeline { position: relative; height: 94px; margin: 8px 6px 18px; cursor: crosshair; touch-action: none; }
+.audio-split-track { position: absolute; inset: 21px 0 18px; border: 1px solid #35516a; border-radius: 8px; background: repeating-linear-gradient(90deg, #15313d 0 2px, transparent 2px 8px), linear-gradient(90deg, #17453f, #214e67 52%, #332f61); box-shadow: inset 0 0 26px #070b12; }
+.audio-split-label { position: absolute; top: 0; color: #8195ad; font-size: 10px; font-variant-numeric: tabular-nums; }.audio-split-label.start { left: 0; }.audio-split-label.end { right: 0; }
+.audio-split-marker { position: absolute; z-index: 1; top: 13px; bottom: 7px; width: 17px; transform: translateX(-50%); border: 0; background: transparent; cursor: ew-resize; touch-action: none; }
+.audio-split-marker::before { position: absolute; top: 8px; bottom: 8px; left: 8px; width: 2px; border-radius: 2px; background: #ff8091; box-shadow: 0 0 9px #ff5269aa; content: ""; }
+.audio-split-marker i { position: absolute; top: 1px; left: 4px; width: 10px; height: 15px; border: 1px solid #ffc2ca; border-radius: 4px; background: #e45167; }
+.import-loading { min-height: calc(100dvh - 64px); border: 0; background: transparent; color: #92a5bf; }
 
 /* Keep focused editors on the available screen after a source is loaded. */
 .resize-page.has-media { height: 100dvh; min-height: 0; display: flex; flex-direction: column; overflow: auto; padding-bottom: 10px; }

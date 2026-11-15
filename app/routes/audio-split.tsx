@@ -3,6 +3,7 @@ import { zipSync } from "fflate";
 import type { Route } from "./+types/audio-split";
 import { MediaImportScreen } from "../components/media-import-screen";
 import { CustomMediaPreview } from "../components/custom-media-preview";
+import { AudioSplitTimeline } from "../components/audio-split-timeline";
 
 const MAX_INPUT_BYTES = 512 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
@@ -117,7 +118,7 @@ export default function AudioSplit() {
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-segments.zip`}>Download segment ZIP</a>}
         {url && <CustomMediaPreview kind="audio" src={url} label="Source audio preview" />}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Split plan</strong><span>{audio ? `${parsed.points.length + 1} clip(s)` : "No audio selected"}</span></div>{audio ? <ol className="clip-list">{[0, ...parsed.points, audio.duration].slice(0, -1).map((start, index) => { const end = ([...parsed.points, audio.duration][index]); return <li key={`${start}-${end}`}><span><strong>Part {String(index + 1).padStart(2, "0")}</strong><small>{start.toFixed(2)} s – {end.toFixed(2)} s · {(end - start).toFixed(2)} s</small></span></li>; })}</ol> : <div className="empty-preview">Choose audio and enter custom split points.</div>}</div>
+      <div className="resize-preview"><div className="preview-heading"><strong>Split timeline</strong><span>{audio ? `${parsed.points.length + 1} clip(s)` : "No audio selected"}</span></div>{audio ? <><AudioSplitTimeline duration={audio.duration} points={parsed.points} onChange={(points) => setSplitPoints(points.join(", "))} /><ol className="clip-list">{[0, ...parsed.points, audio.duration].slice(0, -1).map((start, index) => { const end = ([...parsed.points, audio.duration][index]); return <li key={`${start}-${end}`}><span><strong>Part {String(index + 1).padStart(2, "0")}</strong><small>{start.toFixed(2)} s – {end.toFixed(2)} s · {(end - start).toFixed(2)} s</small></span></li>; })}</ol></> : <div className="empty-preview">Choose audio and enter custom split points.</div>}</div>
     </section>}
   </main>;
 }

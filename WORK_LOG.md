@@ -553,3 +553,9 @@
 - Replaced visible browser-native media controls in the standalone audio/video tools and Audio/Video Studio export previews with app-styled local play and timeline controls. Audio previews use a designed media surface; Video Speed keeps its capture-capable media element and uses app transport controls.
 - Updated the interface direction and status in the feature matrix. Image pointer controls and trim timeline interactions still need a human browser review.
 - Verification: `npm.cmd run typecheck` passed; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable) with 95 service-worker assets. Existing Bungee dynamic-import warning remains.
+# 2026-11-15 — Design: waveform ranges and split markers
+
+- Added a shared waveform range timeline with direct edge trim, selection move, and drag-to-create behavior. Noise Reduction uses it to choose a noise-only sample; Volume/Fades uses it to place fade boundaries; Audio Studio uses it to select source in/out points.
+- Audio Studio records one undo-history entry per waveform gesture while keeping its typed source range fields synchronized. Added an interactive split timeline that creates cut points on the track and lets users drag them; the comma-separated custom input and segment list stay synchronized.
+- Updated the feature matrix. Browser interaction, accessibility, and narrow viewport review are still pending.
+- Verification: `npm.cmd run typecheck` passed. Production build and static route verification are pending for this slice.
