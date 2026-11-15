@@ -1,5 +1,5 @@
 import { ToolPageHeader } from "../components/tool-page-header";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Route } from "./+types/audio-trim";
 import { MediaImportScreen } from "../components/media-import-screen";
 
@@ -48,7 +48,22 @@ export default function AudioTrim() {
   const [playing, setPlaying] = useState(false);
   const [playhead, setPlayhead] = useState(0);
   const [previewTime, setPreviewTime] = useState(0);
+  const previewTimer = useRef<number | null>(null);
+  const previewUrlRef = useRef("");
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
+
+  const waveformPeaks = useMemo(() => {
+    if (!audio) return null;
+    const samples = audio.getChannelData(0), bucketCount = 4096;
+    const peaks = new Float32Array(bucketCount), bucketSize = Math.max(1, Math.ceil(samples.length / bucketCount));
+    for (let bucket = 0; bucket < bucketCount; bucket++) {
+      let peak = 0;
+      const from = bucket * bucketSize;
+      for (let index = from; index < Math.min(samples.length, from + bucketSize); index++) peak = Math.max(peak, Math.abs(samples[index]));
+      peaks[bucket] = peak;
+    }
+    return peaks;
+  }, [audio]);
 
   async function importFile(next?: File) {
     if (!next) return;
@@ -71,11 +86,30 @@ export default function AudioTrim() {
   const ranges: Array<[number, number]> = trimMode === "keep" ? [[start, end]] : [[0, start], [end, audio?.duration ?? end]];
 
   useEffect(() => {
-    if (!audio || !valid) { setPreviewUrl(""); return; }
-    const nextUrl = URL.createObjectURL(toWav(audio, ranges));
-    setPreviewUrl(nextUrl);
-    return () => URL.revokeObjectURL(nextUrl);
+    if (!audio || !valid) {
+      setPreviewUrl((previous) => { if (previous) URL.revokeObjectURL(previous); previewUrlRef.current = ""; return ""; });
+      return;
+    }
+    // Pointer movement can produce dozens of range updates per second. Building a
+    // complete WAV synchronously for every update blocks the pointer event loop.
+    const timer = window.setTimeout(() => {
+      const nextUrl = URL.createObjectURL(toWav(audio, ranges));
+      setPreviewUrl((previous) => {
+        if (previous) URL.revokeObjectURL(previous);
+        previewUrlRef.current = nextUrl;
+        return nextUrl;
+      });
+      setPreviewTime(0);
+      if (player.current) player.current.currentTime = 0;
+    }, selectionGesture.current ? 180 : 0);
+    previewTimer.current = timer;
+    return () => window.clearTimeout(timer);
   }, [audio, start, end, trimMode, valid]);
+
+  useEffect(() => () => {
+    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+  }, []);
 
   useEffect(() => {
     const canvas = timeline.current, context = canvas?.getContext("2d");
@@ -86,17 +120,14 @@ export default function AudioTrim() {
     const left = Math.max(0, Math.min(width, start / audio.duration * width));
     const right = Math.max(left, Math.min(width, end / audio.duration * width));
     context.fillStyle = trimMode === "keep" ? "#183042" : "#432533"; context.fillRect(left, 0, Math.max(0, right - left), height);
-    const samples = audio.getChannelData(0), step = Math.max(1, Math.floor(samples.length / width));
     for (let x = 0; x < width; x++) {
-      let peak = 0;
-      const from = x * step;
-      for (let i = from; i < Math.min(samples.length, from + step); i++) peak = Math.max(peak, Math.abs(samples[i]));
+      const peak = waveformPeaks?.[Math.min((waveformPeaks.length - 1), Math.floor(x / width * (waveformPeaks?.length ?? 1)))] ?? 0;
       context.fillStyle = x >= left && x <= right ? trimMode === "keep" ? "#65d3b1" : "#ff8794" : "#425571";
       const amplitude = Math.max(1, peak * height * .43), center = height / 2;
       context.fillRect(x, center - amplitude, 1, amplitude * 2);
     }
     context.fillStyle = "#f1f6ff"; context.fillRect(left - 1, 0, 2, height); context.fillRect(right - 1, 0, 2, height);
-  }, [audio, start, end, trimMode]);
+  }, [audio, start, end, trimMode, waveformPeaks]);
 
   function timeFromPointer(event: React.PointerEvent<HTMLCanvasElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -116,8 +147,8 @@ export default function AudioTrim() {
     const gesture = selectionGesture.current, duration = audio?.duration ?? 0;
     if (!gesture || gesture.pointerId !== event.pointerId || !duration) return;
     const value = timeFromPointer(event), minimum = Math.min(.01, duration);
-    if (gesture.mode === "start") setStart(Math.max(0, Math.min(end - minimum, value)));
-    else if (gesture.mode === "end") setEnd(Math.max(start + minimum, Math.min(duration, value)));
+    if (gesture.mode === "start") setStart(Math.max(0, Math.min(gesture.end - minimum, value)));
+    else if (gesture.mode === "end") setEnd(Math.max(gesture.start + minimum, Math.min(duration, value)));
     else if (gesture.mode === "create") { setStart(Math.min(gesture.anchor, value)); setEnd(Math.max(gesture.anchor + minimum, value)); }
     else {
       const length = gesture.end - gesture.start, nextStart = Math.max(0, Math.min(duration - length, gesture.start + value - gesture.anchor));

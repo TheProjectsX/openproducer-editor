@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   kind: "audio" | "video";
@@ -19,7 +19,32 @@ export function CustomMediaPreview({ kind, src, label, onDuration, className = "
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const onDurationRef = useRef(onDuration);
+  onDurationRef.current = onDuration;
   const media = () => kind === "audio" ? audioRef.current : videoRef.current;
+
+  useEffect(() => {
+    setDuration(0);
+    setCurrentTime(0);
+    setPlaying(false);
+    const element = kind === "audio" ? audioRef.current : videoRef.current;
+    if (!element) return;
+    const syncDuration = () => {
+      const value = element.duration;
+      if (!Number.isFinite(value)) return;
+      setDuration(value);
+      onDurationRef.current?.(value);
+    };
+    element.addEventListener("loadedmetadata", syncDuration);
+    element.addEventListener("durationchange", syncDuration);
+    // A Blob URL can finish loading before the effect subscribes. Read its
+    // current metadata too, so custom transport state cannot remain at 0.
+    syncDuration();
+    return () => {
+      element.removeEventListener("loadedmetadata", syncDuration);
+      element.removeEventListener("durationchange", syncDuration);
+    };
+  }, [src, kind]);
 
   function togglePlayback() {
     const element = media();

@@ -1,5 +1,12 @@
 # Feature matrix and release boundaries
 
+## Focused browser audit (2026-11-16)
+
+- Audio Trim drag responsiveness passed with the 4-second WAV fixture; keep/remove exports measured 3.000/1.000 seconds. Gain and spectral noise-reduction fixture measurements passed. Merge handled 48 kHz plus 44.1 kHz inputs.
+- Video trim, speed preview, mute, replacement mix, and multitrack render passed focused local fixture checks; outputs decoded in FFmpeg. Extract Audio failed on AAC MP4 and Opus WebM fixtures despite their audio streams. The route now selects all tracks while discarding video (typecheck/build pass; browser retest remains outstanding).
+- Image Resize produced exact 300×300 RGBA output from 400×340; aspect-ratio mode recalculated 300×255. CPU upscale produced 800×680 with transparency retained. Collage PNG project save/reopen and export passed; SVG input currently fails late during decode with generic feedback.
+- Audio Split calculated two segments and generated a ZIP link, but browser download capture timed out, so archive integrity is unconfirmed. Offline install/export, cancellation/recovery, external-player review, keyboard/accessibility, and supported-browser matrix remain unverified. These spot checks do not complete the Core gate.
+
 ## Interface direction (2026-11-15)
 
 - Site-wide visual direction: dark charcoal with restrained navy/blue editor surfaces; Ubuntu for general interface text and locally bundled Inter for headings/display text. Do not load fonts from a runtime CDN because the PWA must remain self-contained offline. Font WOFF/WOFF2 files must be included in the service worker's asset cache.
@@ -74,3 +81,7 @@ The Core release is not complete. Audio has trim/split/merge/volume/normalize pl
 ## Browser and format policy
 
 Chrome and Edge desktop are the full-editor targets. Firefox and Safari get only tools whose complete import/preview/export path passes tests. Mobile gets a responsive interface and only tested processing paths. Format support is a measured matrix of **container + codec + direction + browser**, not a blanket promise based on `.mp4` or `.wav` extensions. Initial export targets are PNG/JPEG for images, WAV for audio, and MP4/WebM video configurations where the device supports the encoders. AI features may have narrower support and must say so before download.
+
+## Audio Trim responsiveness follow-up (2026-11-15)
+
+Waveform peaks are precomputed and edited WAV preview generation waits until pointer movement settles, avoiding full-buffer scanning and WAV encoding on every drag event. Core tests passed 18/18 before a dependency repair attempt; the current run fails because `bungee-web` is missing after `npm ci` hit a locked native module. Browser responsiveness remains unverified.

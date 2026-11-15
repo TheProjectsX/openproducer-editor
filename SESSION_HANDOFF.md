@@ -1,11 +1,30 @@
 # Session handoff — Local Studio Core
 
-**Checkpoint date:** 2026-11-15 (Asia/Dhaka)  
+**Checkpoint date:** 2026-11-16 (Asia/Dhaka)
 **Goal status:** Resumed by the user on 2026-11-15. Continue the same Core objective.
-**Repository:** `C:\Users\Modasser Hasan\Contents\openproducer-editor`
+**Repository:** `E:\Coding_Practice\Live Projects\openproducer-editor`
 **Branch/commit:** `main`, latest `82f2d2c` (`fix: guard replace audio mix memory`).
 
-## Latest session handoff — 2026-11-15
+## Latest session handoff — 2026-11-16
+
+### Audit update — 2026-11-16
+
+The user requested item-by-item testing of the open issues below and reported Audio Trim waveform selection lag. The Audio Trim route now caches a 4,096-bucket waveform envelope per decoded file, delays edited-WAV preview regeneration until 180 ms after pointer activity settles, and clamps edge drags against the captured gesture boundary. Browser dragging moved the selected range immediately (under 0.4 s for the interaction round trip); keep/remove exports were 3.000 s and 1.000 s as expected.
+
+Audit evidence/status (Chrome in the in-app browser, local production build):
+
+- **Build/typecheck/tests:** root `node_modules` could not be repaired because Windows held native module files. A clean audit copy at `C:\Users\User\.codex\visualizations\2026\11\15\01a1e04b-95f2-7511-8363-5c276fa4f669\local-studio-audit` was installed instead. Core tests passed 18/18, typecheck passed, and the final production build passed after the extractor change (27 prerendered routes, 22 public indexable; service worker generated with 106 cached assets). Repository `git diff --check` passed.
+- **1. Visual redesign/responsive layout:** homepage categories and mobile stacking were reviewed; no horizontal overflow was visible at 390×844. A full route-by-route visual/accessibility review remains open.
+- **2. Video Studio:** multitrack fixture project rendered H.264/AAC at 320×180, 12 fps, 13.08 s; FFmpeg decoded it. Project reload restored six assets and edits. The export contact sheet showed a 72 px test title clipped at the deliberately small 320 px output; title fitting needs review.
+- **3. Audio output:** +6 dB export measured exactly +6 dB on the fixture. Noise reduction reduced noise-only RMS from −35.23 to −63.36 dB and retained tone-region RMS within 1.08 dB. Listening/subjective quality and cancellation remain open.
+- **4. Result previews:** trim, speed, volume, merge, mute, and replacement mix were exercised. WAV/MP4 outputs were probed and decoded. Video Speed initially showed stale zero duration; `CustomMediaPreview` now resets and listens for metadata changes, and retest showed 2.07 s duration and live playback time. Audio Extract failed on AAC MP4 and Opus WebM fixtures despite confirmed audio streams; its selector was changed from `tracks: "primary"` to `tracks: "all"` while discarding video. This change typechecks/builds but still needs browser retest.
+- **5. Video operations:** trim output was 3.02 s H.264/AAC and decoded; mute output contained video only and decoded; replacement mix produced H.264 plus AAC stereo and decoded. Offline export, VLC/external player, broader sync, and browser matrix remain open.
+- **6. Replace Audio limits:** two replacement tracks at different rates and offsets mixed successfully; published memory/time bounds have not been stress-tested.
+- **7. Images:** exact 400×340→300×300 transparent PNG stretch and 300×255 ratio-lock behavior passed. Upscaler CPU/WASM produced 800×680 output and retained transparent pixels. Collage PNG save/reload/order/cell settings passed with PNG inputs; SVG import failed later at decode with a generic error and should be rejected earlier with a useful message. Image quality, offline inference, memory, and external viewer review remain open.
+- **8. Numeric inputs and drag:** audio trim live drag, video trim/playhead, exact image dimensions, ratio lock, mix gain/offset, and timeline size/frame-rate inputs were exercised. Broader accessibility and all-tool typed-value coverage remain open.
+- **9. Progress/recovery:** visible progress and successful completion were observed on upscale and video processing; cancellation, worker recovery, cleanup, quota, and storage failures remain untested. Audio Split computed two 2 s segments and generated a ZIP link, but the browser harness did not observe a download event; output ZIP integrity remains unverified.
+
+Changes also fix a missing mounted canvas in Image Upscale and stale metadata in custom media previews. The Audio Extract track-selection fix has not yet been browser-verified. The existing root `package-lock.json` change was preserved. The repo is not release-ready: offline operation, external-player review, broader browser coverage, extractor retest, ZIP verification, cancellation/recovery, and several project/storage gates remain open.
 
 **This section is the current status and supersedes older implementation-status claims below. The project is not finished: several problems from the user's design/functionality list still need real-browser review and may need additional fixes.**
 
@@ -113,4 +132,4 @@ The build command includes service-worker generation and static-output verificat
 
 ## Next-session opening instruction
 
-First inspect this handoff, the current `git status --short`, the roadmap, release plan, feature matrix, and current source/spec versions. Preserve the existing uncommitted work. Resume the paused goal only when instructed, then start at the M6 gaps above. No local preview server is currently expected to be running.
+First inspect this handoff, the current `git status --short`, the roadmap, release plan, feature matrix, and current source/spec versions. Preserve the existing uncommitted work. The immediate next check is to run the latest production build and browser-test `/tools/video/extract-audio` on `tests/fixtures/core-media/av-red-blue.mp4` and `av-green-yellow.webm` after changing track selection to `tracks: "all"`; verify the generated WAV stream, duration, playback, and download. Then verify Audio Split ZIP download and inspect the archive. Continue the remaining roadmap-ordered Core gates; do not treat the audit as release completion. No local preview server is currently expected to be running.

@@ -192,7 +192,7 @@ export default function ImageUpscale() {
         {!upscaleReady ? <button className="export-button" disabled={!file || !valid || upscaling} onClick={() => void upscale()}>{upscaling ? "Enhancing image…" : "AI upscale image"}</button> : <button className="export-button" disabled={!file || !valid} onClick={download}>Download enhanced PNG</button>}
         {upscaleReady && <p className="source-info" role="status">{phase || `AI enhancement complete · ${backend}`}. This model and your image stay on this device.</p>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>{upscaleReady ? "AI-enhanced preview" : "Upscaled preview"}</strong><span>{file && valid ? `${output.width} × ${output.height} px` : "Choose an image to begin"}</span></div>{upscaleReady ? <canvas ref={canvasRef} className="preview-canvas" aria-label="AI-enhanced output preview" /> : <div className="empty-preview">{upscaling ? "Enhancing the image…" : "Choose output dimensions, then run AI Upscale."}</div>}</div>
+      <div className="resize-preview"><div className="preview-heading"><strong>{upscaleReady ? "AI-enhanced preview" : "Upscaled preview"}</strong><span>{file && valid ? `${output.width} × ${output.height} px` : "Choose an image to begin"}</span></div><canvas ref={canvasRef} className="preview-canvas" style={{ display: upscaleReady ? "" : "none" }} aria-label="AI-enhanced output preview" />{!upscaleReady && <div className="empty-preview">{upscaling ? "Enhancing the image…" : "Choose output dimensions, then run AI Upscale."}</div>}</div>
     </section>}
   </main>;
 }

@@ -1,5 +1,11 @@
 # Work log
 
+## 2026-11-15 — Handover issue audit and Audio Trim responsiveness
+
+- Reviewed `SESSION_HANDOFF.md` and recorded all nine open audit areas individually with current evidence and remaining browser/runtime checks.
+- Audio Trim previously rescanned the full decoded waveform and synchronously rebuilt an edited WAV for every pointer move. It now caches waveform peaks, updates selection state without full-audio rescans, defers edited preview regeneration until movement settles, and uses the original gesture boundaries for edge drags.
+- `npm.cmd run test:core` passed 18/18 before attempting dependency repair. `npm.cmd run typecheck` failed because Tailwind's Windows native binding could not load and Vite resolution returned `EPERM`; a sequential retry reproduced it. `npm ci` failed because Windows denied unlinking a locked Lightning CSS native module, after which `bungee-web` was missing and a second core test run failed during module loading. Direct `tsc` also found missing `@types/node` and `vite/client`. Browser interaction checks were not possible; the pre-existing package-lock change was preserved.
+
 ## 2026-11-15 — Dark visual system and media workspace navigation (in progress)
 
 - Replaced the flat homepage tool list with exactly three entry cards: Audio Editor Tools, Video Editor Tools, and Image Tools. `/tools` is now the same three-way workspace selector, and each category page displays only that category's tools.
@@ -673,3 +679,10 @@
 - Updated `SESSION_HANDOFF.md` with the current `main` checkpoint and a clear statement that the redesign/functionality work is not fully verified or complete.
 - Added the user's remaining problem list: browser visual review; CapCut-like studio polish; listening checks for volume/noise reduction; edited-result preview audit; real-file video trim/extract/speed/mute/mix checks; Replace Audio memory/codec limits; image design/upscaler/collage review; custom-input/drag audit; and processing progress/error behavior.
 - Recorded that typecheck/build passed, while this session did not run the test suite or manually verify browser media behavior. Left the two status-only projects/storage route entries untouched.
+
+## 2026-11-16 — Browser audit of handover issues
+
+- Ran item-by-item browser checks across homepage/mobile layout, audio trim/split/merge/gain/noise reduction, video trim/speed/mute/extract/replace and multitrack export, image resize/upscale/collage, and project reload. Audio Trim waveform movement now updates immediately; keep/remove WAVs were 3.000/1.000 s. Added a persistent canvas in Image Upscale after discovering inference returned early when the canvas was not mounted. Fixed `CustomMediaPreview` metadata reset/synchronization after Video Speed preview retained a zero duration; retest showed 2.07 s and live playback.
+- Fixture checks: gain measured +6 dB; noise-only RMS fell −35.23→−63.36 dB while tone region changed −15.01→−16.08 dB. Trim, mute, replacement mix, multitrack H.264/AAC, resize, upscale, and collage outputs were probed/decoded with FFmpeg. Image resize preserved RGBA; CPU upscale produced 800×680 with transparent pixels; collage PNG save/reload restored ordering and cell edits.
+- Remaining observed gaps: Audio Extract incorrectly rejects AAC MP4 and Opus WebM containing audio streams. Collage SVG import fails late with generic decode feedback. Audio Split created a ZIP link, but the browser harness did not observe a download event; archive integrity remains unverified. A 72 px title was clipped in the 320 px-wide test export. Offline export, external player review, listening, cancellation/recovery, quota handling, full accessibility/browser coverage remain open.
+- Verification ran in an isolated audit copy because Windows blocked removal of locked root native modules. `npm.cmd run test:core` passed 18/18, `npm.cmd run typecheck` passed, and production build passed (27 route pages, 106 precache assets). The pre-existing root `package-lock.json` edit was preserved.

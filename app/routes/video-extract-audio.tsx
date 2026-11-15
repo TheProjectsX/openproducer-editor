@@ -46,7 +46,10 @@ export default function VideoExtractAudio() {
       const target = new BufferTarget();
       const output = new Output({ format: new WavOutputFormat(), target });
       const conversion = await Conversion.init({
-        input, output, tracks: "primary", video: { discard: true },
+        // "primary" may select only the primary video track. Include the
+        // input tracks and explicitly discard video so audio-only extraction
+        // still sees the source audio stream.
+        input, output, tracks: "all", video: { discard: true },
         audio: { numberOfChannels: 2, sampleRate: 48_000, sampleFormat: "s16" },
       });
       if (!conversion.isValid || conversion.utilizedTracks.length === 0) throw new Error("This video has no audio track that the browser can export.");
