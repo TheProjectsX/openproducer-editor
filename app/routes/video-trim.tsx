@@ -19,7 +19,7 @@ export default function VideoTrim() {
   const [file, setFile] = useState<File | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
   const [duration, setDuration] = useState(0);
-  const [start, setStart] = useState("0");
+  const [start, setStart] = useState("0.000");
   const [end, setEnd] = useState("");
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -42,6 +42,7 @@ export default function VideoTrim() {
   }
 
   const from = Number(start), to = Number(end || duration);
+  const precise = (value: number) => (Math.round(value * 1000) / 1000).toFixed(3);
   function timeFromTimeline(event: React.PointerEvent<HTMLDivElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
     return Math.max(0, Math.min(duration, (event.clientX - bounds.left) / bounds.width * duration));
@@ -57,12 +58,12 @@ export default function VideoTrim() {
     const gesture = timelineGesture.current;
     if (!gesture || gesture.pointerId !== event.pointerId || !duration) return;
     const value = timeFromTimeline(event), minLength = Math.min(.01, duration);
-    if (gesture.mode === "start") setStart(String(Math.max(0, Math.min(to - minLength, value))));
-    else if (gesture.mode === "end") setEnd(String(Math.max(from + minLength, Math.min(duration, value))));
-    else if (gesture.mode === "create") { setStart(String(Math.min(gesture.anchor, value))); setEnd(String(Math.max(gesture.anchor + minLength, value))); }
+    if (gesture.mode === "start") setStart(precise(Math.max(0, Math.min(to - minLength, value))));
+    else if (gesture.mode === "end") setEnd(precise(Math.max(from + minLength, Math.min(duration, value))));
+    else if (gesture.mode === "create") { setStart(precise(Math.min(gesture.anchor, value))); setEnd(precise(Math.max(gesture.anchor + minLength, value))); }
     else {
       const length = gesture.end - gesture.start, nextStart = Math.max(0, Math.min(duration - length, gesture.start + value - gesture.anchor));
-      setStart(String(nextStart)); setEnd(String(nextStart + length));
+      setStart(precise(nextStart)); setEnd(precise(nextStart + length));
     }
   }
   function togglePlayback() {
@@ -111,8 +112,8 @@ export default function VideoTrim() {
     {!file ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={selectFile} error={error} /> : <section className="resize-workspace video-trim-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>Choose a different video</span><input type="file" accept="video/*,.mkv,.webm" onChange={(event) => selectFile(event.currentTarget.files?.[0])} /></label>
-        <p className="source-info">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MiB{duration ? ` · ${duration.toFixed(2)} seconds` : " · Reading duration…"}</p>
-        <div className="dimension-fields"><label>Start time <span>seconds</span><input type="number" min="0" max={duration || undefined} step="any" value={start} onChange={(event) => setStart(event.currentTarget.value)} /></label><label>End time <span>seconds</span><input type="number" min="0" max={duration || undefined} step="any" value={end} placeholder={duration ? duration.toFixed(2) : "Video duration"} onChange={(event) => setEnd(event.currentTarget.value)} /></label></div>
+        <p className="source-info">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MiB{duration ? ` · ${duration.toFixed(3)} seconds` : " · Reading duration…"}</p>
+        <div className="dimension-fields"><label>Start time <span>seconds</span><input type="number" min="0" max={duration || undefined} step="0.001" value={start} onBlur={() => { const value = Number(start); if (Number.isFinite(value)) setStart(precise(value)); }} onChange={(event) => setStart(event.currentTarget.value)} /></label><label>End time <span>seconds</span><input type="number" min="0" max={duration || undefined} step="0.001" value={end} placeholder={duration ? duration.toFixed(3) : "Video duration"} onBlur={() => { const value = Number(end); if (Number.isFinite(value)) setEnd(precise(value)); }} onChange={(event) => setEnd(event.currentTarget.value)} /></label></div>
         <p className="resize-note">MP4 output. The timeline handles and exact time fields edit the same selection. Long renders use in-memory output in this prototype.</p>
         {error && <p className="resize-error" role="alert">{error}</p>}
         {progress !== null && <><p className="source-info" role="status">Exporting video: {progress}%</p><progress max="100" value={progress} aria-label="Video export progress" /></>}
@@ -120,11 +121,11 @@ export default function VideoTrim() {
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={resultName}>Download {resultName}</a>}
       </div>
       <div className="resize-preview video-trim-preview">
-        <div className="preview-heading"><strong>Video preview</strong><span>{duration ? `${playhead.toFixed(2)} / ${duration.toFixed(2)} s` : "Loading video metadata…"}</span></div>
-        <div className="trim-video-stage">{sourceUrl && <video ref={videoRef} className="trim-video-surface" src={sourceUrl} playsInline preload="metadata" onLoadedMetadata={(event) => { const length = event.currentTarget.duration; if (Number.isFinite(length)) { setDuration(length); setEnd(String(length)); } }} onTimeUpdate={(event) => { const time = event.currentTarget.currentTime; setPlayhead(time); if (stopAtRef.current !== null && time >= stopAtRef.current) { event.currentTarget.pause(); stopAtRef.current = null; setPlaying(false); } }} onPause={() => { setPlaying(false); }} onEnded={() => setPlaying(false)} />}</div>
-        {duration > 0 && <><div className="video-trim-ruler"><span>00:00</span><span>{duration.toFixed(2)} s</span></div><div className="video-trim-timeline" role="group" aria-label="Video trim timeline. Drag the range edges to trim, drag inside the range to move it, or drag outside to create a new selection." onPointerDown={beginTimeline} onPointerMove={moveTimeline} onPointerUp={(event) => { if (timelineGesture.current?.pointerId === event.pointerId) timelineGesture.current = null; }} onPointerCancel={(event) => { if (timelineGesture.current?.pointerId === event.pointerId) timelineGesture.current = null; }}>
+        <div className="preview-heading"><strong>Video preview</strong><span>{duration ? `${playhead.toFixed(3)} / ${duration.toFixed(3)} s` : "Loading video metadata…"}</span></div>
+        <div className="trim-video-stage">{sourceUrl && <video ref={videoRef} className="trim-video-surface" src={sourceUrl} playsInline preload="metadata" onLoadedMetadata={(event) => { const length = event.currentTarget.duration; if (Number.isFinite(length)) { setDuration(length); setEnd(precise(length)); } }} onTimeUpdate={(event) => { const time = event.currentTarget.currentTime; setPlayhead(time); if (stopAtRef.current !== null && time >= stopAtRef.current) { event.currentTarget.pause(); stopAtRef.current = null; setPlaying(false); } }} onPause={() => { setPlaying(false); }} onEnded={() => setPlaying(false)} />}</div>
+        {duration > 0 && <><div className="video-trim-ruler"><span>0.000 s</span><span>{duration.toFixed(3)} s</span></div><div className="video-trim-timeline" role="group" aria-label="Video trim timeline. Drag the range edges to trim, drag inside the range to move it, or drag outside to create a new selection." onPointerDown={beginTimeline} onPointerMove={moveTimeline} onPointerUp={(event) => { if (timelineGesture.current?.pointerId === event.pointerId) timelineGesture.current = null; }} onPointerCancel={(event) => { if (timelineGesture.current?.pointerId === event.pointerId) timelineGesture.current = null; }}>
           <div className="video-trim-track" /><div className="video-trim-selected" style={{ left: `${Math.max(0, from / duration * 100)}%`, width: `${Math.max(0, (to - from) / duration * 100)}%` }} /><span className="video-range-handle start" style={{ left: `${Math.max(0, Math.min(100, from / duration * 100))}%` }} /><span className="video-range-handle end" style={{ left: `${Math.max(0, Math.min(100, to / duration * 100))}%` }} /><span className="video-trim-playhead" style={{ left: `${Math.max(0, Math.min(100, playhead / duration * 100))}%` }} />
-        </div><div className="video-custom-transport"><button type="button" className="transport-play" onClick={togglePlayback} aria-label={playing ? "Pause video preview" : "Play video preview"}>{playing ? "Ⅱ" : "▶"}</button><button type="button" className="transport-step" onClick={() => seekTo(playhead - 1 / 30)} aria-label="Step back one frame">−1f</button><button type="button" className="transport-step" onClick={() => seekTo(playhead + 1 / 30)} aria-label="Step forward one frame">+1f</button><input className="transport-scrub" type="range" min="0" max={duration} step="any" value={playhead} aria-label="Video preview playhead" onChange={(event) => seekTo(event.currentTarget.valueAsNumber)} /></div></>}
+        </div><div className="video-custom-transport"><button type="button" className="transport-play" onClick={togglePlayback} aria-label={playing ? "Pause video preview" : "Play video preview"}>{playing ? "Ⅱ" : "▶"}</button><button type="button" className="transport-step" onClick={() => seekTo(playhead - 1 / 30)} aria-label="Step back one frame">−1f</button><button type="button" className="transport-step" onClick={() => seekTo(playhead + 1 / 30)} aria-label="Step forward one frame">+1f</button><input className="transport-scrub" type="range" min="0" max={duration} step="0.001" value={playhead} aria-label="Video preview playhead" onChange={(event) => seekTo(event.currentTarget.valueAsNumber)} /></div></>}
       </div>
     </section>}
   </main>;

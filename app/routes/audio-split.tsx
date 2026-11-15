@@ -57,7 +57,7 @@ export default function AudioSplit() {
     const points = [...values].sort((a, b) => a - b);
     if (points.length > 49) return { valid: false, points, message: "Use no more than 49 split points (50 output clips)." };
     if (points.some((point, index) => point <= 0 || point >= audio.duration || (index > 0 && point === points[index - 1]))) return { valid: false, points, message: "Split points must be unique and strictly inside the audio duration." };
-    return { valid: true, points, message: `${points.length + 1} output segment(s) · ${audio.duration.toFixed(2)} seconds total.` };
+    return { valid: true, points, message: `${points.length + 1} output segment(s) · ${audio.duration.toFixed(3)} seconds total.` };
   }, [audio, splitPoints]);
 
   async function chooseFile(next?: File) {
@@ -108,10 +108,10 @@ export default function AudioSplit() {
   return <main className={`resize-page${audio ? " has-media" : ""}`}>
     <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Split audio at exact times</h1><p>Enter any number of custom cut points in seconds. The segments download together as a ZIP of WAV files.</p></section>
-    {!audio ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace">
+    {!audio ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Working…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void chooseFile(event.currentTarget.files?.[0])} /></span></label>
-        {audio && <p className="source-info">{file?.name} · {audio.duration.toFixed(2)} s · {audio.sampleRate} Hz · {audio.numberOfChannels} channel(s)</p>}
+        {audio && <p className="source-info">{file?.name} · {audio.duration.toFixed(3)} s · {audio.sampleRate} Hz · {audio.numberOfChannels} channel(s)</p>}
         <label className="ratio-field">Split points <span>seconds, comma-separated; all values are custom</span><input type="text" inputMode="decimal" value={splitPoints} onChange={(event) => setSplitPoints(event.currentTarget.value)} placeholder="30, 62.5, 120" /></label>
         <p className={parsed.valid ? "resize-note" : "resize-error"} role={parsed.valid ? "status" : "alert"}>{error || parsed.message}</p>
         <p className="resize-note">ZIP contains 16-bit PCM WAV parts at the source sample rate and channel count. Decoded audio is capped at 512 MiB and ZIP output at 256 MiB.</p>
@@ -119,7 +119,7 @@ export default function AudioSplit() {
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-segments.zip`}>Download segment ZIP</a>}
         {url && <CustomMediaPreview kind="audio" src={url} label="Source audio preview" />}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Split timeline</strong><span>{audio ? `${parsed.points.length + 1} clip(s)` : "No audio selected"}</span></div>{audio ? <><AudioSplitTimeline duration={audio.duration} points={parsed.points} onChange={(points) => setSplitPoints(points.join(", "))} /><ol className="clip-list">{[0, ...parsed.points, audio.duration].slice(0, -1).map((start, index) => { const end = ([...parsed.points, audio.duration][index]); return <li key={`${start}-${end}`}><span><strong>Part {String(index + 1).padStart(2, "0")}</strong><small>{start.toFixed(2)} s – {end.toFixed(2)} s · {(end - start).toFixed(2)} s</small></span></li>; })}</ol></> : <div className="empty-preview">Choose audio and enter custom split points.</div>}</div>
+      <div className="resize-preview"><div className="preview-heading"><strong>Split timeline</strong><span>{audio ? `${parsed.points.length + 1} clip(s)` : "No audio selected"}</span></div>{audio ? <><AudioSplitTimeline duration={audio.duration} points={parsed.points} onChange={(points) => setSplitPoints(points.join(", "))} /><ol className="clip-list">{[0, ...parsed.points, audio.duration].slice(0, -1).map((start, index) => { const end = ([...parsed.points, audio.duration][index]); return <li key={`${start}-${end}`}><span><strong>Part {String(index + 1).padStart(2, "0")}</strong><small>{start.toFixed(3)} s – {end.toFixed(3)} s · {(end - start).toFixed(3)} s</small></span></li>; })}</ol></> : <div className="empty-preview">Choose audio and enter custom split points.</div>}</div>
     </section>}
   </main>;
 }

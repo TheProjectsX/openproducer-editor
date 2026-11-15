@@ -468,6 +468,11 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .resize-page.has-media .resize-controls { max-height: 100%; }
 .resize-page.has-media .resize-preview { max-height: 100%; }
 .resize-page.has-media.image-collage-page { overflow-y: auto; }
+.resize-page.has-media > .resize-workspace.audio-tool-workspace, .resize-page.has-media > .resize-workspace.video-tool-workspace, .resize-page.has-media > .resize-workspace.video-trim-workspace { display: flex; flex-direction: column; width: min(100%, 1180px); flex: 1 1 auto; min-height: 0; max-height: none; gap: 12px; overflow: auto; margin: 0 auto; }
+.resize-page.has-media > .resize-workspace.audio-tool-workspace > .resize-preview, .resize-page.has-media > .resize-workspace.video-tool-workspace > .resize-preview, .resize-page.has-media > .resize-workspace.video-trim-workspace > .resize-preview { order: 0; width: 100%; min-height: 240px; max-height: 44dvh; flex: 0 0 auto; }
+.resize-page.has-media > .resize-workspace.audio-tool-workspace > .resize-controls, .resize-page.has-media > .resize-workspace.video-tool-workspace > .resize-controls, .resize-page.has-media > .resize-workspace.video-trim-workspace > .resize-controls { order: 1; width: 100%; max-height: none; flex: 0 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); align-items: end; gap: 12px; overflow: visible; }
+.resize-page.has-media > .resize-workspace.audio-tool-workspace .audio-tool-timeline, .resize-page.has-media > .resize-workspace.video-trim-workspace .dimension-fields, .resize-page.has-media > .resize-workspace.video-trim-workspace .resize-note, .resize-page.has-media > .resize-workspace.video-trim-workspace .source-info { grid-column: 1 / -1; }
+.resize-page.has-media > .resize-workspace.audio-tool-workspace .audio-tool-timeline, .resize-page.has-media > .resize-workspace.video-trim-workspace .video-trim-timeline, .resize-page.has-media > .resize-workspace.video-trim-workspace .video-trim-ruler, .resize-page.has-media > .resize-workspace.video-trim-workspace .video-custom-transport { grid-column: 1 / -1; }
 @media (max-width: 760px) {
   .resize-page.has-media { height: auto; min-height: 100dvh; overflow: visible; }
   .resize-page.has-media > .resize-workspace { flex: initial; min-height: auto; max-height: none; }

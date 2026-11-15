@@ -58,7 +58,7 @@ export default function VideoRemoveAudio() {
     {!file ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseFile} error={error} /> : <section className="resize-workspace video-tool-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{file ? "Choose another video" : "Choose a video"}<input type="file" accept="video/*,.mkv,.webm" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} /></span></label>
-        {file && <p className="source-info">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MiB{duration ? ` · ${duration.toFixed(2)} s` : ""}</p>}
+        {file && <p className="source-info">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MiB{duration ? ` · ${duration.toFixed(3)} s` : ""}</p>}
         <p className="resize-note">The primary audio track is discarded. Video packets are copied when the source/container combination supports it; other cases may transcode. Input and output memory limits are 512 MiB.</p>
         {error && <p className="resize-error" role="alert">{error}</p>}
         {progress !== null && <p className="source-info" role="status">Processing video: {progress}%</p>}

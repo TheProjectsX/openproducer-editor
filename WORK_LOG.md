@@ -608,3 +608,10 @@
 - Added a reusable local WAV waveform renderer and placed the extracted-audio waveform and custom player beneath the source video after extraction. The extraction route now also releases replaced result URLs and reports source duration to three decimals.
 - Added a reusable animated processing spinner for local preview work.
 - Verification: `npm.cmd run typecheck` and `git diff --check` passed. Audio-level listening and video-file extraction/export checks remain pending.
+
+## 2026-11-15 — Compact media tool layouts and time precision
+
+- Standalone audio and video editors now use a centered, compact vertical workspace after import: preview/timeline above and controls beneath, instead of stretching a small control panel beside a mostly empty preview. This covers Audio Trim, Speed, Split, Merge, effects, Volume, Video Trim, Speed, Extract, Remove, and Replace Audio.
+- Video Trim's range fields and direct timeline gestures now use millisecond precision, while the linked playhead slider is also movable at 1 ms increments. Audio/video tool time readouts now show three decimal places.
+- Custom media transport displays time in seconds to three decimals.
+- Verification: `npm.cmd run typecheck` and `git diff --check` passed. Visual review at desktop and mobile sizes remains pending.

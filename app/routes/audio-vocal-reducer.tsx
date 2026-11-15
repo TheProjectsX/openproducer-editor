@@ -90,7 +90,7 @@ export default function VocalReducer() {
     {!source ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void chooseFile(event.currentTarget.files?.[0])} /></span></label>
-        {source && <p className="source-info">{file?.name} · Stereo · {source.duration.toFixed(2)} s · {source.sampleRate} Hz</p>}
+        {source && <p className="source-info">{file?.name} · Stereo · {source.duration.toFixed(3)} s · {source.sampleRate} Hz</p>}
         <label className="speed-field">Center reduction <span>custom · 0–100%</span><input type="number" min="0" max="100" step="any" value={amount} onChange={(event) => { setAmount(event.currentTarget.value); if (resultUrl) URL.revokeObjectURL(resultUrl); setResultUrl(""); }} /></label>
         <p className="resize-note">This subtracts a portion of the shared center signal from left and right. It can reduce centered vocals, but also affects centered bass, drums, and other sounds; stereo recordings only. This is not AI source separation.</p>
         {!validAmount && <p className="resize-error" role="alert">Enter a custom amount from 0% to 100%.</p>}{error && <p className="resize-error" role="alert">{error}</p>}
