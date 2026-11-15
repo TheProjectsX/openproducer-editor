@@ -148,6 +148,11 @@ a { color: inherit; }
 .timeline-track > strong { position: sticky; left: 0; z-index: 2; display: flex; align-items: center; padding: 8px; border-right: 1px solid #e5e8ef; background: #f8f9fb; color: #66718a; font-size: 11px; }
 .track-lane { position: relative; min-height: 55px; background-image: linear-gradient(to right, #f0f1f5 1px, transparent 1px); background-size: 60px 100%; }
 .timeline-clip { position: absolute; top: 7px; height: 40px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding: 4px 7px; border: 1px solid #8ca0f5; border-radius: 6px; background: #e5eaff; color: #384a9b; text-align: left; cursor: grab; }
+.timeline-clip { touch-action: none; }
+.timeline-trim-handle { position: absolute; z-index: 2; top: 0; bottom: 0; width: 8px; background: rgb(68 82 190 / 28%); cursor: ew-resize; touch-action: none; }
+.timeline-trim-handle.left { left: 0; border-radius: 5px 0 0 5px; }
+.timeline-trim-handle.right { right: 0; border-radius: 0 5px 5px 0; }
+.timeline-trim-handle:hover { background: rgb(68 82 190 / 70%); }
 .timeline-clip.audio { border-color: #69b69c; background: #e1f4ec; color: #286f56; }
 .timeline-clip.image { border-color: #d0a559; background: #fff3d9; color: #7b5717; }
 .timeline-clip.text { border-color: #9e7be3; background: #f0e8ff; color: #56328f; }

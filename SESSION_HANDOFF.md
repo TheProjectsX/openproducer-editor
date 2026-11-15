@@ -1,9 +1,9 @@
 # Session handoff — Local Studio Core
 
 **Checkpoint date:** 2026-11-15 (Asia/Dhaka)  
-**Goal status:** Paused at the user's request. This handoff records state; it does not resume implementation.  
-**Repository:** `E:\Coding_Practice\Live Projects\openproducer-editor`  
-**Branch/commit:** No commit was made during this work. The working tree has the edits listed below.
+**Goal status:** Resumed by the user on 2026-11-15. Continue the same Core objective.
+**Repository:** `C:\Users\Modasser Hasan\Contents\openproducer-editor`
+**Branch/commit:** `main`, starting checkpoint `50c9a98` (`M-6 Works`); drag-trim/ripple implementation is being committed in this resumed session.
 
 ## Objective and guardrails
 
@@ -16,9 +16,8 @@ Keep all media, projects, inference, previews, and exports on-device. Do not add
 - All task-started local preview/development process handles were stopped: sessions for ports 4173, 4174, 4175, 4176, and 4177. Do not expect those listeners to exist. No server was started after the pause.
 - The active goal was explicitly marked **paused**. The request to pause processes was not a request to abandon or complete the Core objective.
 - No other Codex thread handoff was performed. Codex's `handoff_thread` operation cannot move the calling thread itself; this document is the saved handoff for resuming this thread.
-- `git status --short` showed a broad, uncommitted worktree. Do not reset or clean it. Modified tracked files: `WORK_LOG.md`, `app/app.css`, `app/lib/audio-timeline-render.ts`, `app/lib/project-store.ts`, `app/lib/video-composition.ts`, `app/root.tsx`, `app/routes.ts`, `app/routes/home.tsx`, `app/routes/image-collage.tsx`, `app/routes/image-resize.tsx`, `app/routes/projects.tsx`, `app/routes/studio-image.tsx`, `app/routes/studio-video.tsx`, `package.json`, `project_research/docs/02-feature-matrix.md`, `project_research/docs/04-routes-seo-and-pwa.md`, `project_research/docs/05-project-data-and-media-pipelines.md`, `project_research/docs/06-editor-interactions.md`, `project_research/docs/10-decisions-and-sources.md`, and `scripts/build-service-worker.mjs`.
-- Untracked work includes `app/components/`; `app/lib/{audio-normalization,audio-speed,image-history,media-inspection,video-timing}.ts`; routes `audio-normalize.tsx`, `storage-settings.tsx`, `studio-audio.tsx`, `tools-audio.tsx`, `tools-image.tsx`, `tools-video.tsx`, `tools.tsx`; `app/workers/`; `public/404.html`, `public/_headers`; `scripts/verify-static-output.mjs`; and `tests/`.
-- The repository was originally reported by Git as having dubious ownership in this sandbox. Read-only Git status/diff commands worked with `git -c safe.directory='E:/Coding_Practice/Live Projects/openproducer-editor'`; avoid changing global Git config just for this.
+- The worktree was clean at the `50c9a98` resume checkpoint. Do not reset or clean other-session work.
+- This sandbox reports the project at `C:\Users\Modasser Hasan\Contents\openproducer-editor`; Git may require a per-command `safe.directory` setting. Do not change global Git config.
 
 ## Last verified implementation and evidence
 
@@ -26,7 +25,7 @@ These are targeted results, not proof that Core is release-ready:
 
 - The most recent sequential production build passed and verified 27 pre-rendered routes (22 indexable public routes and 5 noindex private shells). Typecheck passed; `npm.cmd run test:core` passed 16/16 at the last full check. `git diff --check` passed after the pause checkpoint was logged. An earlier concurrent build/typegen race failed with a missing generated route chunk; the subsequent sequential build passed.
 - Known build notices: media processing chunk is roughly 643 kB and Bungee WASM dynamic import is reported as ineffective. Keep these visible for M8 bundle/performance work.
-- Video Studio has a local bin, six tracks, clip move/reorder by drag/drop, split, duplicate/delete, source/timeline numeric edits, snap, playhead, zoom, undo/redo, text/image overlays, transforms, keyframes, filters, fades/transitions, custom speed/volume/mute, detached audio, and local MP4/WebM export after capability checks. Its preview and export use the shared composition/timing path. The UI still lacks drag trim handles and ripple-edit behavior.
+- Video Studio has a local bin, six tracks, clip move/reorder by drag/drop, split, duplicate/delete, source/timeline numeric edits, snap, playhead, zoom, undo/redo, text/image overlays, transforms, keyframes, filters, fades/transitions, custom speed/volume/mute, detached audio, and local MP4/WebM export after capability checks. Its preview and export use the shared composition/timing path. Drag trim handles and a default-on, Video-1-only ripple toggle were added after this checkpoint; typecheck/build pass, but the new pointer interactions still need direct runtime verification.
 - An in-app local development-browser M6 run imported locally generated H.264/AAC MP4, VP9/Opus WebM, 48 kHz and 44.1 kHz WAV, a sync-marker MP4, and transparent PNG. SVG was rejected as an unsupported container. Two visual lanes, two audio lanes, title/image overlays, dissolve, crossfade, detached audio, and 1.5× natural-pitch audio were exercised. A refresh restored eight asset entries and edits. At timeline 9.5 s, the sync video and detached audio were both at source time 1.0 s.
 - That run exposed and fixed a React playhead event-value issue and unity-speed audio transient loss. After the unity-speed fix, a 320×180, 24 fps, 15.168 s H.264/AAC export was fully decoded by FFmpeg and opened in VLC (exit code 0). Narrow-band analysis located 1 kHz pulses at 9.50, 10.50, and 11.50 s, aligned with the clip start and source markers.
 - A subsequent production static preview on port 4176 produced `C:\Users\User\Downloads\local-studio-edit (4).mp4`: H.264/AAC, 320×180, 24 fps, 5.013 s; FFmpeg decoded it and VLC exited successfully; pulse analysis found peaks near 1.001, 2.001, and 3.001 s. This older static project showed a hydration error on refresh; the query/project-ready hydration guard was then added and a sequential production build passed.
@@ -38,11 +37,10 @@ These are targeted results, not proof that Core is release-ready:
 
 ### 1. M6 video implementation and gate
 
-1. Re-read `project_research/docs/02-feature-matrix.md`, `06-editor-interactions.md`, `05-project-data-and-media-pipelines.md`, and the M6 work log before changing code. Inspect current `app/routes/studio-video.tsx`, `app/lib/video-composition.ts`, `app/lib/video-timing.ts`, `app/lib/audio-timeline-render.ts`, and project schema.
-2. Implement the missing timeline trim handles and explicit ripple behavior according to the interaction spec (including clear default/selection behavior and typed source/timeline values). Cover timing math and undo/save behavior with focused tests.
-3. Resolve and verify the pending static-export artifact if it remains available; otherwise rerun the fresh static build preview, export, download, inspect streams/duration/dimensions and sync pulses, and open the file outside the app.
-4. Start a production static preview on an unused port. Direct-load **and refresh** a query URL with an existing local project; check hydration, project asset recovery, and state. Use the internal browser for requested runtime testing. A dev server alone cannot prove offline behavior.
-5. Exercise two visual tracks and two audio tracks, overlays/title, transition, keyframes/filters, speed and pitch modes, detach/replace/mix controls, edit-save-refresh-reopen, and compare preview timing to external output, including boundaries and joins. Ensure unsupported codecs are rejected from parsed capability evidence.
+1. Directly verify the new trim handles and Video 1 ripple toggle. Check left trim preserves the end, right trim changes source-out, ripple shifts only later Video 1 clips on duration changes, undo is one step per drag, and autosave/reopen preserves the result.
+2. Resolve and verify the pending static-export artifact if it remains available; otherwise rerun the fresh static build preview, export, download, inspect streams/duration/dimensions and sync pulses, and open the file outside the app.
+3. Start a production static preview on an unused port. Direct-load **and refresh** a query URL with an existing local project; check hydration, project asset recovery, and state. Use an available browser tool for requested runtime testing. A dev server alone cannot prove offline behavior.
+4. Exercise two visual tracks and two audio tracks, overlays/title, transition, keyframes/filters, speed and pitch modes, detach/replace/mix controls, edit-save-refresh-reopen, and compare preview timing to external output, including boundaries and joins. Ensure unsupported codecs are rejected from parsed capability evidence.
 6. Test real service-worker installation and offline operation from the production static build/HTTPS-equivalent environment: install/cache readiness, close/reopen, direct studio navigation, edit/save/export, and update waiting/activation. Record exact environment/browser versions. If the internal browser cannot simulate required install/offline behavior, document that limitation and use an available named browser or a browser automation harness; do not call an unavailable check passed.
 
 ### 2. M4 image audit and gate

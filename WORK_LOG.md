@@ -454,3 +454,11 @@
 
 - Recorded the full active Core objective, worktree/process state, latest verified evidence and limitations, exact browser project IDs/outputs, roadmap-ordered open gates, useful commands, and next-session instructions in `SESSION_HANDOFF.md`.
 - Goal remains paused by user request; all local preview processes remain stopped. This entry is handoff documentation only, not phase completion or permission to begin M7.
+
+## 2026-11-15 — M6 drag trim and primary-track ripple
+
+- Added left/right pointer trim handles on timeline clips. Left trim preserves the prior clip end while adjusting source-in and timeline start; right trim adjusts source-out. Existing numeric source in/out fields remain available.
+- Added the “Ripple edits on Video 1” switch, enabled by default. Changes to source-in, source-out, or speed shift later clips on Video 1 by the clip end-time delta; overlay and audio lanes are not moved. One drag gesture creates one undo entry and the preview/autosave follows the trim.
+- Updated interaction and feature documentation. Direct trim/ripple interaction checks remain open; the production build and static route verifier do not prove pointer behavior.
+- Verification: `npm.cmd run typecheck`, `npm.cmd run build` (27 routes verified, 22 indexable, service worker generated), and `git diff --check` passed. The core test suite was not run in this slice.
+- Commit: pending.

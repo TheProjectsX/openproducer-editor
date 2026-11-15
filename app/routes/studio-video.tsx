@@ -16,6 +16,27 @@ export function meta({}: Route.MetaArgs) { return [{ title: "Video Studio | Loca
 
 const clipLength = getClipLength;
 
+function updateClipTimeline(current: VideoTimelineProject, id: string, patch: Partial<VideoTimelineClip>, playhead: number, ripplePrimaryTrack: boolean) {
+  const clips = current.clips.map((clip) => {
+    if (clip.id !== id) return clip;
+    const updated = { ...clip, ...patch };
+    if (clip.keyframes?.length && (patch.transform || patch.volume !== undefined)) {
+      const time = Math.max(0, Math.min(clipLength(clip), playhead - clip.start));
+      const values = evaluateClipKeyframes(clip, time);
+      updated.keyframes = upsertClipKeyframe(clip, { time, transform: patch.transform ?? values.transform, volume: patch.volume ?? values.volume });
+    }
+    return updated;
+  });
+  const previous = current.clips.find((clip) => clip.id === id);
+  const changed = clips.find((clip) => clip.id === id);
+  const timingEdit = patch.sourceStart !== undefined || patch.sourceEnd !== undefined || patch.speed !== undefined;
+  const endDelta = previous && changed ? changed.start + clipLength(changed) - (previous.start + clipLength(previous)) : 0;
+  const rippled = timingEdit && ripplePrimaryTrack && previous?.track === 0 && Math.abs(endDelta) > 0.0001
+    ? clips.map((clip) => clip.id !== id && clip.track === 0 && clip.start > previous.start + 0.001 ? { ...clip, start: Math.max(0, clip.start + endDelta) } : clip)
+    : clips;
+  return { ...current, clips: rippled, duration: Math.max(0, ...rippled.map((clip) => clip.start + clipLength(clip))) };
+}
+
 export default function VideoStudio() {
   const [params] = useSearchParams();
   const projectId = params.get("project") ?? "";
@@ -30,6 +51,7 @@ export default function VideoStudio() {
   const [zoom, setZoom] = useState("60");
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [snapThreshold, setSnapThreshold] = useState("0.1");
+  const [ripplePrimaryTrack, setRipplePrimaryTrack] = useState(true);
   const [transitionDuration, setTransitionDuration] = useState("0.5");
   const [exporting, setExporting] = useState(false);
   const [extractingAudio, setExtractingAudio] = useState(false);
@@ -52,6 +74,7 @@ export default function VideoStudio() {
   const timelineRef = useRef(timeline);
   const drawFrameRef = useRef<(time?: number) => void>(() => undefined);
   const historyRef = useRef({ past: [] as VideoTimelineProject[], future: [] as VideoTimelineProject[] });
+  const trimDragRef = useRef<{ clip: VideoTimelineClip; timeline: VideoTimelineProject; edge: "left" | "right"; pointerId: number; initialX: number } | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   timelineRef.current = timeline;
   const selectedClip = timeline.clips.find((clip) => clip.id === selected);
@@ -190,19 +213,44 @@ export default function VideoStudio() {
   }
 
   function editClip(id: string, patch: Partial<VideoTimelineClip>) {
-    applyTimelineEdit((current) => {
-      const clips = current.clips.map((clip) => {
-        if (clip.id !== id) return clip;
-        const updated = { ...clip, ...patch };
-        if (clip.keyframes?.length && (patch.transform || patch.volume !== undefined)) {
-          const time = Math.max(0, Math.min(clipLength(clip), timeline.playhead - clip.start));
-          const values = evaluateClipKeyframes(clip, time);
-          updated.keyframes = upsertClipKeyframe(clip, { time, transform: patch.transform ?? values.transform, volume: patch.volume ?? values.volume });
-        }
-        return updated;
-      });
-      return { ...current, clips, duration: Math.max(0, ...clips.map((clip) => clip.start + clipLength(clip))) };
-    });
+    applyTimelineEdit((current) => updateClipTimeline(current, id, patch, timeline.playhead, ripplePrimaryTrack));
+  }
+  function beginTrim(event: React.PointerEvent<HTMLSpanElement>, clip: VideoTimelineClip, edge: "left" | "right") {
+    event.preventDefault(); event.stopPropagation();
+    const button = event.currentTarget.closest("button");
+    if (!button) return;
+    button.setPointerCapture(event.pointerId);
+    const current = timelineRef.current;
+    historyRef.current.past.push(current);
+    if (historyRef.current.past.length > 50) historyRef.current.past.shift();
+    historyRef.current.future = [];
+    setHistoryVersion((value) => value + 1);
+    trimDragRef.current = { clip, timeline: current, edge, pointerId: event.pointerId, initialX: event.clientX };
+    setSelected(clip.id);
+  }
+  function moveTrim(event: React.PointerEvent<HTMLButtonElement>, clipId: string) {
+    const drag = trimDragRef.current;
+    if (!drag || drag.clip.id !== clipId || drag.pointerId !== event.pointerId) return;
+    const delta = (event.clientX - drag.initialX) / pxPerSecond;
+    const original = drag.clip;
+    const asset = drag.timeline.assets.find((item) => item.id === original.assetId);
+    let patch: Partial<VideoTimelineClip>;
+    if (drag.edge === "left") {
+      const desiredStart = Math.max(0, original.start + delta);
+      const start = snapClipStart(desiredStart, original.id, original.track);
+      const sourceStart = Math.max(0, Math.min(original.sourceEnd - 0.01, original.sourceStart + (start - original.start) * original.speed));
+      patch = { start: original.start + (sourceStart - original.sourceStart) / original.speed, sourceStart };
+    } else {
+      const sourceEnd = Math.max(original.sourceStart + 0.01, Math.min(asset?.duration ?? original.sourceEnd, original.sourceEnd + delta * original.speed));
+      patch = { sourceEnd };
+    }
+    const updated = updateClipTimeline(drag.timeline, clipId, patch, drag.timeline.playhead, ripplePrimaryTrack);
+    timelineRef.current = updated; setTimeline(updated);
+  }
+  function finishTrim(event: React.PointerEvent<HTMLButtonElement>) {
+    if (trimDragRef.current?.pointerId !== event.pointerId) return;
+    trimDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
   function snapClipStart(value: number, clipId: string, track: number) {
     const target = Math.max(0, value);
@@ -550,7 +598,7 @@ export default function VideoStudio() {
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`local-studio-edit.${resultType === "video/mp4" ? "mp4" : "webm"}`}>Download {resultType === "video/mp4" ? "MP4" : "WebM"}</a>}
       </div>
       <div className="resize-preview"><div className="preview-heading"><strong>Export preview</strong><span>{resultUrl ? "Rendered file" : "Export keeps your editable project"}</span></div>{resultUrl ? <video className="video-preview" controls src={resultUrl} /> : <div className="empty-preview">Render a project to get a playable file.</div>}</div>
-    </section>    <section className="video-timeline" inert={exporting}><div className="timeline-toolbar"><strong>Timeline · {timeline.duration.toFixed(2)} seconds</strong><div className="timeline-actions" data-history-version={historyVersion}><button disabled={!historyRef.current.past.length} onClick={undo}>Undo</button><button disabled={!historyRef.current.future.length} onClick={redo}>Redo</button><label><input type="checkbox" checked={snapEnabled} onChange={(event) => setSnapEnabled(event.currentTarget.checked)} />Snap</label><label>Snap tolerance<input type="number" min="0" max="5" step="any" value={snapThreshold} disabled={!snapEnabled} onChange={(event) => setSnapThreshold(event.currentTarget.value)} />s</label><label>Zoom<input type="number" min="12" max="160" value={zoom} onChange={(event) => setZoom(event.currentTarget.value)} />px/s</label></div></div><div className="timeline-scroll"><div className="timeline-ruler" style={{ width: Math.max(800, timeline.duration * pxPerSecond) }} onClick={(event) => { const bounds = event.currentTarget.getBoundingClientRect(); setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, (event.clientX - bounds.left + event.currentTarget.scrollLeft) / pxPerSecond)) })); }}>{Array.from({ length: Math.ceil(timeline.duration) + 1 }, (_, second) => <span key={second} style={{ left: second * pxPerSecond }}>{second}s</span>)}</div>{[2, 1, 0, -1, -2, -3].map((track) => <div className="timeline-track" key={track}><strong>{track >= 0 ? `Video ${track + 1}` : `Audio ${-track}`}</strong><div className="track-lane" style={{ width: Math.max(800, timeline.duration * pxPerSecond) }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const id = event.dataTransfer.getData("text/clip"); const rect = event.currentTarget.getBoundingClientRect(); editClip(id, { track, start: snapClipStart((event.clientX - rect.left + event.currentTarget.scrollLeft) / pxPerSecond, id, track) }); }} onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, (event.clientX - rect.left + event.currentTarget.scrollLeft) / pxPerSecond)) })); }}>{timeline.clips.filter((clip) => clip.track === track).map((clip) => { const asset = timeline.assets.find((item) => item.id === clip.assetId); return <button draggable key={clip.id} className={`timeline-clip ${selected === clip.id ? "selected" : ""} ${asset?.kind ?? ""}`} style={{ left: clip.start * pxPerSecond, width: Math.max(22, clipLength(clip) * pxPerSecond) }} onDragStart={(event) => event.dataTransfer.setData("text/clip", clip.id)} onClick={(event) => { event.stopPropagation(); setSelected(clip.id); }}><strong>{asset?.name}</strong><small>{clipLength(clip).toFixed(2)}s · {clip.speed}×</small>{clip.keyframes?.map((frame, index) => <span key={`${clip.id}-key-${index}`} className="timeline-keyframe" aria-hidden="true" style={{ left: `${Math.max(0, Math.min(100, frame.time / Math.max(clipLength(clip), 0.001) * 100))}%` }} />)}</button>; })}</div></div>)}<div className="timeline-playhead" style={{ left: 104 + timeline.playhead * pxPerSecond }} /> </div></section>
+    </section>    <section className="video-timeline" inert={exporting}><div className="timeline-toolbar"><strong>Timeline · {timeline.duration.toFixed(2)} seconds</strong><div className="timeline-actions" data-history-version={historyVersion}><button disabled={!historyRef.current.past.length} onClick={undo}>Undo</button><button disabled={!historyRef.current.future.length} onClick={redo}>Redo</button><label><input type="checkbox" checked={ripplePrimaryTrack} onChange={(event) => setRipplePrimaryTrack(event.currentTarget.checked)} />Ripple edits on Video 1</label><label><input type="checkbox" checked={snapEnabled} onChange={(event) => setSnapEnabled(event.currentTarget.checked)} />Snap</label><label>Snap tolerance<input type="number" min="0" max="5" step="any" value={snapThreshold} disabled={!snapEnabled} onChange={(event) => setSnapThreshold(event.currentTarget.value)} />s</label><label>Zoom<input type="number" min="12" max="160" value={zoom} onChange={(event) => setZoom(event.currentTarget.value)} />px/s</label></div></div><div className="timeline-scroll"><div className="timeline-ruler" style={{ width: Math.max(800, timeline.duration * pxPerSecond) }} onClick={(event) => { const bounds = event.currentTarget.getBoundingClientRect(); setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, (event.clientX - bounds.left + event.currentTarget.scrollLeft) / pxPerSecond)) })); }}>{Array.from({ length: Math.ceil(timeline.duration) + 1 }, (_, second) => <span key={second} style={{ left: second * pxPerSecond }}>{second}s</span>)}</div>{[2, 1, 0, -1, -2, -3].map((track) => <div className="timeline-track" key={track}><strong>{track >= 0 ? `Video ${track + 1}` : `Audio ${-track}`}</strong><div className="track-lane" style={{ width: Math.max(800, timeline.duration * pxPerSecond) }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const id = event.dataTransfer.getData("text/clip"); const rect = event.currentTarget.getBoundingClientRect(); editClip(id, { track, start: snapClipStart((event.clientX - rect.left + event.currentTarget.scrollLeft) / pxPerSecond, id, track) }); }} onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, (event.clientX - rect.left + event.currentTarget.scrollLeft) / pxPerSecond)) })); }}>{timeline.clips.filter((clip) => clip.track === track).map((clip) => { const asset = timeline.assets.find((item) => item.id === clip.assetId); return <button draggable key={clip.id} className={`timeline-clip ${selected === clip.id ? "selected" : ""} ${asset?.kind ?? ""}`} style={{ left: clip.start * pxPerSecond, width: Math.max(22, clipLength(clip) * pxPerSecond) }} onPointerMove={(event) => moveTrim(event, clip.id)} onPointerUp={finishTrim} onPointerCancel={finishTrim} onDragStart={(event) => event.dataTransfer.setData("text/clip", clip.id)} onClick={(event) => { event.stopPropagation(); setSelected(clip.id); }}><span className="timeline-trim-handle left" aria-hidden="true" onPointerDown={(event) => beginTrim(event, clip, "left")} /><span className="timeline-trim-handle right" aria-hidden="true" onPointerDown={(event) => beginTrim(event, clip, "right")} /><strong>{asset?.name}</strong><small>{clipLength(clip).toFixed(2)}s · {clip.speed}×</small>{clip.keyframes?.map((frame, index) => <span key={`${clip.id}-key-${index}`} className="timeline-keyframe" aria-hidden="true" style={{ left: `${Math.max(0, Math.min(100, frame.time / Math.max(clipLength(clip), 0.001) * 100))}%` }} />)}</button>; })}</div></div>)}<div className="timeline-playhead" style={{ left: 104 + timeline.playhead * pxPerSecond }} /> </div></section>
     <p className="resize-note editor-disclaimer">Timeline preview composites active visual clips from bottom to top, including per-clip transforms, text titles, and custom linear fade transitions. Audio lanes play in sync with the project clock. Timeline render/export is available in supported browsers; verify output playback for your media and device.</p>
   </main>;
 }
