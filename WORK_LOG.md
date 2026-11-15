@@ -5,7 +5,7 @@
 - Replaced the flat homepage tool list with exactly three entry cards: Audio Editor Tools, Video Editor Tools, and Image Tools. `/tools` is now the same three-way workspace selector, and each category page displays only that category's tools.
 - Added a shared dark charcoal/navy palette, blue/cyan/violet accents, a responsive editorial landing layout, and dark full-width styling for existing tool and video-studio shells.
 - Added locally bundled Ubuntu 400/500/700 and Inter Variable fonts so typography does not depend on a network font service. General text uses Ubuntu; headings use Inter.
-- Updated route metadata and feature/design notes. The editor onboarding flow, time-selection timelines, custom players, direct-manipulation image layers, and workspace-level fit/scroll behavior remain to implement.
+- Updated route metadata and feature/design notes. Later design slices below add editor onboarding, time-selection timelines, custom players, direct-manipulation image layers, and workspace-level fit/scroll behavior; manual visual review is still pending.
 - Verification: `npm.cmd run typecheck` passed. `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable). The generated service worker includes 94 assets, including the bundled font files. The known ~643 kB processing chunk and Bungee dynamic-import warning remain. Visual browser review is pending because this session still does not expose direct Chrome controls; the localhost preview has been queued in the Codex browser panel.
 - Commit is pending for this slice.
 
@@ -545,3 +545,11 @@
 - Updated Audio Studio feature and gate notes. Route-level history and save/reopen checks are pending.
 - Verification: `npm.cmd run typecheck` passed; `npm.cmd run test:core` passed 18/18; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable) and 51 cached assets. The existing ~643 kB bundle warning and Bungee WASM dynamic-import notice remain. Route-level history and save/reopen interaction checks remain pending.
 - Follow-up: recorded the preview graph and bounded history design plus validation limits in `project_research/docs/10-decisions-and-sources.md`.
+# 2026-11-15 — Design: source-first tool entry, custom previews, and full-screen workspaces
+
+- Added a reusable drag/drop and local-file picker screen for audio, video, and image workflows. Audio Merge and Image Collage accept multiple files from the same screen; saved-project loading remains supported for collage. The multitrack Video Studio remains directly open as the requested exception.
+- Applied source-first entry to all standalone media tools and Audio Studio, including image resize/crop/upscale/collage, audio trim/split/speed/merge/effects/normalization, and video trim/speed/audio operations. Replacing the source stays available within each loaded editor.
+- After media loads, the tool description collapses and the editor expands to the viewport. Dense controls scroll inside their workspace; smaller-screen layouts return to normal document scrolling.
+- Replaced visible browser-native media controls in the standalone audio/video tools and Audio/Video Studio export previews with app-styled local play and timeline controls. Audio previews use a designed media surface; Video Speed keeps its capture-capable media element and uses app transport controls.
+- Updated the interface direction and status in the feature matrix. Image pointer controls and trim timeline interactions still need a human browser review.
+- Verification: `npm.cmd run typecheck` passed; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable) with 95 service-worker assets. Existing Bungee dynamic-import warning remains.

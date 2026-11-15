@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/video-extract-audio";
+import { MediaImportScreen } from "../components/media-import-screen";
+import { CustomMediaPreview } from "../components/custom-media-preview";
 
 const MAX_INPUT_BYTES = 512 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 512 * 1024 * 1024;
@@ -59,10 +61,10 @@ export default function VideoExtractAudio() {
     }
   }
 
-  return <main className="resize-page">
+  return <main className={`resize-page${file ? " has-media" : ""}`}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
     <section className="resize-intro"><p className="eyebrow">VIDEO · LOCAL PROCESSING</p><h1>Extract a video’s audio</h1><p>Keep the primary audio track and export it as 48 kHz stereo WAV. Conversion runs in this browser.</p></section>
-    <section className="resize-workspace">
+    {!file ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseFile} error={error} /> : <section className="resize-workspace video-tool-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{file ? "Choose another video" : "Choose a video"}<input type="file" accept="video/*,.mkv,.webm" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} /></span></label>
         {file && <p className="source-info">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MiB{duration ? ` · ${duration.toFixed(2)} s` : " · Reading duration…"}</p>}
@@ -72,7 +74,7 @@ export default function VideoExtractAudio() {
         <button className="export-button" disabled={!file || !duration || progress !== null || file.size > MAX_INPUT_BYTES || Boolean(error)} onClick={extract}>{progress !== null ? "Extracting…" : "Extract and export WAV"}</button>
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-audio.wav`}>Download extracted WAV</a>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Video source</strong><span>{file ? "Local preview" : "No video selected"}</span></div>{url ? <video className="video-preview" src={url} controls onLoadedMetadata={(event) => { const value = event.currentTarget.duration; if (Number.isFinite(value)) setDuration(value); }} /> : <div className="empty-preview">Choose a video with an audio track.</div>}</div>
-    </section>
+      <div className="resize-preview"><div className="preview-heading"><strong>Video source</strong><span>{file ? "Local preview" : "No video selected"}</span></div>{url ? <CustomMediaPreview kind="video" src={url} label="Video source preview" onDuration={setDuration} /> : <div className="empty-preview">Choose a video with an audio track.</div>}</div>
+    </section>}
   </main>;
 }

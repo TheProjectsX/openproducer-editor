@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/audio-vocal-reducer";
+import { MediaImportScreen } from "../components/media-import-screen";
+import { CustomMediaPreview } from "../components/custom-media-preview";
 
 const MAX_FILE_BYTES = 512 * 1024 * 1024;
 
@@ -81,10 +83,10 @@ export default function VocalReducer() {
   }
 
   const validAmount = Number.isFinite(Number(amount)) && Number(amount) >= 0 && Number(amount) <= 100;
-  return <main className="resize-page">
+  return <main className={`resize-page${source ? " has-media" : ""}`}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
     <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Reduce centered vocals</h1><p>Try a custom-strength stereo center cancel on a local audio file. Processing never uploads your source.</p></section>
-    <section className="resize-workspace">
+    {!source ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void chooseFile(event.currentTarget.files?.[0])} /></span></label>
         {source && <p className="source-info">{file?.name} · Stereo · {source.duration.toFixed(2)} s · {source.sampleRate} Hz</p>}
@@ -94,7 +96,7 @@ export default function VocalReducer() {
         <button className="export-button" disabled={!source || !validAmount || busy} onClick={exportReduced}>{busy ? "Processing…" : "Create vocal-reduced preview"}</button>
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-center-reduced.wav`}>Download WAV</a>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Audio comparison</strong><span>{resultUrl ? "Original and processed" : "Original"}</span></div>{source ? <div className="audio-preview"><strong>{file?.name}</strong><audio className="audio-player" controls src={sourceUrl} /><span>Original stereo audio</span>{resultUrl && <><audio className="audio-player" controls src={resultUrl} /><span>Center-reduced audio</span></>}</div> : <div className="empty-preview">Choose a stereo audio file.</div>}</div>
-    </section>
+      <div className="resize-preview"><div className="preview-heading"><strong>Audio comparison</strong><span>{resultUrl ? "Original and processed" : "Original"}</span></div>{source ? <div className="audio-preview"><strong>{file?.name}</strong><span>Original stereo audio</span><CustomMediaPreview kind="audio" src={sourceUrl} label="Original stereo audio" />{resultUrl && <><span>Center-reduced audio</span><CustomMediaPreview kind="audio" src={resultUrl} label="Center-reduced audio" /></>}</div> : <div className="empty-preview">Choose a stereo audio file.</div>}</div>
+    </section>}
   </main>;
 }

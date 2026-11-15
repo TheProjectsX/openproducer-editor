@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Route } from "./+types/image-upscale";
+import { MediaImportScreen } from "../components/media-import-screen";
 
 const MAX_PIXELS = 100_000_000;
 const MAX_SIDE = 32_768;
@@ -86,10 +87,10 @@ export default function ImageUpscale() {
     }, "image/png");
   }
 
-  return <main className="resize-page">
+  return <main className={`resize-page${file ? " has-media" : ""}`}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/tools/image/resize">Image editor</a></nav></header>
     <section className="resize-intro"><p className="eyebrow">IMAGE · LOCAL PROCESSING</p><h1>Upscale an image</h1><p>Choose a custom multiplier or exact output dimensions. Source pixels stay on this device.</p></section>
-    <section className="resize-workspace">
+    {!file ? <MediaImportScreen kind="image" accept="image/*" onFile={chooseFile} error={error} /> : <section className="resize-workspace image-tool-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{file ? "Choose another image" : "Choose an image"}<input type="file" accept="image/*" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} /></span></label>
         {file && <p className="source-info">{file.name} · Original {naturalSize.width} × {naturalSize.height} px</p>}
@@ -102,6 +103,6 @@ export default function ImageUpscale() {
         <button className="export-button" disabled={!file || !valid} onClick={download}>Download upscaled PNG</button>
       </div>
       <div className="resize-preview"><div className="preview-heading"><strong>Upscaled preview</strong><span>{file && valid ? `${output.width} × ${output.height} px` : "Choose an image to begin"}</span></div>{url ? <canvas ref={canvasRef} className="preview-canvas" aria-label="Upscaled output preview" /> : <div className="empty-preview">The upscaled result will appear here.</div>}</div>
-    </section>
+    </section>}
   </main>;
 }

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/audio-volume";
+import { MediaImportScreen } from "../components/media-import-screen";
+import { CustomMediaPreview } from "../components/custom-media-preview";
 
 const MAX_BYTES = 512 * 1024 * 1024;
 
@@ -89,10 +91,10 @@ export default function AudioVolume() {
     }, 20);
   }
 
-  return <main className="resize-page">
+  return <main className={`resize-page${source ? " has-media" : ""}`}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
     <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Adjust volume and fades</h1><p>Set custom gain and fade durations, then compare the result and download a WAV.</p></section>
-    <section className="resize-workspace">
+    {!source ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void chooseFile(event.currentTarget.files?.[0])} /></span></label>
         {source && <p className="source-info">{file?.name} · {source.duration.toFixed(2)} s · {source.sampleRate} Hz · {source.numberOfChannels} channel(s)</p>}
@@ -106,7 +108,7 @@ export default function AudioVolume() {
         <button className="export-button" disabled={!valid || busy} onClick={render}>{busy ? "Processing…" : "Preview volume and fades"}</button>
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-volume-fades.wav`}>Download WAV</a>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Audio comparison</strong><span>{resultUrl ? "Original and processed" : "Original"}</span></div>{source ? <div className="audio-preview"><strong>{file?.name}</strong><audio className="audio-player" controls src={sourceUrl} /><span>Original audio</span>{resultUrl && <><audio className="audio-player" controls src={resultUrl} /><span>Gain and fades</span></>}</div> : <div className="empty-preview">Choose audio to begin.</div>}</div>
-    </section>
+      <div className="resize-preview"><div className="preview-heading"><strong>Audio comparison</strong><span>{resultUrl ? "Original and processed" : "Original"}</span></div>{source ? <div className="audio-preview"><strong>{file?.name}</strong><span>Original audio</span><CustomMediaPreview kind="audio" src={sourceUrl} label="Original audio" />{resultUrl && <><span>Gain and fades</span><CustomMediaPreview kind="audio" src={resultUrl} label="Volume adjusted audio" /></>}</div> : <div className="empty-preview">Choose audio to begin.</div>}</div>
+    </section>}
   </main>;
 }

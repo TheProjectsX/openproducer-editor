@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router";
 import type { Route } from "./+types/image-resize";
 import { getProject, readProjectSource, saveImageSettings, saveProjectSource, type ImageLayer, type ImageProjectSettings } from "../lib/project-store";
 import { createImageHistory, recordImageEdit, redoImageEdit, undoImageEdit } from "../lib/image-history";
+import { MediaImportScreen } from "../components/media-import-screen";
 
 type SourceImage = { file: File; url: string; width: number; height: number };
 
@@ -329,7 +330,7 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
   }
 
   return (
-    <main className="resize-page">
+    <main className={`resize-page${workspace ? " has-media" : ""}`}>
       <header className="resize-header">
         <a href="/" className="brand">Local Studio</a>
         <nav aria-label="Main navigation"><a href="/projects">Projects</a></nav>
@@ -339,7 +340,7 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
         <h1>{workspace ? "Edit your image project." : "Resize and adjust your image."}</h1>
         <p>{workspace ? "Resize, rotate, flip, adjust color, and arrange editable text and shape layers. Project instructions and source image stay on this device." : "Set exact output pixels and tune brightness, contrast, and saturation. Your image stays in this browser."}</p>
       </section>
-      <section className="resize-workspace" aria-label="Image resizing workspace" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); importImage(event.dataTransfer.files?.[0]); }}>
+      {!source ? <MediaImportScreen kind="image" accept="image/*" onFile={(next) => importImage(next)} error={error} /> : <section className="resize-workspace" aria-label="Image resizing workspace" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); importImage(event.dataTransfer.files?.[0]); }}>
         <div className="resize-controls">
           <label className="file-picker">
             <span>{source ? "Choose another image" : "Choose an image"}</span>
@@ -392,7 +393,7 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
           </div>
           {!source && <div className="empty-preview">Your image preview will appear here.</div>}
         </div>
-      </section>
+      </section>}
     </main>
   );
 }

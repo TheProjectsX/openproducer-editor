@@ -3,6 +3,7 @@ import { BungeeNode, BungeeStretcher, compileBungee, instantiateBungee, Transpor
 import wasmUrl from "bungee-web/bungee.wasm?url";
 import workletUrl from "bungee-web/worklet?url";
 import type { Route } from "./+types/audio-speed";
+import { MediaImportScreen } from "../components/media-import-screen";
 import { PITCH_PRESERVE_RENDER_CHUNK_FRAMES } from "../lib/audio-speed";
 
 export function meta({}: Route.MetaArgs) {
@@ -123,10 +124,10 @@ export default function AudioSpeed() {
   const validSpeed = Number.isFinite(speed) && speed >= 0.1 && speed <= 16;
   const estimatedBytes = duration && validSpeed ? (duration / speed) * sampleRate * 4 : 0;
   const exportFitsMemory = estimatedBytes <= 512 * 1024 * 1024;
-  return <main className="resize-page">
+  return <main className={`resize-page${file ? " has-media" : ""}`}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/tools/audio/speed">Audio Speed</a></nav></header>
     <section className="resize-intro"><p className="eyebrow">AUDIO TOOL · PITCH PRESERVED</p><h1>Set your own playback speed.</h1><p>Enter any speed from 0.1× to 16×. Pitch stays steady while the duration changes.</p></section>
-    <section className="resize-workspace" aria-label="Audio speed workspace">
+    {!file ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importFile(next)} error={error} /> : <section className="resize-workspace" aria-label="Audio speed workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{file ? "Choose another audio file" : "Choose an audio file"}<input type="file" accept="audio/*" onChange={(event) => void importFile(event.currentTarget.files?.[0])} /></span></label>
         {file && <p className="source-info">{file.name} · {duration.toFixed(2)} s · {sampleRate} Hz</p>}
@@ -139,6 +140,6 @@ export default function AudioSpeed() {
         {status && <p className="resize-note" role="status">{status}</p>}{error && <p className="resize-error" role="alert">{error}</p>}
       </div>
       <div className="resize-preview"><div className="preview-heading"><strong>Speed preview</strong><span>{ready ? `${speed}×` : "Choose audio to begin"}</span></div><div className="empty-preview audio-preview"><strong>{ready ? "Pitch-preserved audio is ready" : "Audio will be processed locally"}</strong><span>Set a custom speed, preview, then export a WAV.</span></div></div>
-    </section>
+    </section>}
   </main>;
 }

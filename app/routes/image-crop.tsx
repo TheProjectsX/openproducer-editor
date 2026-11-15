@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Route } from "./+types/image-crop";
+import { MediaImportScreen } from "../components/media-import-screen";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -64,10 +65,10 @@ export default function ImageCrop() {
     }, "image/png");
   }
 
-  return <main className="resize-page">
+  return <main className={`resize-page${file ? " has-media" : ""}`}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/tools/image/resize">Image editor</a></nav></header>
     <section className="resize-intro"><p className="eyebrow">IMAGE · LOCAL PROCESSING</p><h1>Crop by exact pixels</h1><p>Set a crop rectangle in source-image coordinates. Cropping is an explicit separate action; the resize tool keeps the full frame.</p></section>
-    <section className="resize-workspace">
+    {!file ? <MediaImportScreen kind="image" accept="image/*" onFile={chooseFile} error={error} /> : <section className="resize-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{file ? "Choose another image" : "Choose an image"}<input type="file" accept="image/*" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} /></span></label>
         {file && <p className="source-info">{file.name} · Source {size.width} × {size.height} px</p>}
@@ -78,6 +79,6 @@ export default function ImageCrop() {
         <button className="export-button" disabled={!valid} onClick={download}>Download cropped PNG</button>
       </div>
       <div className="resize-preview"><div className="preview-heading"><strong>Cropped result</strong><span>{valid ? `${crop.width} × ${crop.height} px` : "Choose an image to begin"}</span></div>{file ? <canvas ref={canvasRef} className="preview-canvas" aria-label="Cropped image preview" /> : <div className="empty-preview">The cropped image will appear here.</div>}</div>
-    </section>
+    </section>}
   </main>;
 }

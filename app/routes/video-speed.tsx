@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/video-speed";
+import { MediaImportScreen } from "../components/media-import-screen";
 
 const MAX_INPUT_BYTES = 512 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 512 * 1024 * 1024;
@@ -22,6 +23,8 @@ export default function VideoSpeed() {
   const [preservePitch, setPreservePitch] = useState(true);
   const [recording, setRecording] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
   const [error, setError] = useState("");
   const [recordedMime, setRecordedMime] = useState("");
 
@@ -39,7 +42,7 @@ export default function VideoSpeed() {
     if (!next) return;
     if (!next.type.startsWith("video/") && !/\.(mp4|mov|webm|mkv|avi)$/i.test(next.name)) { setError("Choose a video file."); return; }
     if (next.size > MAX_INPUT_BYTES) { setError("Choose a video up to 512 MiB for this prototype."); return; }
-    setFile(next); setUrl(URL.createObjectURL(next)); setResultUrl(""); setDuration(0); setProgress(0); setError(""); setRecordedMime("");
+    setFile(next); setUrl(URL.createObjectURL(next)); setResultUrl(""); setDuration(0); setCurrentTime(0); setPreviewPlaying(false); setProgress(0); setError(""); setRecordedMime("");
   }
 
   const rate = Number(speed), validRate = Number.isFinite(rate) && rate >= 0.1 && rate <= 16;
@@ -90,10 +93,10 @@ export default function VideoSpeed() {
   }
 
   const outputExtension = recordedMime.includes("mp4") ? "mp4" : "webm";
-  return <main className="resize-page">
+  return <main className={`resize-page${file ? " has-media" : ""}`}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
     <section className="resize-intro"><p className="eyebrow">VIDEO · LOCAL PROCESSING</p><h1>Set a custom video speed</h1><p>Preview at any custom rate from 0.1× to 16× and record the playback locally. Export format depends on browser support.</p></section>
-    <section className="resize-workspace">
+    {!file ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseFile} error={error} /> : <section className="resize-workspace video-tool-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{file ? "Choose another video" : "Choose a video"}<input type="file" accept="video/*,.mkv,.webm" disabled={recording} onChange={(event) => chooseFile(event.currentTarget.files?.[0])} /></span></label>
         {file && <p className="source-info">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MiB · {duration ? `${duration.toFixed(2)} s` : "Reading duration…"}</p>}
@@ -106,7 +109,7 @@ export default function VideoSpeed() {
         {recording ? <button className="export-button secondary-button" onClick={cancelExport}>Stop recording</button> : <button className="export-button" disabled={!file || !duration || !validRate} onClick={startExport}>Record speed-adjusted video</button>}
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-${rate}x.${outputExtension}`}>Download {outputExtension.toUpperCase()}</a>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Speed preview</strong><span>{validRate ? `${rate}×` : "Enter a valid rate"}</span></div>{url ? <video ref={videoRef} className="video-preview" src={url} controls onLoadedMetadata={(event) => { const length = event.currentTarget.duration; if (Number.isFinite(length)) setDuration(length); }} onTimeUpdate={(event) => { if (recording && duration) setProgress(Math.min(100, Math.round(event.currentTarget.currentTime / duration * 100))); }} onEnded={() => { if (recorderRef.current?.state === "recording") recorderRef.current.stop(); }} /> : <div className="empty-preview">Choose a local video to begin.</div>}</div>
-    </section>
+      <div className="resize-preview"><div className="preview-heading"><strong>Speed preview</strong><span>{validRate ? `${rate}×` : "Enter a valid rate"}</span></div>{url ? <><div className="custom-video-stage"><video ref={videoRef} className="video-preview" src={url} playsInline onLoadedMetadata={(event) => { const length = event.currentTarget.duration; if (Number.isFinite(length)) setDuration(length); }} onTimeUpdate={(event) => { setCurrentTime(event.currentTarget.currentTime); if (recording && duration) setProgress(Math.min(100, Math.round(event.currentTarget.currentTime / duration * 100))); }} onPlay={() => setPreviewPlaying(true)} onPause={() => setPreviewPlaying(false)} onEnded={() => { setPreviewPlaying(false); if (recorderRef.current?.state === "recording") recorderRef.current.stop(); }} /></div><div className="video-custom-transport"><button type="button" className="transport-play" aria-label={previewPlaying ? "Pause video preview" : "Play video preview"} onClick={() => { const video = videoRef.current; if (!video) return; if (video.paused) void video.play(); else video.pause(); }}>{previewPlaying ? "Ⅱ" : "▶"}</button><span className="transport-time">{currentTime.toFixed(2)} / {duration.toFixed(2)} s</span><input className="transport-scrub" type="range" min="0" max={duration || 0} step="any" value={Math.min(currentTime, duration)} aria-label="Video preview timeline" disabled={!duration} onChange={(event) => { const time = event.currentTarget.valueAsNumber; setCurrentTime(time); if (videoRef.current) videoRef.current.currentTime = time; }} /></div></> : <div className="empty-preview">Choose a local video to begin.</div>}</div>
+    </section>}
   </main>;
 }

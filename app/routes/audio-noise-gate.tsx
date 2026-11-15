@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Route } from "./+types/audio-noise-gate";
+import { MediaImportScreen } from "../components/media-import-screen";
+import { CustomMediaPreview } from "../components/custom-media-preview";
 
 const MAX_FILE_BYTES = 128 * 1024 * 1024;
 const MAX_DECODED_BYTES = 64 * 1024 * 1024;
@@ -107,10 +109,10 @@ export default function AudioNoiseGate() {
     workerRef.current.postMessage({ type: "cancel", jobId: activeJobId.current });
   }
 
-  return <main className="resize-page">
+  return <main className={`resize-page${source ? " has-media" : ""}`}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
     <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Reduce steady background noise</h1><p>Select a short section that contains only background noise. The app builds a frequency profile and reduces matching noise in the full recording.</p></section>
-    <section className="resize-workspace">
+    {!source ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => { const next = event.currentTarget.files?.[0]; event.currentTarget.value = ""; void chooseFile(next); }} /></span></label>
         {source && <p className="source-info">{file?.name} · {source.duration.toFixed(2)} s · {source.sampleRate} Hz · {source.numberOfChannels} channel(s)</p>}
@@ -127,7 +129,7 @@ export default function AudioNoiseGate() {
         <button className="export-button" disabled={!source || !valid || busy} onClick={() => void reduceNoise()}>{busy ? "Processing…" : "Reduce noise and preview"}</button>
         {cleanedUrl && <a className="export-button download-link" href={cleanedUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-noise-reduced.wav`}>Download cleaned WAV</a>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Audio preview</strong><span>{cleanedUrl ? "Compare original and noise-reduced audio" : "Original"}</span></div>{source ? <div className="audio-preview"><strong>{file?.name}</strong><audio className="audio-player" controls src={sourceUrl} /><span>Original audio</span>{cleanedUrl && <><audio className="audio-player" controls src={cleanedUrl} /><span>Noise-reduced preview</span></>}</div> : <div className="empty-preview">Choose an audio file to begin.</div>}</div>
-    </section>
+      <div className="resize-preview"><div className="preview-heading"><strong>Audio preview</strong><span>{cleanedUrl ? "Compare original and noise-reduced audio" : "Original"}</span></div>{source ? <div className="audio-preview"><strong>{file?.name}</strong><span>Original audio</span><CustomMediaPreview kind="audio" src={sourceUrl} label="Original audio" />{cleanedUrl && <><span>Noise-reduced preview</span><CustomMediaPreview kind="audio" src={cleanedUrl} label="Noise-reduced audio" /></>}</div> : <div className="empty-preview">Choose an audio file to begin.</div>}</div>
+    </section>}
   </main>;
 }

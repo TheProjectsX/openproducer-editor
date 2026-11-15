@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { zipSync } from "fflate";
 import type { Route } from "./+types/audio-split";
+import { MediaImportScreen } from "../components/media-import-screen";
+import { CustomMediaPreview } from "../components/custom-media-preview";
 
 const MAX_INPUT_BYTES = 512 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
@@ -101,10 +103,10 @@ export default function AudioSplit() {
     finally { setBusy(false); }
   }
 
-  return <main className="resize-page">
+  return <main className={`resize-page${audio ? " has-media" : ""}`}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
     <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Split audio at exact times</h1><p>Enter any number of custom cut points in seconds. The segments download together as a ZIP of WAV files.</p></section>
-    <section className="resize-workspace">
+    {!audio ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Working…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void chooseFile(event.currentTarget.files?.[0])} /></span></label>
         {audio && <p className="source-info">{file?.name} · {audio.duration.toFixed(2)} s · {audio.sampleRate} Hz · {audio.numberOfChannels} channel(s)</p>}
@@ -113,9 +115,9 @@ export default function AudioSplit() {
         <p className="resize-note">ZIP contains 16-bit PCM WAV parts at the source sample rate and channel count. Decoded audio is capped at 512 MiB and ZIP output at 256 MiB.</p>
         <button className="export-button" disabled={!audio || !file || !parsed.valid || busy} onClick={exportSegments}>{busy ? "Preparing…" : "Split and download ZIP"}</button>
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-segments.zip`}>Download segment ZIP</a>}
-        {url && <audio className="audio-player" controls src={url} />}
+        {url && <CustomMediaPreview kind="audio" src={url} label="Source audio preview" />}
       </div>
       <div className="resize-preview"><div className="preview-heading"><strong>Split plan</strong><span>{audio ? `${parsed.points.length + 1} clip(s)` : "No audio selected"}</span></div>{audio ? <ol className="clip-list">{[0, ...parsed.points, audio.duration].slice(0, -1).map((start, index) => { const end = ([...parsed.points, audio.duration][index]); return <li key={`${start}-${end}`}><span><strong>Part {String(index + 1).padStart(2, "0")}</strong><small>{start.toFixed(2)} s – {end.toFixed(2)} s · {(end - start).toFixed(2)} s</small></span></li>; })}</ol> : <div className="empty-preview">Choose audio and enter custom split points.</div>}</div>
-    </section>
+    </section>}
   </main>;
 }

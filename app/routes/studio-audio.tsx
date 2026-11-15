@@ -4,6 +4,8 @@ import type { Route } from "./+types/studio-audio";
 import { getProject, readAudioAsset, saveAudioProject, type AudioProjectDocument } from "../lib/project-store";
 import { inspectMediaFile } from "../lib/media-inspection";
 import { PITCH_PRESERVE_RENDER_CHUNK_FRAMES } from "../lib/audio-speed";
+import { MediaImportScreen } from "../components/media-import-screen";
+import { CustomMediaPreview } from "../components/custom-media-preview";
 
 const MAX_SOURCE_BYTES = 256 * 1024 * 1024;
 const MAX_BUFFER_BYTES = 512 * 1024 * 1024;
@@ -41,6 +43,8 @@ export default function AudioStudio() {
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
   const [resultUrl, setResultUrl] = useState("");
+  const [previewTime, setPreviewTime] = useState(0);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -187,6 +191,7 @@ export default function AudioStudio() {
     const player = playerRef.current; if (!player || !valid) return;
     const context = ensurePreviewGraph(player);
     player.currentTime = document.sourceStart; player.playbackRate = document.speed;
+    setPreviewTime(document.sourceStart);
     player.preservesPitch = document.pitchMode === "preserve";
     void context.resume().then(() => player.play()).catch(() => setError("Audio preview was blocked. Press Play again to allow local audio playback."));
   }
@@ -270,10 +275,10 @@ export default function AudioStudio() {
     finally { setBusy(false); setExporting(false); }
   }
 
-  return <main className="resize-page">
+  return <main className={`resize-page${buffer ? " has-media" : ""}`}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/projects">Projects</a></nav><span role="status">{status}</span></header>
     <section className="resize-intro"><p className="eyebrow">LOCAL AUDIO STUDIO</p><h1>Audio Studio</h1><p>Trim and shape a local audio source. Edits and source audio are saved in this browser.</p></section>
-    <section className="resize-workspace" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void importAudio(event.dataTransfer.files?.[0]); }}>
+    {!buffer ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importAudio(next)} error={error} /> : <section className="resize-workspace" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void importAudio(event.dataTransfer.files?.[0]); }}>
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Import audio"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void importAudio(event.currentTarget.files?.[0])} /></span></label>
         <div className="project-actions" aria-label="Audio edit history"><button type="button" className="editor-action" disabled={!past.length || busy} onClick={undo}>Undo</button><button type="button" className="editor-action" disabled={!future.length || busy} onClick={redo}>Redo</button></div>
@@ -293,9 +298,10 @@ export default function AudioStudio() {
         {exporting && <><p role="status" className="source-info">Rendering audio: {progress}%</p><progress max="100" value={progress} aria-label="Audio export progress" /><button className="editor-action danger" onClick={() => { cancelRef.current = true; }}>Cancel export</button></>}
         <button className="export-button" disabled={!valid || busy} onClick={() => void exportWav()}>Render WAV</button>
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-edited.wav`}>Download WAV</a>}
-        {sourceUrl && <audio ref={playerRef} className="audio-player" controls src={sourceUrl} onPlay={schedulePreviewEnvelope} onTimeUpdate={() => { if (playerRef.current && playerRef.current.currentTime >= document.sourceEnd) playerRef.current.pause(); }} />}
+        {sourceUrl && <audio ref={playerRef} className="media-source-hidden" src={sourceUrl} onPlay={() => { setPreviewPlaying(true); schedulePreviewEnvelope(); }} onPause={() => setPreviewPlaying(false)} onTimeUpdate={() => { if (playerRef.current) { setPreviewTime(playerRef.current.currentTime); if (playerRef.current.currentTime >= document.sourceEnd) playerRef.current.pause(); } }} />}
+        {buffer && <div className="custom-media-transport studio-audio-transport"><button type="button" className="transport-play" aria-label={previewPlaying ? "Pause audio preview" : "Play selected audio"} onClick={() => { if (playerRef.current?.paused) preview(); else playerRef.current?.pause(); }}>{previewPlaying ? "Ⅱ" : "▶"}</button><span className="transport-time">{previewTime.toFixed(2)} / {buffer.duration.toFixed(2)} s</span><input className="transport-scrub" type="range" min="0" max={buffer.duration} step="any" value={Math.min(previewTime, buffer.duration)} aria-label="Audio preview timeline" onChange={(event) => { const time = event.currentTarget.valueAsNumber; setPreviewTime(time); if (playerRef.current) playerRef.current.currentTime = time; }} /></div>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Audio waveform</strong><span>{buffer ? `${buffer.duration.toFixed(2)} s` : "Import audio to begin"}</span></div>{buffer ? <canvas ref={waveformRef} className="audio-waveform" aria-label="Audio waveform and selected range" /> : <div className="empty-preview">The waveform and selected range will appear here.</div>}{resultUrl && <audio className="audio-player" controls src={resultUrl} aria-label="Rendered audio preview" />}</div>
-    </section>
+      <div className="resize-preview"><div className="preview-heading"><strong>Audio waveform</strong><span>{buffer ? `${buffer.duration.toFixed(2)} s` : "Import audio to begin"}</span></div>{buffer ? <canvas ref={waveformRef} className="audio-waveform" aria-label="Audio waveform and selected range" /> : <div className="empty-preview">The waveform and selected range will appear here.</div>}{resultUrl && <CustomMediaPreview kind="audio" src={resultUrl} label="Rendered audio preview" />}</div>
+    </section>}
   </main>;
 }

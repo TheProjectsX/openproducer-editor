@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Route } from "./+types/audio-merge";
+import { MediaImportScreen } from "../components/media-import-screen";
 
 type Clip = { file: File; audio: AudioBuffer };
 const MAX_DECODED_BYTES = 512 * 1024 * 1024;
@@ -54,7 +55,7 @@ export default function AudioMerge() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  async function addFiles(files: FileList | null) {
+  async function addFiles(files: FileList | File[] | null) {
     if (!files?.length) return;
     setBusy(true); setError("");
     const context = new AudioContext();
@@ -94,10 +95,10 @@ export default function AudioMerge() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not create the merged WAV."); }
   }
 
-  return <main className="resize-page">
+  return <main className={`resize-page${clips.length ? " has-media" : ""}`}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
     <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Merge audio files</h1><p>Add audio, arrange its order, set a custom gap between clips, and export one WAV. Files stay in this browser.</p></section>
-    <section className="resize-workspace">
+    {!clips.length ? <MediaImportScreen kind="audio" accept="audio/*" multiple onFiles={(files) => void addFiles(files)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Decoding audio…" : "Add audio files"}<input type="file" accept="audio/*" multiple disabled={busy} onChange={(event) => { void addFiles(event.currentTarget.files); event.currentTarget.value = ""; }} /></span></label>
         {clips.length > 0 && <p className="source-info">{clips.length} file(s) · {clips.reduce((sum, clip) => sum + clip.audio.duration, 0).toFixed(2)} s total audio</p>}
@@ -107,6 +108,6 @@ export default function AudioMerge() {
         <button className="export-button" disabled={clips.length < 2 || busy || !Number.isFinite(Number(gap)) || Number(gap) < 0 || Number(gap) > 600} onClick={exportMerge}>Download merged WAV</button>
       </div>
       <div className="resize-preview"><div className="preview-heading"><strong>Clip order</strong><span>{clips.length} loaded</span></div>{clips.length ? <ol className="clip-list">{clips.map((clip, index) => <li key={`${clip.file.name}-${index}`}><span><strong>{index + 1}. {clip.file.name}</strong><small>{clip.audio.duration.toFixed(2)} s · {clip.audio.sampleRate} Hz</small></span><div><button type="button" aria-label={`Move ${clip.file.name} up`} disabled={index === 0} onClick={() => moveClip(index, -1)}>↑</button><button type="button" aria-label={`Move ${clip.file.name} down`} disabled={index === clips.length - 1} onClick={() => moveClip(index, 1)}>↓</button><button type="button" aria-label={`Remove ${clip.file.name}`} onClick={() => setClips(clips.filter((_, clipIndex) => clipIndex !== index))}>×</button></div></li>)}</ol> : <div className="empty-preview">Choose two or more audio files to arrange.</div>}</div>
-    </section>
+    </section>}
   </main>;
 }

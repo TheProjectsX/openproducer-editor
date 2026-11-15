@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/audio-normalize";
 import { normalizationGain } from "../lib/audio-normalization";
+import { MediaImportScreen } from "../components/media-import-screen";
+import { CustomMediaPreview } from "../components/custom-media-preview";
 
 const MAX_BYTES = 512 * 1024 * 1024;
 const CHUNK_FRAMES = 65_536;
@@ -96,9 +98,9 @@ export default function AudioNormalize() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not normalize this audio."); }
     finally { terminateWorker(worker); workerRef.current = null; setBusy(false); setRendering(false); }
   }
-  return <main className="resize-page"><header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
+  return <main className={`resize-page${audio ? " has-media" : ""}`}><header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
     <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Normalize audio peak level.</h1><p>Set a custom peak target and download a normalized WAV. The original remains unchanged.</p></section>
-    <section className="resize-workspace"><div className="resize-controls">
+    {!audio ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importAudio(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace"><div className="resize-controls">
       <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void importAudio(event.currentTarget.files?.[0])} /></span></label>
       {audio && <p className="source-info">{file?.name} · {audio.duration.toFixed(2)} s · {audio.sampleRate} Hz · {audio.numberOfChannels} channel(s)</p>}
       <label className="speed-field">Target peak <span>−24 to 0 dBFS</span><input type="number" min="-24" max="0" step="any" value={target} disabled={!audio || busy} onChange={(event) => { setTarget(event.currentTarget.value); setResultUrl(""); }} /></label>
@@ -107,6 +109,6 @@ export default function AudioNormalize() {
       {rendering && <><p className="source-info" role="status">Worker normalization: {progress}%</p><progress max="100" value={progress} aria-label="Audio normalization progress" /><button type="button" className="editor-action danger" onClick={() => { cancelRef.current = true; }}>Cancel normalization</button></>}
       <button className="secondary-button export-button" disabled={!valid || busy} onClick={() => void render()}>{rendering ? "Normalizing…" : "Normalize and preview"}</button>
       {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-normalized.wav`}>Download normalized WAV</a>}
-    </div><div className="resize-preview"><div className="preview-heading"><strong>Audio comparison</strong><span>{resultUrl ? "Original and normalized" : "Original"}</span></div>{audio ? <div className="audio-preview"><strong>{file?.name}</strong><audio className="audio-player" controls src={sourceUrl} /><span>Original</span>{resultUrl && <><audio className="audio-player" controls src={resultUrl} /><span>Normalized peak</span></>}</div> : <div className="empty-preview">Choose an audio file to begin.</div>}</div></section>
+    </div><div className="resize-preview"><div className="preview-heading"><strong>Audio comparison</strong><span>{resultUrl ? "Original and normalized" : "Original"}</span></div>{audio ? <div className="audio-preview"><strong>{file?.name}</strong><span>Original</span><CustomMediaPreview kind="audio" src={sourceUrl} label="Original audio" />{resultUrl && <><span>Normalized peak</span><CustomMediaPreview kind="audio" src={resultUrl} label="Normalized audio" /></>}</div> : <div className="empty-preview">Choose an audio file to begin.</div>}</div></section>}
   </main>;
 }

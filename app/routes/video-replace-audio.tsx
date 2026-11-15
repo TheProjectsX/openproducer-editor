@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/video-replace-audio";
+import { MediaImportScreen } from "../components/media-import-screen";
+import { CustomMediaPreview } from "../components/custom-media-preview";
 
 const MAX_BYTES = 512 * 1024 * 1024;
 
@@ -76,10 +78,10 @@ export default function VideoReplaceAudio() {
     } finally { videoInput?.dispose(); audioInput?.dispose(); }
   }
 
-  return <main className="resize-page">
+  return <main className={`resize-page${videoFile ? " has-media" : ""}`}>
     <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
     <section className="resize-intro"><p className="eyebrow">VIDEO · LOCAL PROCESSING</p><h1>Replace video audio</h1><p>Keep the video track, replace its primary audio, and set a custom start offset for the new soundtrack.</p></section>
-    <section className="resize-workspace">
+    {!videoFile ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseVideo} error={error} /> : <section className="resize-workspace video-tool-workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{videoFile ? "Choose another video" : "Choose video"}<input type="file" accept="video/*,.mkv,.webm" onChange={(event) => chooseVideo(event.currentTarget.files?.[0])} /></span></label>
         {videoFile && <p className="source-info">Video: {videoFile.name} · {duration ? `${duration.toFixed(2)} s` : "Reading duration…"}</p>}
@@ -92,9 +94,9 @@ export default function VideoReplaceAudio() {
         {progress !== null && <p className="source-info" role="status">Composing replacement MP4: {progress}%</p>}
         <button className="export-button" disabled={!valid || progress !== null} onClick={() => void replaceAudio()}>{progress !== null ? "Processing…" : "Replace audio and export MP4"}</button>
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${videoFile?.name.replace(/\.[^.]+$/, "")}-new-audio.mp4`}>Download MP4</a>}
-        {audioUrl && <audio className="audio-player" controls src={audioUrl} />}
+        {audioUrl && <CustomMediaPreview kind="audio" src={audioUrl} label="Replacement audio preview" />}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Video preview</strong><span>{videoFile ? "Original source" : "No video selected"}</span></div>{videoUrl ? <video className="video-preview" src={videoUrl} controls onLoadedMetadata={(event) => { const value = event.currentTarget.duration; if (Number.isFinite(value)) setDuration(value); }} /> : <div className="empty-preview">Choose a video and replacement audio.</div>}</div>
-    </section>
+      <div className="resize-preview"><div className="preview-heading"><strong>Video preview</strong><span>{videoFile ? "Original source" : "No video selected"}</span></div>{videoUrl ? <CustomMediaPreview kind="video" src={videoUrl} label="Original video preview" onDuration={setDuration} /> : <div className="empty-preview">Choose a video and replacement audio.</div>}</div>
+    </section>}
   </main>;
 }
