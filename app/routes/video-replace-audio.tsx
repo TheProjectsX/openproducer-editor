@@ -11,7 +11,8 @@ const MAX_SOURCE_WAVE_BYTES = 128 * 1024 * 1024;
 const MAX_TRACKS = 8;
 const MAX_AUDIO_INPUT_BYTES = 128 * 1024 * 1024;
 const MIX_SAMPLE_RATE = 48_000;
-const MAX_MIX_SECONDS = 480;
+const MAX_MIX_SECONDS = 240;
+const MAX_DECODED_AUDIO_SECONDS = 480;
 type AudioLane = { id: string; file: File; url: string; duration: number; offset: string; volumeDb: string; enabled: boolean };
 
 export function meta({}: Route.MetaArgs) {
@@ -116,8 +117,11 @@ export default function VideoReplaceAudio() {
 
   const enabledLanes = audioLanes.filter((lane) => lane.enabled);
   const laneSettingsValid = enabledLanes.every((lane) => Number.isFinite(Number(lane.offset)) && Number(lane.offset) >= 0 && Number(lane.offset) < duration
+    && lane.duration > 0 && Number.isFinite(lane.duration)
     && Number.isFinite(Number(lane.volumeDb)) && Number(lane.volumeDb) >= -60 && Number(lane.volumeDb) <= 6);
-  const valid = Boolean(videoFile && duration > 0 && (keepVideoAudio || enabledLanes.length > 0) && laneSettingsValid && Number.isFinite(Number(sourceVolumeDb)) && Number(sourceVolumeDb) >= -60 && Number(sourceVolumeDb) <= 6);
+  const decodedAudioSeconds = (keepVideoAudio ? duration : 0) + enabledLanes.reduce((sum, lane) => sum + lane.duration, 0);
+  const withinMemoryBudget = decodedAudioSeconds <= MAX_DECODED_AUDIO_SECONDS;
+  const valid = Boolean(videoFile && duration > 0 && duration <= MAX_MIX_SECONDS && (keepVideoAudio || enabledLanes.length > 0) && laneSettingsValid && withinMemoryBudget && Number.isFinite(Number(sourceVolumeDb)) && Number(sourceVolumeDb) >= -60 && Number(sourceVolumeDb) <= 6);
 
   async function replaceAudio() {
     if (!videoFile || !duration || !valid) return;
@@ -127,6 +131,7 @@ export default function VideoReplaceAudio() {
     let offlineContext: OfflineAudioContext | undefined;
     try {
       if (duration > MAX_MIX_SECONDS) throw new Error(`The current local mix is limited to ${MAX_MIX_SECONDS / 60} minutes to keep high-quality audio rendering within browser memory limits.`);
+      if (!withinMemoryBudget) throw new Error("The total decoded audio duration is over the local browser memory budget. Disable or remove some long tracks.");
       const mixFrames = Math.ceil(duration * MIX_SAMPLE_RATE);
       if (mixFrames * 2 * Float32Array.BYTES_PER_ELEMENT > 192 * 1024 * 1024) throw new Error("This video is too long for the available in-memory mix preview.");
       const { ALL_FORMATS, AudioBufferSource, BlobSource, BufferTarget, Conversion, Input, Mp4OutputFormat, Output, Quality, canEncodeAudio } = await import("mediabunny");
@@ -209,7 +214,7 @@ export default function VideoReplaceAudio() {
         </fieldset>)}
         {sourceAudioProgress !== null && <ProcessingProgress label="Reading the source video's audio waveform" value={sourceAudioProgress} />}
         {sourceAudioStatus && sourceAudioProgress === null && <p className="source-info" role="status">{sourceAudioStatus}</p>}
-        {!valid && duration > 0 && <p className="resize-error" role="alert">Keep source audio or enable an extra track. Every enabled track needs a valid offset and level.</p>}
+        {!valid && duration > 0 && <p className="resize-error" role="alert">{!withinMemoryBudget ? "The combined source and added audio exceeds the decoded-memory budget. Disable or remove some long tracks." : duration > MAX_MIX_SECONDS ? `This local mixer supports video up to ${MAX_MIX_SECONDS / 60} minutes.` : "Keep source audio or enable an extra track. Every enabled track needs a loaded duration, valid offset, and level."}</p>}
         {error && <p className="resize-error" role="alert">{error}</p>}
         {progress !== null && <ProcessingProgress label="Composing video and audio tracks" value={progress} />}
         <button className="export-button" disabled={!valid || progress !== null || sourceAudioProgress !== null} onClick={() => void replaceAudio()}>{progress !== null ? "Building mix preview…" : resultUrl ? "Rebuild mix preview" : "Preview and export mixed video"}</button>

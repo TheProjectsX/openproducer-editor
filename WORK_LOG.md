@@ -661,3 +661,9 @@
 - Added a decoded `ImageBitmap` cache keyed by each local image asset so dragging and changing cell settings redraws from cached pixels rather than repeatedly decoding all source files.
 - Updated the feature matrix and image design notes to describe the canvas-centered collage interaction inspired by BeFunky's customizable layouts.
 - Verification: `npm.cmd run typecheck` and `git diff --check` passed. Production build, save/reopen, and drag interaction are pending.
+
+## 2026-11-15 — Replace Audio decoded-memory guard
+
+- Tightened the Replace Audio export limits to four-minute videos and added an eight-minute combined decoded-audio budget across source audio and enabled lanes. Tracks must report their duration before export; over-budget exports are blocked with an actionable message instead of being decoded until the tab runs out of memory.
+- Updated the current feature matrix and implementation decision note with the actual memory limits.
+- Verification: `npm.cmd run typecheck` passed; `git diff --check` passed; `npm.cmd run build` passed and verified 27 prerendered routes with 106 cached assets. Runtime memory measurements remain pending browser validation.
