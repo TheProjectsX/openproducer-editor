@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/video-remove-audio";
 import { MediaImportScreen } from "../components/media-import-screen";
@@ -52,7 +53,7 @@ export default function VideoRemoveAudio() {
   }
 
   return <main className={`resize-page${file ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">VIDEO · LOCAL PROCESSING</p><h1>Remove video audio</h1><p>Discard the primary audio track and export the remaining video as MP4. Your file stays in this browser.</p></section>
     {!file ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseFile} error={error} /> : <section className="resize-workspace video-tool-workspace">
       <div className="resize-controls">

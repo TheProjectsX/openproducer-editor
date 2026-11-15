@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useState } from "react";
 import type { Route } from "./+types/audio-merge";
 import { MediaImportScreen } from "../components/media-import-screen";
@@ -96,7 +97,7 @@ export default function AudioMerge() {
   }
 
   return <main className={`resize-page${clips.length ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Merge audio files</h1><p>Add audio, arrange its order, set a custom gap between clips, and export one WAV. Files stay in this browser.</p></section>
     {!clips.length ? <MediaImportScreen kind="audio" accept="audio/*" multiple onFiles={(files) => void addFiles(files)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">

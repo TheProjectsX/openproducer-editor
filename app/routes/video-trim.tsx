@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/video-trim";
 import { MediaImportScreen } from "../components/media-import-screen";
@@ -105,7 +106,7 @@ export default function VideoTrim() {
   }
 
   return <main className={`resize-page video-trim-page${file ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/tools/video">Video tools</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">VIDEO · LOCAL PROCESSING</p><h1>Trim a video</h1><p>Choose a range on the timeline or enter exact times. Processing and export happen in this browser.</p></section>
     {!file ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={selectFile} error={error} /> : <section className="resize-workspace video-trim-workspace">
       <div className="resize-controls">

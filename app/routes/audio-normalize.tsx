@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/audio-normalize";
 import { normalizationGain } from "../lib/audio-normalization";
@@ -98,7 +99,7 @@ export default function AudioNormalize() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not normalize this audio."); }
     finally { terminateWorker(worker); workerRef.current = null; setBusy(false); setRendering(false); }
   }
-  return <main className={`resize-page${audio ? " has-media" : ""}`}><header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
+  return <main className={`resize-page${audio ? " has-media" : ""}`}><ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Normalize audio peak level.</h1><p>Set a custom peak target and download a normalized WAV. The original remains unchanged.</p></section>
     {!audio ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importAudio(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace"><div className="resize-controls">
       <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void importAudio(event.currentTarget.files?.[0])} /></span></label>

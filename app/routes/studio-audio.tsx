@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import type { Route } from "./+types/studio-audio";
@@ -256,7 +257,7 @@ export default function AudioStudio() {
   }
 
   return <main className={`resize-page${buffer ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/projects">Projects</a></nav><span role="status">{status}</span></header>
+    <ToolPageHeader status={status} />
     <section className="resize-intro"><p className="eyebrow">LOCAL AUDIO STUDIO</p><h1>Audio Studio</h1><p>Trim and shape a local audio source. Edits and source audio are saved in this browser.</p></section>
     {!buffer ? loaded ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importAudio(next)} error={error} /> : <div className="empty-preview import-loading" role="status">Opening audio project from this device…</div> : <section className="resize-workspace" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void importAudio(event.dataTransfer.files?.[0]); }}>
       <div className="resize-controls">

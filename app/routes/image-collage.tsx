@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import type { Route } from "./+types/image-collage";
@@ -181,7 +182,7 @@ export default function ImageCollage() {
   }
 
   return <main className={`resize-page${images.length ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/tools/image/resize">Image editor</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">IMAGE · LOCAL PROCESSING</p><h1>Make an image collage</h1><p>Add, reorder, and arrange images into a custom canvas. Everything renders locally in this browser.</p></section>
     {!images.length ? projectLoaded ? <MediaImportScreen kind="image" accept="image/*" multiple onFiles={addFiles} error={error} /> : <div className="empty-preview import-loading" role="status">Opening collage project from this device…</div> : <section className="resize-workspace image-tool-workspace">
       <div className="resize-controls">

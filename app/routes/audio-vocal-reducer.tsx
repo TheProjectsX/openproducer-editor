@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/audio-vocal-reducer";
 import { MediaImportScreen } from "../components/media-import-screen";
@@ -84,7 +85,7 @@ export default function VocalReducer() {
 
   const validAmount = Number.isFinite(Number(amount)) && Number(amount) >= 0 && Number(amount) <= 100;
   return <main className={`resize-page${source ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Reduce centered vocals</h1><p>Try a custom-strength stereo center cancel on a local audio file. Processing never uploads your source.</p></section>
     {!source ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">

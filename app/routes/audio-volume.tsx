@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/audio-volume";
 import { MediaImportScreen } from "../components/media-import-screen";
@@ -93,7 +94,7 @@ export default function AudioVolume() {
   }
 
   return <main className={`resize-page${source ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Adjust volume and fades</h1><p>Set custom gain and fade durations, then compare the result and download a WAV.</p></section>
     {!source ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">

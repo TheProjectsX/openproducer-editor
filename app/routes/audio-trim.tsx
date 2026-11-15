@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/audio-trim";
 import { MediaImportScreen } from "../components/media-import-screen";
@@ -130,7 +131,7 @@ export default function AudioTrim() {
   }
 
   return <main className={`resize-page audio-trim-page${audio ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/tools/audio/trim">Audio Trim</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">AUDIO TOOL · PRIVATE BY DESIGN</p><h1>Trim audio with exact times.</h1><p>Choose a start and end point, preview the selection, then download a WAV. Audio stays in your browser.</p></section>
     {!audio ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importFile(next)} error={error} /> : <section className="resize-workspace" aria-label="Audio trimming workspace">
       <div className="resize-controls">

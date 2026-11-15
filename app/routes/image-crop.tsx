@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Route } from "./+types/image-crop";
 import { MediaImportScreen } from "../components/media-import-screen";
@@ -66,7 +67,7 @@ export default function ImageCrop() {
   }
 
   return <main className={`resize-page${file ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/tools/image/resize">Image editor</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">IMAGE · LOCAL PROCESSING</p><h1>Crop by exact pixels</h1><p>Set a crop rectangle in source-image coordinates. Cropping is an explicit separate action; the resize tool keeps the full frame.</p></section>
     {!file ? <MediaImportScreen kind="image" accept="image/*" onFile={chooseFile} error={error} /> : <section className="resize-workspace">
       <div className="resize-controls">

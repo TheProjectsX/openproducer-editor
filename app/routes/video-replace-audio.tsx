@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/video-replace-audio";
 import { MediaImportScreen } from "../components/media-import-screen";
@@ -80,7 +81,7 @@ export default function VideoReplaceAudio() {
   }
 
   return <main className={`resize-page${videoFile ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">VIDEO · LOCAL PROCESSING</p><h1>Replace video audio</h1><p>Keep the video track, replace its primary audio, and set a custom start offset for the new soundtrack.</p></section>
     {!videoFile ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseVideo} error={error} /> : <section className="resize-workspace video-tool-workspace">
       <div className="resize-controls">

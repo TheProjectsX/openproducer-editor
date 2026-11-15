@@ -588,3 +588,9 @@
 - Added a distinct Creative Studio shortcut for multitrack audio, video, and image editing.
 - Removed the multitrack video editor from Video Tools and linked Audio Studio and Image Studio to their actual editor routes. Updated the displayed video tool count.
 - Verification: `npm.cmd run typecheck` passed. Visual review remains pending.
+
+## 2026-11-15 — Navigation: tool breadcrumbs and group menus
+
+- Replaced the misleading standalone editor headers with a shared navigation header: linked Home and media-workspace breadcrumbs, the current tool name, and hover/focus/click dropdowns for audio, video, and image tools.
+- Added the Creative Studio breadcrumb at the multitrack editor route while keeping it outside the Video Tools category. Existing project and storage headers remain unchanged.
+- Verification: `npm.cmd run typecheck` passed. Browser pointer, keyboard, and narrow-screen navigation review remains pending.

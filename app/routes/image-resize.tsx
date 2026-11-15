@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import type { Route } from "./+types/image-resize";
@@ -331,10 +332,7 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
 
   return (
     <main className={`resize-page${workspace && source ? " has-media" : ""}`}>
-      <header className="resize-header">
-        <a href="/" className="brand">Local Studio</a>
-        <nav aria-label="Main navigation"><a href="/projects">Projects</a></nav>
-      </header>
+      <ToolPageHeader />
       <section className="resize-intro">
         <p className="eyebrow">{workspace ? "IMAGE STUDIO · LOCAL PROJECT" : "IMAGE TOOL · PRIVATE BY DESIGN"}</p>
         <h1>{workspace ? "Edit your image project." : "Resize and adjust your image."}</h1>

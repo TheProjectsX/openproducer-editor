@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/video-speed";
 import { MediaImportScreen } from "../components/media-import-screen";
@@ -94,7 +95,7 @@ export default function VideoSpeed() {
 
   const outputExtension = recordedMime.includes("mp4") ? "mp4" : "webm";
   return <main className={`resize-page${file ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">VIDEO · LOCAL PROCESSING</p><h1>Set a custom video speed</h1><p>Preview at any custom rate from 0.1× to 16× and record the playback locally. Export format depends on browser support.</p></section>
     {!file ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseFile} error={error} /> : <section className="resize-workspace video-tool-workspace">
       <div className="resize-controls">

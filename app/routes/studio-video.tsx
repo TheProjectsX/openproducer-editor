@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import type { Route } from "./+types/studio-video";
@@ -550,7 +551,7 @@ export default function VideoStudio() {
   }
 
   return <main className="video-studio-page" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (event.dataTransfer.files.length) void importFiles(event.dataTransfer.files); }}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav><a href="/projects">Projects</a></nav><span role="status">{status}</span></header>
+    <ToolPageHeader status={status} />
     <div className="video-studio-top">
       <section>
         <p className="eyebrow">LOCAL VIDEO STUDIO · TIMELINE FOUNDATION</p>

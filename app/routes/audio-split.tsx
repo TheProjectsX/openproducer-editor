@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useMemo, useState } from "react";
 import { zipSync } from "fflate";
 import type { Route } from "./+types/audio-split";
@@ -105,7 +106,7 @@ export default function AudioSplit() {
   }
 
   return <main className={`resize-page${audio ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Split audio at exact times</h1><p>Enter any number of custom cut points in seconds. The segments download together as a ZIP of WAV files.</p></section>
     {!audio ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace">
       <div className="resize-controls">

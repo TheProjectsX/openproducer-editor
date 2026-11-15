@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Route } from "./+types/audio-noise-gate";
 import { MediaImportScreen } from "../components/media-import-screen";
@@ -111,7 +112,7 @@ export default function AudioNoiseGate() {
   }
 
   return <main className={`resize-page${source ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/">All tools</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Reduce steady background noise</h1><p>Select a short section that contains only background noise. The app builds a frequency profile and reduces matching noise in the full recording.</p></section>
     {!source ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">

@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Route } from "./+types/image-upscale";
 import { MediaImportScreen } from "../components/media-import-screen";
@@ -88,7 +89,7 @@ export default function ImageUpscale() {
   }
 
   return <main className={`resize-page${file ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/tools/image/resize">Image editor</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">IMAGE · LOCAL PROCESSING</p><h1>Upscale an image</h1><p>Choose a custom multiplier or exact output dimensions. Source pixels stay on this device.</p></section>
     {!file ? <MediaImportScreen kind="image" accept="image/*" onFile={chooseFile} error={error} /> : <section className="resize-workspace image-tool-workspace">
       <div className="resize-controls">

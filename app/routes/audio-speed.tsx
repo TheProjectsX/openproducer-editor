@@ -1,3 +1,4 @@
+import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useRef, useState } from "react";
 import { BungeeNode, BungeeStretcher, compileBungee, instantiateBungee, Transport } from "bungee-web";
 import wasmUrl from "bungee-web/bungee.wasm?url";
@@ -134,7 +135,7 @@ export default function AudioSpeed() {
   const estimatedBytes = duration && validSpeed ? (duration / speed) * sampleRate * 4 : 0;
   const exportFitsMemory = estimatedBytes <= 512 * 1024 * 1024;
   return <main className={`resize-page${file ? " has-media" : ""}`}>
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/tools/audio/speed">Audio Speed</a></nav></header>
+    <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">AUDIO TOOL · PITCH PRESERVED</p><h1>Set your own playback speed.</h1><p>Enter any speed from 0.1× to 16×. Pitch stays steady while the duration changes.</p></section>
     {!file ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importFile(next)} error={error} /> : <section className="resize-workspace" aria-label="Audio speed workspace">
       <div className="resize-controls">
