@@ -1,5 +1,12 @@
 # Feature matrix and release boundaries
 
+## Interface direction (2026-11-15)
+
+- Site-wide visual direction: dark charcoal with restrained navy/blue editor surfaces; Ubuntu for general interface text and locally bundled Inter for headings/display text. Do not load fonts from a runtime CDN because the PWA must remain self-contained offline. Font WOFF/WOFF2 files must be included in the service worker's asset cache.
+- Home contains exactly three category cards: Audio editor tools, Video editor tools, and Image tools. `/tools` is the same three-way category selector. Each category route lists only that media type's tools.
+- Editing tools should begin with a source-selection/upload screen, then reveal the workspace after media is selected (the multitrack video studio is the stated exception). Image overlays should be manipulated on the preview canvas. Trim-capable audio/video tools need a visual selection timeline; preview controls should be custom app UI rather than browser-native player chrome.
+- Status: the homepage/category information architecture, dark base palette, and local fonts are being implemented in this pass. The tool upload gate, per-tool timelines, custom media controls/previews, direct manipulation, and full-viewport editor refinements remain separate unfinished design slices. Do not describe them as completed based only on shared CSS.
+
 Legend: **Core** = first usable release; **AI** = subsequent downloaded-model release; **Later** = candidate, not a commitment. All processing is local. Every adjustable setting has a typed numeric input alongside any slider or preset. Core assets must be cached for offline work; each AI model becomes offline-ready after its own successful download.
 
 ## Shared application features

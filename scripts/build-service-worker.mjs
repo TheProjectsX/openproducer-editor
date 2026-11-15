@@ -15,7 +15,7 @@ async function collect(directory) {
 
 await collect(root);
 const htmlFiles = files.filter((file) => file.endsWith(".html") && !["404.html", "offline.html", "__spa-fallback.html"].includes(path.basename(file)));
-const staticAssets = files.filter((file) => /\.(?:js|css|wasm|svg|png|ico|webmanifest)$/.test(file));
+const staticAssets = files.filter((file) => /\.(?:js|css|wasm|svg|png|ico|webmanifest|woff2?|ttf|otf)$/.test(file));
 const buildHash = createHash("sha256");
 for (const file of [...htmlFiles, ...staticAssets].sort()) {
   buildHash.update(file);

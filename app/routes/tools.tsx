@@ -2,7 +2,7 @@ import type { Route } from "./+types/tools";
 import { ToolDirectory } from "../components/tool-directory";
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: "Audio, video, and image tools | Local Studio" }, { name: "description", content: "Explore private, browser-based tools for editing audio, video, and images on your device." }];
+  return [{ title: "Choose a media workspace | Local Studio" }, { name: "description", content: "Choose the audio, video, or image workspace. Each page groups tools for one kind of media." }];
 }
 
 export default function Tools() { return <ToolDirectory />; }

@@ -1,5 +1,14 @@
 # Work log
 
+## 2026-11-15 — Dark visual system and media workspace navigation (in progress)
+
+- Replaced the flat homepage tool list with exactly three entry cards: Audio Editor Tools, Video Editor Tools, and Image Tools. `/tools` is now the same three-way workspace selector, and each category page displays only that category's tools.
+- Added a shared dark charcoal/navy palette, blue/cyan/violet accents, a responsive editorial landing layout, and dark full-width styling for existing tool and video-studio shells.
+- Added locally bundled Ubuntu 400/500/700 and Inter Variable fonts so typography does not depend on a network font service. General text uses Ubuntu; headings use Inter.
+- Updated route metadata and feature/design notes. The editor onboarding flow, time-selection timelines, custom players, direct-manipulation image layers, and workspace-level fit/scroll behavior remain to implement.
+- Verification: `npm.cmd run typecheck` passed. `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable). The generated service worker includes 94 assets, including the bundled font files. The known ~643 kB processing chunk and Bungee dynamic-import warning remain. Visual browser review is pending because this session still does not expose direct Chrome controls; the localhost preview has been queued in the Codex browser panel.
+- Commit is pending for this slice.
+
 ## 2026-11-14 — Repository foundation
 
 - Initialized an empty Git repository in the project workspace.

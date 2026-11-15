@@ -2,43 +2,95 @@ import type { Route } from "./+types/home";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Local Studio | Private media editing" },
+    { title: "Local Studio | A private media workspace" },
     {
       name: "description",
-      content: "Edit audio, video, and images locally in an installable offline studio.",
+      content: "A focused local workspace for audio, video, and image editing. Your media stays on your device.",
     },
   ];
 }
 
+const categories = [
+  {
+    title: "Audio editor tools",
+    description: "Shape sound, clean recordings, adjust speed, and bring tracks together.",
+    href: "/tools/audio",
+    type: "audio",
+    number: "01",
+    tools: "Trim · Split · Mix · Clean",
+  },
+  {
+    title: "Video editor tools",
+    description: "Make precise cuts, control playback speed, and work across video and audio.",
+    href: "/tools/video",
+    type: "video",
+    number: "02",
+    tools: "Trim · Speed · Audio · Studio",
+  },
+  {
+    title: "Image tools",
+    description: "Refine dimensions, crop with control, compose collages, and prepare exports.",
+    href: "/tools/image",
+    type: "image",
+    number: "03",
+    tools: "Resize · Crop · Compose · Export",
+  },
+] as const;
+
+function CategoryMark({ type }: { type: (typeof categories)[number]["type"] }) {
+  if (type === "audio") return <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 20v8m7-15v22m7-28v34m7-23v12m7-19v26m7-17v8m7-13v18" /></svg>;
+  if (type === "video") return <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="10" width="27" height="28" rx="5" /><path d="m32 20 11-7v22l-11-7z" /></svg>;
+  return <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="5" width="38" height="38" rx="8" /><circle cx="17" cy="17" r="4" /><path d="m8 36 11-11 7 7 5-5 9 9" /></svg>;
+}
+
 export default function Home() {
   return (
-    <main className="resize-page">
-      <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/tools">All tools</a><a href="/projects">Projects</a></nav></header>
-      <section className="resize-intro">
-        <p className="eyebrow">YOUR MEDIA STAYS ON YOUR DEVICE</p>
-        <h1>A private workspace for audio, video, and images.</h1>
-        <p>Local Studio is built to edit in your browser, keep projects on your device, and work offline after installation.</p>
+    <main className="marketing-page">
+      <header className="site-header">
+        <a href="/" className="brand"><span className="brand-mark" aria-hidden="true">L</span>Local Studio</a>
+        <nav className="site-nav" aria-label="Main navigation">
+          <a href="/tools">Explore tools</a>
+          <a href="/projects">Projects</a>
+          <a href="/settings/storage">Storage</a>
+        </nav>
+      </header>
+
+      <section className="home-hero">
+        <div className="hero-copy">
+          <span className="hero-kicker"><span className="status-dot" /> PRIVATE BY DESIGN · READY OFFLINE</span>
+          <h1>Make more of<br /><span>your media.</span></h1>
+          <p>Thoughtful tools for the details that make audio, video, and images feel right. Your files stay on your device.</p>
+          <a className="hero-link" href="/tools">Explore the workspace <span aria-hidden="true">↗</span></a>
+        </div>
+        <div className="hero-art" aria-hidden="true">
+          <div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" />
+          <div className="art-glow" />
+          <div className="art-window">
+            <div className="art-window-top"><span /><span /><span /><i>LOCAL / 01</i></div>
+            <div className="art-wave"><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /></div>
+            <div className="art-track"><i /><i /><i /></div>
+            <div className="art-image"><span /><span /><span /></div>
+          </div>
+          <div className="art-chip chip-a">✳ &nbsp; LOCAL FIRST</div>
+          <div className="art-chip chip-b">NO UPLOADS. NO ACCOUNTS.</div>
+        </div>
       </section>
-      <section className="resize-workspace" aria-label="Available tools">
-        <a className="tool-card" href="/tools/image/resize"><span className="eyebrow">IMAGE</span><strong>Resize image pixels</strong><span>Set exact width and height without cropping.</span><span className="tool-link">Open image resize →</span></a>
-        <a className="tool-card" href="/tools/image/upscale"><span className="eyebrow">IMAGE</span><strong>Upscale image</strong><span>Set a custom multiplier or exact output dimensions.</span><span className="tool-link">Open image upscaler →</span></a>
-        <a className="tool-card" href="/tools/image/collage"><span className="eyebrow">IMAGE</span><strong>Make a collage</strong><span>Arrange, reorder, and fit images on a custom canvas.</span><span className="tool-link">Open collage maker →</span></a>
-        <a className="tool-card" href="/tools/image/crop"><span className="eyebrow">IMAGE</span><strong>Crop image</strong><span>Choose an exact crop rectangle in source pixels.</span><span className="tool-link">Open image crop →</span></a>
-        <a className="tool-card" href="/tools/audio/trim"><span className="eyebrow">AUDIO</span><strong>Trim audio</strong><span>Choose exact start and end times and export WAV.</span><span className="tool-link">Open audio trim →</span></a>
-        <a className="tool-card" href="/tools/audio/speed"><span className="eyebrow">AUDIO</span><strong>Change audio speed</strong><span>Set a custom speed while keeping pitch steady.</span><span className="tool-link">Open audio speed →</span></a>
-        <a className="tool-card" href="/tools/audio/merge"><span className="eyebrow">AUDIO</span><strong>Merge audio files</strong><span>Arrange multiple files, add a custom gap, and export one WAV.</span><span className="tool-link">Open audio merge →</span></a>
-        <a className="tool-card" href="/tools/audio/split"><span className="eyebrow">AUDIO</span><strong>Split audio</strong><span>Enter custom timestamps and download all segments together.</span><span className="tool-link">Open audio split →</span></a>
-        <a className="tool-card" href="/tools/audio/noise-gate"><span className="eyebrow">AUDIO</span><strong>Reduce background noise</strong><span>Profile a noise-only section and reduce matching sound locally.</span><span className="tool-link">Open noise reduction →</span></a>
-        <a className="tool-card" href="/tools/audio/vocal-reducer"><span className="eyebrow">AUDIO</span><strong>Reduce centered vocals</strong><span>Try an adjustable stereo center-cancel effect.</span><span className="tool-link">Open vocal reducer →</span></a>
-        <a className="tool-card" href="/tools/audio/volume"><span className="eyebrow">AUDIO</span><strong>Volume and fades</strong><span>Set custom gain, fade-in, and fade-out durations.</span><span className="tool-link">Open volume tool →</span></a>
-        <a className="tool-card" href="/tools/audio/normalize"><span className="eyebrow">AUDIO</span><strong>Normalize audio</strong><span>Set a custom peak target and preview the normalized WAV.</span><span className="tool-link">Open normalizer →</span></a>
-        <a className="tool-card" href="/tools/video/trim"><span className="eyebrow">VIDEO</span><strong>Trim video</strong><span>Choose a precise range and export a local MP4.</span><span className="tool-link">Open video trim →</span></a>
-        <a className="tool-card" href="/tools/video/extract-audio"><span className="eyebrow">VIDEO</span><strong>Extract video audio</strong><span>Export the primary audio track as a local WAV.</span><span className="tool-link">Open audio extractor →</span></a>
-        <a className="tool-card" href="/tools/video/speed"><span className="eyebrow">VIDEO</span><strong>Custom video speed</strong><span>Record local playback at a custom rate with browser-supported audio pitch control.</span><span className="tool-link">Open video speed →</span></a>
-        <a className="tool-card" href="/tools/video/remove-audio"><span className="eyebrow">VIDEO</span><strong>Remove video audio</strong><span>Discard the main audio track and export a muted local MP4.</span><span className="tool-link">Open audio remover →</span></a>
-        <a className="tool-card" href="/tools/video/replace-audio"><span className="eyebrow">VIDEO</span><strong>Replace video audio</strong><span>Add a local soundtrack with a custom start offset.</span><span className="tool-link">Open audio replacement →</span></a>
-        <a className="tool-card" href="/projects"><span className="eyebrow">VIDEO</span><strong>Multitrack video studio</strong><span>Build a local multi-track project with custom clip timing.</span><span className="tool-link">Create or open a video project →</span></a>
+
+      <section className="category-section" aria-labelledby="category-heading">
+        <div className="section-heading">
+          <div><p className="eyebrow">CHOOSE YOUR WORKSPACE</p><h2 id="category-heading">What are you working on?</h2></div>
+          <span>Three focused spaces.<br />One private studio.</span>
+        </div>
+        <div className="category-grid">
+          {categories.map((category) => <a className={`category-card category-${category.type}`} href={category.href} key={category.type}>
+            <div className="category-card-top"><span className="category-icon"><CategoryMark type={category.type} /></span><span className="category-number">{category.number}</span></div>
+            <div className="category-card-copy"><h3>{category.title}</h3><p>{category.description}</p></div>
+            <div className="category-card-bottom"><span>{category.tools}</span><span className="category-arrow" aria-hidden="true">↗</span></div>
+          </a>)}
+        </div>
       </section>
+
+      <footer className="home-footer"><span>LOCAL STUDIO</span><span>Private editing. Right on your device.</span><a href="/projects">Your projects ↗</a></footer>
     </main>
   );
 }

@@ -1,53 +1,102 @@
 const groups = {
   audio: {
-    title: "Audio tools",
-    description: "Trim, arrange, shape, and export audio locally in your browser.",
+    label: "AUDIO WORKSPACE",
+    title: "Shape your sound.",
+    description: "A focused set of tools for editing, cleaning, and preparing audio. Everything runs locally in your browser.",
+    color: "audio",
     tools: [
-      ["Trim audio", "Choose exact start and end times and export WAV.", "/tools/audio/trim"],
-      ["Change audio speed", "Set a custom speed with pitch-preserving processing.", "/tools/audio/speed"],
-      ["Merge audio", "Arrange files, set a custom gap, and export one WAV.", "/tools/audio/merge"],
-      ["Split audio", "Choose custom timestamps and download each segment.", "/tools/audio/split"],
-      ["Volume and fades", "Set gain, fade-in, and fade-out values.", "/tools/audio/volume"],
-      ["Normalize audio", "Set a peak target and preview the normalized WAV.", "/tools/audio/normalize"],
-      ["Reduce quiet noise", "Use a local broadband noise gate.", "/tools/audio/noise-gate"],
-      ["Reduce centered vocals", "Apply a basic stereo center-cancel filter.", "/tools/audio/vocal-reducer"],
-      ["Audio Studio", "Save a local audio source with trim, speed, gain, and fades.", "/projects"],
+      ["Trim audio", "Choose a section with precise start and end controls, then export WAV.", "/tools/audio/trim", "01"],
+      ["Change audio speed", "Set a custom playback rate with pitch-preserving processing.", "/tools/audio/speed", "02"],
+      ["Merge audio", "Put files in order, set a custom gap, and create one WAV.", "/tools/audio/merge", "03"],
+      ["Split audio", "Add exact split points and download the resulting segments.", "/tools/audio/split", "04"],
+      ["Volume and fades", "Set gain and shape the start or end of a recording.", "/tools/audio/volume", "05"],
+      ["Normalize audio", "Choose a custom peak target and preview the result.", "/tools/audio/normalize", "06"],
+      ["Reduce background noise", "Profile a quiet section and reduce matching noise locally.", "/tools/audio/noise-gate", "07"],
+      ["Reduce centered vocals", "Try an adjustable stereo center-cancel effect.", "/tools/audio/vocal-reducer", "08"],
+      ["Audio editor", "Open a saved local project with source range, speed, gain, and fades.", "/projects", "09"],
     ],
   },
   video: {
-    title: "Video tools",
-    description: "Trim, retime, and adjust local video, or open the multitrack editor.",
+    label: "VIDEO WORKSPACE",
+    title: "Give every frame a place.",
+    description: "Make precise video changes and open the multitrack studio when the edit needs more room.",
+    color: "video",
     tools: [
-      ["Trim video", "Choose a precise range and export a local video file.", "/tools/video/trim"],
-      ["Extract video audio", "Export a primary audio track as WAV.", "/tools/video/extract-audio"],
-      ["Change video speed", "Set a custom playback rate for a local export.", "/tools/video/speed"],
-      ["Remove video audio", "Export a muted video copy.", "/tools/video/remove-audio"],
-      ["Replace video audio", "Add a local soundtrack with a custom offset.", "/tools/video/replace-audio"],
-      ["Video Studio", "Create or reopen a local multitrack video project.", "/projects"],
+      ["Trim video", "Set a precise source range and export a local video file.", "/tools/video/trim", "01"],
+      ["Extract video audio", "Save the primary audio track as a WAV file.", "/tools/video/extract-audio", "02"],
+      ["Change video speed", "Use any supported custom playback rate for a local export.", "/tools/video/speed", "03"],
+      ["Remove video audio", "Keep the picture and export a muted video copy.", "/tools/video/remove-audio", "04"],
+      ["Replace video audio", "Add a local soundtrack and set its start offset.", "/tools/video/replace-audio", "05"],
+      ["Multitrack video editor", "Build a local edit with multiple tracks, overlays, transitions, and audio.", "/projects", "06"],
     ],
   },
   image: {
-    title: "Image tools",
-    description: "Resize, crop, enlarge, arrange, and export images locally.",
+    label: "IMAGE WORKSPACE",
+    title: "Make the image fit your idea.",
+    description: "Prepare exact dimensions, refine a composition, and export images without sending them anywhere.",
+    color: "image",
     tools: [
-      ["Image editor and resize", "Set exact pixel dimensions and make non-destructive edits.", "/tools/image/resize"],
-      ["Enlarge an image", "Use browser resampling for larger output dimensions.", "/tools/image/upscale"],
-      ["Crop image", "Choose an exact crop rectangle in source pixels.", "/tools/image/crop"],
-      ["Make a collage", "Arrange source images, add a caption, save, and export.", "/tools/image/collage"],
-      ["Image Studio", "Create or reopen a local image workspace.", "/projects"],
+      ["Image editor and resize", "Set exact pixel dimensions and make non-destructive adjustments.", "/tools/image/resize", "01"],
+      ["Upscale image", "Set custom output dimensions with local image resampling.", "/tools/image/upscale", "02"],
+      ["Crop image", "Choose a crop rectangle directly in source-image pixels.", "/tools/image/crop", "03"],
+      ["Make a collage", "Arrange, fit, and caption images on a custom canvas.", "/tools/image/collage", "04"],
+      ["Image editor project", "Open a saved local image workspace and its editable layers.", "/projects", "05"],
     ],
   },
 } as const;
 
+const categories = [
+  { key: "audio", title: "Audio editor tools", text: "Shape sound, clean recordings, adjust speed, and bring tracks together.", href: "/tools/audio", count: "09 TOOLS" },
+  { key: "video", title: "Video editor tools", text: "Make precise cuts, retime a clip, or compose a multitrack edit.", href: "/tools/video", count: "06 TOOLS" },
+  { key: "image", title: "Image tools", text: "Resize, crop, refine, and compose image projects.", href: "/tools/image", count: "05 TOOLS" },
+] as const;
+
+function Icon({ type }: { type: "audio" | "video" | "image" }) {
+  if (type === "audio") return <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 20v8m7-15v22m7-28v34m7-23v12m7-19v26m7-17v8m7-13v18" /></svg>;
+  if (type === "video") return <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="10" width="27" height="28" rx="5" /><path d="m32 20 11-7v22l-11-7z" /></svg>;
+  return <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="5" width="38" height="38" rx="8" /><circle cx="17" cy="17" r="4" /><path d="m8 36 11-11 7 7 5-5 9 9" /></svg>;
+}
+
 export function ToolDirectory({ category }: { category?: keyof typeof groups }) {
-  const selected = category ? [groups[category]] : Object.values(groups);
-  return <main className="resize-page">
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/tools">All tools</a><a href="/projects">Projects</a></nav></header>
-    <section className="resize-intro"><p className="eyebrow">PRIVATE, LOCAL MEDIA TOOLS</p><h1>{category ? groups[category].title : "Explore Local Studio tools"}</h1><p>{category ? groups[category].description : "Choose a tool for audio, video, or images. Your media stays on this device."}</p></section>
-    {selected.map((group) => <section className="resize-workspace" key={group.title} aria-label={group.title}>
-      {!category && <h2>{group.title}</h2>}
-      <div className="tool-directory-grid">{group.tools.map(([title, description, href]) => <a className="tool-card" href={href} key={title}><strong>{title}</strong><span>{description}</span><span className="tool-link">Open {title} →</span></a>)}</div>
-    </section>)}
-    <p className="resize-note">Supported formats and export options depend on the browser. Media processing and project storage run locally.</p>
+  return <main className="catalog-page">
+    <header className="site-header">
+      <a href="/" className="brand"><span className="brand-mark" aria-hidden="true">L</span>Local Studio</a>
+      <nav className="site-nav" aria-label="Main navigation"><a href="/tools">Explore tools</a><a href="/projects">Projects</a></nav>
+    </header>
+
+    {!category ? <>
+      <section className="catalog-hero">
+        <p className="hero-kicker"><span className="status-dot" /> PRIVATE, LOCAL WORKSPACES</p>
+        <h1>Choose a place<br />to <span>make something.</span></h1>
+        <p>Start with the kind of media you have. Each workspace keeps its tools together and your files on this device.</p>
+      </section>
+      <section className="category-grid catalog-category-grid" aria-label="Media workspaces">
+        {categories.map((entry) => <a className={`category-card category-${entry.key}`} href={entry.href} key={entry.key}>
+          <div className="category-card-top"><span className="category-icon"><Icon type={entry.key} /></span><span className="category-number">{entry.count}</span></div>
+          <div className="category-card-copy"><h2>{entry.title}</h2><p>{entry.text}</p></div>
+          <div className="category-card-bottom"><span>OPEN WORKSPACE</span><span className="category-arrow" aria-hidden="true">↗</span></div>
+        </a>)}
+      </section>
+    </> : (() => {
+      const group = groups[category];
+      return <>
+        <section className={`catalog-hero catalog-hero-${group.color}`}>
+          <a className="catalog-back" href="/tools">← All workspaces</a>
+          <p className="hero-kicker"><span className="status-dot" /> {group.label}</p>
+          <h1>{group.title}</h1>
+          <p>{group.description}</p>
+        </section>
+        <section className="catalog-tool-section" aria-label={`${category} editing tools`}>
+          <div className="catalog-section-head"><span>TOOLS IN THIS WORKSPACE</span><span>{String(group.tools.length).padStart(2, "0")} TOOLS</span></div>
+          <div className="catalog-tool-grid">{group.tools.map(([title, description, href, number]) => <a className="catalog-tool-card" href={href} key={title}>
+            <span className="catalog-tool-number">{number}</span>
+            <span className="catalog-tool-copy"><strong>{title}</strong><span>{description}</span></span>
+            <span className="catalog-tool-arrow" aria-hidden="true">↗</span>
+          </a>)}</div>
+        </section>
+      </>;
+    })()}
+
+    <footer className="home-footer"><span>LOCAL STUDIO</span><span>Private editing. Right on your device.</span><a href="/projects">Your projects ↗</a></footer>
   </main>;
 }

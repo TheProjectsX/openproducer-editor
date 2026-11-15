@@ -10,6 +10,10 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import type { Route } from "./+types/root";
+import "@fontsource-variable/inter";
+import "@fontsource/ubuntu/400.css";
+import "@fontsource/ubuntu/500.css";
+import "@fontsource/ubuntu/700.css";
 import "./app.css";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -20,7 +24,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#4e5fd0" />
+        <meta name="theme-color" content="#090d18" />
         <link rel="manifest" href="/manifest.webmanifest" />
         {siteUrl && <link rel="canonical" href={`${siteUrl}${location.pathname}`} />}
         <Meta />
