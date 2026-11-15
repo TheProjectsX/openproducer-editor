@@ -3,7 +3,7 @@
 **Checkpoint date:** 2026-11-15 (Asia/Dhaka)  
 **Goal status:** Resumed by the user on 2026-11-15. Continue the same Core objective.
 **Repository:** `C:\Users\Modasser Hasan\Contents\openproducer-editor`
-**Branch/commit:** `main`, starting checkpoint `50c9a98` (`M-6 Works`); drag-trim/ripple implementation is being committed in this resumed session.
+**Branch/commit:** `main`; resumed work added drag-trim/ripple (`c5e626f`) and keyboard shortcuts (`6529d85`). Imported-audio replacement is the current slice.
 
 ## Objective and guardrails
 
@@ -37,9 +37,9 @@ These are targeted results, not proof that Core is release-ready:
 
 ### 1. M6 video implementation and gate
 
-1. Directly verify the new trim handles and Video 1 ripple toggle. Check left trim preserves the end, right trim changes source-out, ripple shifts only later Video 1 clips on duration changes, undo is one step per drag, and autosave/reopen preserves the result.
-2. Resolve and verify the pending static-export artifact if it remains available; otherwise rerun the fresh static build preview, export, download, inspect streams/duration/dimensions and sync pulses, and open the file outside the app.
-3. Start a production static preview on an unused port. Direct-load **and refresh** a query URL with an existing local project; check hydration, project asset recovery, and state. Use an available browser tool for requested runtime testing. A dev server alone cannot prove offline behavior.
+1. Directly verify the new trim handles and Video 1 ripple toggle. Check left trim preserves the end, right trim changes source-out, ripple shifts only later Video 1 clips on duration changes, undo is one step per drag, and autosave/reopen preserves the result. The code typechecks/builds but pointer behavior is not manually verified yet.
+2. Resolve and verify the pending static-export artifact if it remains available; otherwise rerun the fresh static build preview, export, download, inspect streams/duration/dimensions and sync pulses, and open the file outside the app. The prior handoff artifact was not found in this session's Downloads, and `ffprobe`, FFmpeg, VLC, Playwright, Puppeteer, and the in-app CUA tool were unavailable.
+3. Start a production static preview on an unused port. Direct-load **and refresh** a query URL with an existing local project; check hydration, project asset recovery, and state. A dev server alone cannot prove offline behavior.
 4. Exercise two visual tracks and two audio tracks, overlays/title, transition, keyframes/filters, speed and pitch modes, detach/replace/mix controls, edit-save-refresh-reopen, and compare preview timing to external output, including boundaries and joins. Ensure unsupported codecs are rejected from parsed capability evidence.
 6. Test real service-worker installation and offline operation from the production static build/HTTPS-equivalent environment: install/cache readiness, close/reopen, direct studio navigation, edit/save/export, and update waiting/activation. Record exact environment/browser versions. If the internal browser cannot simulate required install/offline behavior, document that limitation and use an available named browser or a browser automation harness; do not call an unavailable check passed.
 

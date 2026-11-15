@@ -53,6 +53,8 @@ export default function VideoStudio() {
   const [snapThreshold, setSnapThreshold] = useState("0.1");
   const [ripplePrimaryTrack, setRipplePrimaryTrack] = useState(true);
   const [transitionDuration, setTransitionDuration] = useState("0.5");
+  const [replacementAudioAssetId, setReplacementAudioAssetId] = useState("");
+  const [replacementAudioOffset, setReplacementAudioOffset] = useState("0");
   const [exporting, setExporting] = useState(false);
   const [extractingAudio, setExtractingAudio] = useState(false);
   const [extractProgress, setExtractProgress] = useState(0);
@@ -79,6 +81,8 @@ export default function VideoStudio() {
   timelineRef.current = timeline;
   const selectedClip = timeline.clips.find((clip) => clip.id === selected);
   const selectedAsset = selectedClip && timeline.assets.find((asset) => asset.id === selectedClip.assetId);
+  const availableAudioAssets = timeline.assets.filter((asset) => asset.kind === "audio");
+  const selectedReplacementAudioAssetId = availableAudioAssets.some((asset) => asset.id === replacementAudioAssetId) ? replacementAudioAssetId : availableAudioAssets[0]?.id ?? "";
   const selectedValues = selectedClip ? evaluateClipKeyframes(selectedClip, Math.max(0, timeline.playhead - selectedClip.start)) : null;
   const selectedTransform = selectedValues?.transform ?? IDENTITY_TRANSFORM;
   const sourceFile = selectedClip ? files[selectedClip.assetId] : undefined;
@@ -303,6 +307,24 @@ export default function VideoStudio() {
   }
   async function cancelAudioExtraction() {
     if (audioConversionRef.current) await audioConversionRef.current.cancel().catch(() => undefined);
+  }
+  function replaceVideoAudio() {
+    if (!selectedClip || selectedAsset?.kind !== "video") return;
+    const assetId = selectedReplacementAudioAssetId;
+    const audioAsset = timeline.assets.find((asset) => asset.id === assetId && asset.kind === "audio");
+    const offset = Number(replacementAudioOffset);
+    if (!audioAsset) { setError("Import an audio source and select it before replacing clip audio."); return; }
+    if (!Number.isFinite(offset) || offset < 0 || offset >= clipLength(selectedClip)) { setError("Audio offset must be a valid time inside the selected video clip."); return; }
+    const sourceEnd = Math.min(audioAsset.duration, (clipLength(selectedClip) - offset) * selectedClip.speed);
+    if (sourceEnd <= 0.01) { setError("The selected video clip is too short for this audio offset."); return; }
+    const audioClip: VideoTimelineClip = { id: crypto.randomUUID(), assetId: audioAsset.id, track: -1, start: selectedClip.start + offset, sourceStart: 0, sourceEnd, speed: selectedClip.speed, volume: 1, muted: false, pitchMode: "preserve" };
+    const detachedAssetId = timeline.assets.find((asset) => asset.kind === "audio" && asset.derivedFromAssetId === selectedAsset.id)?.id;
+    applyTimelineEdit((current) => {
+      const clips = current.clips.map((clip) => clip.assetId === detachedAssetId && Math.abs(clip.start - selectedClip.start) < 0.01 ? { ...clip, muted: true } : clip);
+      const next = [...clips, audioClip];
+      return { ...current, clips: next, duration: Math.max(0, ...next.map((clip) => clip.start + clipLength(clip))) };
+    });
+    setSelected(audioClip.id); setError(""); setStatus(`Replacement audio placed on Audio 1 at ${offset.toFixed(2)} seconds into the selected video clip.`);
   }
   function removeKeyframeAtPlayhead() {
     if (!selectedClip?.keyframes?.length) return;
@@ -558,7 +580,12 @@ export default function VideoStudio() {
           <label className="speed-field">Speed <span>custom 0.1-16x</span><input type="number" min="0.1" max="16" step="any" value={selectedClip.speed} onChange={(event) => editClip(selectedClip.id, { speed: Math.max(0.1, Math.min(16, Number(event.currentTarget.value) || 1)) })} /></label>
           <label className="speed-field">Volume <span>custom 0-1x</span><input type="number" min="0" max="1" step="any" value={selectedValues?.volume ?? selectedClip.volume} onChange={(event) => editClip(selectedClip.id, { volume: Math.max(0, Math.min(1, Number(event.currentTarget.value) || 0)) })} /></label>
           {selectedClip.track < 0 && <label className="ratio-field">Audio pitch mode<select value={selectedClip.pitchMode ?? "preserve"} onChange={(event) => editClip(selectedClip.id, { pitchMode: event.currentTarget.value as "preserve" | "natural" })}><option value="preserve">Preserve pitch (default)</option><option value="natural">Natural pitch change</option></select></label>}
-          {selectedAsset?.kind === "video" && <button className="secondary-button editor-action" disabled={extractingAudio} onClick={() => void detachVideoAudio()}>Detach source audio to Audio 1</button>}
+          {selectedAsset?.kind === "video" && <div className="title-inspector">
+            <label className="ratio-field">Replacement audio<select value={selectedReplacementAudioAssetId} onChange={(event) => setReplacementAudioAssetId(event.currentTarget.value)}><option value="">Select imported audio</option>{availableAudioAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></label>
+            <label className="speed-field">Audio offset <span>custom seconds</span><input type="number" min="0" max={Math.max(0, clipLength(selectedClip) - 0.01)} step="any" value={replacementAudioOffset} onChange={(event) => setReplacementAudioOffset(event.currentTarget.value)} /></label>
+            <button className="secondary-button editor-action" disabled={!availableAudioAssets.length} onClick={replaceVideoAudio}>Replace clip audio</button>
+            <button className="editor-action" disabled={extractingAudio} onClick={() => void detachVideoAudio()}>Detach source audio to Audio 1</button>
+          </div>}
           <button className="secondary-button editor-action" onClick={addOrUpdateKeyframe}>Add/update keyframe at playhead</button>
           {selectedClip.keyframes?.some((frame) => Math.abs(frame.time - Math.max(0, Math.min(clipLength(selectedClip), timeline.playhead - selectedClip.start))) < 0.05) && <button className="editor-action" onClick={removeKeyframeAtPlayhead}>Remove keyframe at playhead</button>}
           <p className="resize-note">{selectedClip.keyframes?.length ?? 0} keyframe(s). Values interpolate linearly between keys in clip-relative seconds.</p>

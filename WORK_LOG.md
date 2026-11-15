@@ -469,4 +469,12 @@
 - Kept text and numeric input behavior intact and avoided intercepting normal Space behavior on focused buttons and links.
 - Updated the interaction specification and feature matrix. Cross-browser keyboard and screen-reader behavior still needs direct accessibility review.
 - Verification: `npm.cmd run typecheck`, production build (27 routes verified, 22 indexable, service worker generated), and `git diff --check` passed. Cross-browser key testing was not performed.
+- Commit: `6529d85 feat: add video studio keyboard shortcuts`.
+
+## 2026-11-15 — M6 imported-audio replacement
+
+- Added selected-video inspector controls to choose a local audio asset already in the project and enter a custom offset. The editor places a new editable Audio 1 clip with the selected video's speed and an in-range source duration.
+- If the selected video placement has a detached primary-audio WAV, the replacement action mutes that matching detached clip while preserving other audio clips and assets.
+- Updated the interaction spec and feature matrix. Runtime interaction, save/reopen, and export sync checks remain open.
+- Verification: `npm.cmd run typecheck`, production build (27 routes verified, 22 indexable, service worker generated), and `git diff --check` passed. Runtime interaction and output sync were not verified.
 - Commit: pending.
