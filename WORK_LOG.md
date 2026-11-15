@@ -529,3 +529,4 @@
 - Undo/redo restores the full saved edit document, so autosave continues to persist the selected range, speed/pitch mode, gain, and fades together.
 - Updated Audio Studio feature and gate notes. Route-level history and save/reopen checks are pending.
 - Verification: `npm.cmd run typecheck` passed; `npm.cmd run test:core` passed 18/18; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable) and 51 cached assets. The existing ~643 kB bundle warning and Bungee WASM dynamic-import notice remain. Route-level history and save/reopen interaction checks remain pending.
+- Follow-up: recorded the preview graph and bounded history design plus validation limits in `project_research/docs/10-decisions-and-sources.md`.
