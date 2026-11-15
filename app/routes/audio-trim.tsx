@@ -11,10 +11,9 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-function toWav(audio: AudioBuffer, startSeconds: number, endSeconds: number) {
-  const first = Math.max(0, Math.floor(startSeconds * audio.sampleRate));
-  const last = Math.min(audio.length, Math.floor(endSeconds * audio.sampleRate));
-  const frames = last - first;
+function toWav(audio: AudioBuffer, ranges: Array<[number, number]>) {
+  const frameRanges = ranges.map(([start, end]) => [Math.max(0, Math.floor(start * audio.sampleRate)), Math.min(audio.length, Math.floor(end * audio.sampleRate))] as const).filter(([start, end]) => end > start);
+  const frames = frameRanges.reduce((total, [start, end]) => total + end - start, 0);
   const channels = audio.numberOfChannels;
   const bytes = new ArrayBuffer(44 + frames * channels * 2);
   const view = new DataView(bytes);
@@ -25,7 +24,7 @@ function toWav(audio: AudioBuffer, startSeconds: number, endSeconds: number) {
   view.setUint32(28, audio.sampleRate * channels * 2, true); view.setUint16(32, channels * 2, true);
   view.setUint16(34, 16, true); text(36, "data"); view.setUint32(40, frames * channels * 2, true);
   let offset = 44;
-  for (let frame = first; frame < last; frame++) for (let channel = 0; channel < channels; channel++) {
+  for (const [first, last] of frameRanges) for (let frame = first; frame < last; frame++) for (let channel = 0; channel < channels; channel++) {
     const sample = Math.max(-1, Math.min(1, audio.getChannelData(channel)[frame]));
     view.setInt16(offset, sample < 0 ? sample * 32768 : sample * 32767, true); offset += 2;
   }
@@ -39,6 +38,8 @@ export default function AudioTrim() {
   const selectionGesture = useRef<{ pointerId: number; mode: "start" | "end" | "move" | "create"; anchor: number; start: number; end: number } | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [trimMode, setTrimMode] = useState<"keep" | "remove">("keep");
   const [audio, setAudio] = useState<AudioBuffer | null>(null);
   const [start, setStart] = useState(0);
   const [end, setEnd] = useState(0);
@@ -46,6 +47,7 @@ export default function AudioTrim() {
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [playhead, setPlayhead] = useState(0);
+  const [previewTime, setPreviewTime] = useState(0);
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
 
   async function importFile(next?: File) {
@@ -63,7 +65,17 @@ export default function AudioTrim() {
     } finally { await context.close(); setLoading(false); }
   }
 
-  const valid = Boolean(audio && Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end > start && end <= audio.duration);
+  const selectedDuration = end - start;
+  const outputDuration = trimMode === "keep" ? selectedDuration : (audio?.duration ?? 0) - selectedDuration;
+  const valid = Boolean(audio && Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end > start && end <= audio.duration && outputDuration > 0);
+  const ranges: Array<[number, number]> = trimMode === "keep" ? [[start, end]] : [[0, start], [end, audio?.duration ?? end]];
+
+  useEffect(() => {
+    if (!audio || !valid) { setPreviewUrl(""); return; }
+    const nextUrl = URL.createObjectURL(toWav(audio, ranges));
+    setPreviewUrl(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [audio, start, end, trimMode, valid]);
 
   useEffect(() => {
     const canvas = timeline.current, context = canvas?.getContext("2d");
@@ -73,18 +85,18 @@ export default function AudioTrim() {
     context.fillStyle = "#0b1320"; context.fillRect(0, 0, width, height);
     const left = Math.max(0, Math.min(width, start / audio.duration * width));
     const right = Math.max(left, Math.min(width, end / audio.duration * width));
-    context.fillStyle = "#183042"; context.fillRect(left, 0, Math.max(0, right - left), height);
+    context.fillStyle = trimMode === "keep" ? "#183042" : "#432533"; context.fillRect(left, 0, Math.max(0, right - left), height);
     const samples = audio.getChannelData(0), step = Math.max(1, Math.floor(samples.length / width));
     for (let x = 0; x < width; x++) {
       let peak = 0;
       const from = x * step;
       for (let i = from; i < Math.min(samples.length, from + step); i++) peak = Math.max(peak, Math.abs(samples[i]));
-      context.fillStyle = x >= left && x <= right ? "#65d3b1" : "#425571";
+      context.fillStyle = x >= left && x <= right ? trimMode === "keep" ? "#65d3b1" : "#ff8794" : "#425571";
       const amplitude = Math.max(1, peak * height * .43), center = height / 2;
       context.fillRect(x, center - amplitude, 1, amplitude * 2);
     }
     context.fillStyle = "#f1f6ff"; context.fillRect(left - 1, 0, 2, height); context.fillRect(right - 1, 0, 2, height);
-  }, [audio, start, end]);
+  }, [audio, start, end, trimMode]);
 
   function timeFromPointer(event: React.PointerEvent<HTMLCanvasElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -112,22 +124,18 @@ export default function AudioTrim() {
       setStart(nextStart); setEnd(nextStart + length);
     }
   }
-  function preview() {
-    if (!player.current || !valid) return;
-    player.current.currentTime = start; setPlayhead(start); stopAt.current = end; void player.current.play().then(() => setPlaying(true)).catch(() => setError("Audio playback was blocked. Press Play again to start the preview."));
-  }
   function togglePlayback() {
     if (!player.current || !valid) return;
     if (!player.current.paused) { player.current.pause(); setPlaying(false); return; }
-    if (player.current.currentTime < start || player.current.currentTime >= end) player.current.currentTime = start;
-    stopAt.current = end;
+    if (player.current.currentTime >= outputDuration) { player.current.currentTime = 0; setPreviewTime(0); setPlayhead(trimMode === "keep" ? start : 0); }
+    stopAt.current = outputDuration;
     void player.current.play().then(() => setPlaying(true)).catch(() => setError("Audio playback was blocked. Press Play again to start the preview."));
   }
   function exportSelection() {
     if (!audio || !file || !valid) return;
-    const result = URL.createObjectURL(toWav(audio, start, end));
+    const result = URL.createObjectURL(toWav(audio, ranges));
     const link = document.createElement("a"); link.href = result;
-    link.download = `${file.name.replace(/\.[^.]+$/, "")}-trimmed.wav`; link.click(); URL.revokeObjectURL(result);
+    link.download = `${file.name.replace(/\.[^.]+$/, "")}-${trimMode === "keep" ? "selection" : "selection-removed"}.wav`; link.click(); window.setTimeout(() => URL.revokeObjectURL(result), 1000);
   }
 
   return <main className={`resize-page audio-trim-page${audio ? " has-media" : ""}`}>
@@ -136,18 +144,18 @@ export default function AudioTrim() {
     {!audio ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importFile(next)} error={error} /> : <section className="resize-workspace" aria-label="Audio trimming workspace">
       <div className="resize-controls">
         <label className="file-picker"><span>{file ? "Choose another audio file" : "Choose an audio file"}<input type="file" accept="audio/*" onChange={(event) => void importFile(event.currentTarget.files?.[0])} /></span></label>
-        {audio && <p className="source-info">{file?.name} · {audio.duration.toFixed(2)} s · {audio.sampleRate} Hz · {audio.numberOfChannels} channel(s)</p>}
-        <div className="dimension-fields"><label>Start <span>seconds</span><input type="number" min="0" max={audio?.duration} step="0.01" value={start} onChange={(event) => setStart(event.currentTarget.valueAsNumber)} /></label><label>End <span>seconds</span><input type="number" min="0" max={audio?.duration} step="0.01" value={end} onChange={(event) => setEnd(event.currentTarget.valueAsNumber)} /></label></div>
-        <p className="resize-note">{valid ? `Selection length: ${(end - start).toFixed(2)} s` : "Enter a valid start and end time."}</p>
-        <button className="export-button" type="button" disabled={!valid || loading} onClick={preview}>Preview selection</button>
-        <button className="export-button secondary-button" type="button" disabled={!valid || loading} onClick={exportSelection}>Download trimmed WAV</button>
+        {audio && <p className="source-info">{file?.name} · {audio.duration.toFixed(3)} s · {audio.sampleRate} Hz · {audio.numberOfChannels} channel(s)</p>}
+        <fieldset className="trim-mode-toggle"><legend>Trim action</legend><label><input type="radio" name="trim-mode" checked={trimMode === "keep"} onChange={() => setTrimMode("keep")} />Keep only selection</label><label><input type="radio" name="trim-mode" checked={trimMode === "remove"} onChange={() => setTrimMode("remove")} />Remove only selection</label></fieldset>
+        <div className="dimension-fields"><label>Start <span>seconds</span><input type="number" min="0" max={audio?.duration} step="0.001" value={start.toFixed(3)} onChange={(event) => setStart(event.currentTarget.valueAsNumber)} /></label><label>End <span>seconds</span><input type="number" min="0" max={audio?.duration} step="0.001" value={end.toFixed(3)} onChange={(event) => setEnd(event.currentTarget.valueAsNumber)} /></label></div>
+        <p className="resize-note">{valid ? `Selected: ${selectedDuration.toFixed(3)} s · Output: ${outputDuration.toFixed(3)} s` : "Select a valid range that leaves audio to export."}</p>
+        <button className="export-button secondary-button" type="button" disabled={!valid || loading} onClick={exportSelection}>Download {trimMode === "keep" ? "selection" : "edited audio"} WAV</button>
         {loading && <p role="status" className="resize-note">Loading and decoding audio…</p>}{error && <p role="alert" className="resize-error">{error}</p>}
-        {url && <audio ref={player} className="media-source-hidden" src={url} onTimeUpdate={(event) => { const time = event.currentTarget.currentTime; setPlayhead(time); if (stopAt.current !== null && time >= stopAt.current) { event.currentTarget.pause(); stopAt.current = null; setPlaying(false); } }} onPause={() => { stopAt.current = null; setPlaying(false); }} onEnded={() => setPlaying(false)} />}
+        {previewUrl && <audio ref={player} className="media-source-hidden" src={previewUrl} onTimeUpdate={(event) => { const time = event.currentTarget.currentTime; setPreviewTime(time); setPlayhead(trimMode === "keep" ? start + time : time < start ? time : time + selectedDuration); if (stopAt.current !== null && time >= stopAt.current) { event.currentTarget.pause(); stopAt.current = null; setPlaying(false); } }} onPause={() => { stopAt.current = null; setPlaying(false); }} onEnded={() => setPlaying(false)} />}
       </div>
-      <div className="resize-preview audio-trim-preview"><div className="preview-heading"><strong>Waveform timeline</strong><span>{valid ? `${start.toFixed(2)} — ${end.toFixed(2)} s · ${(end - start).toFixed(2)} s selected` : "Adjust selection"}</span></div>
-        <div className="timeline-time-labels"><span>00:00</span><span>{audio.duration.toFixed(2)} s</span></div>
+      <div className="resize-preview audio-trim-preview"><div className="preview-heading"><strong>Source waveform</strong><span>{valid ? `${start.toFixed(3)} — ${end.toFixed(3)} s · ${trimMode === "keep" ? "kept" : "removed"}` : "Adjust selection"}</span></div>
+        <div className="timeline-time-labels"><span>0.000 s</span><span>{audio.duration.toFixed(3)} s</span></div>
         <div className="audio-waveform-stage"><canvas ref={timeline} className="audio-trim-waveform" role="img" aria-label="Waveform timeline. Drag near either edge to trim, drag inside the selected range to move it, or drag outside to choose a new range." onPointerDown={beginSelection} onPointerMove={moveSelection} onPointerUp={(event) => { if (selectionGesture.current?.pointerId === event.pointerId) selectionGesture.current = null; }} onPointerCancel={(event) => { if (selectionGesture.current?.pointerId === event.pointerId) selectionGesture.current = null; }} />{audio.duration > 0 && <span className="waveform-playhead" style={{ left: `${playhead / audio.duration * 100}%` }} aria-hidden="true" />}</div>
-        <div className="custom-transport"><button type="button" className="transport-play" onClick={togglePlayback} aria-label={playing ? "Pause preview" : "Play preview"}>{playing ? "Ⅱ" : "▶"}</button><span className="transport-time">{playhead.toFixed(2)} / {audio.duration.toFixed(2)} s</span><input className="transport-scrub" type="range" min="0" max={audio.duration} step="0.01" value={playhead} aria-label="Preview playhead" onChange={(event) => { const time = event.currentTarget.valueAsNumber; setPlayhead(time); if (player.current) player.current.currentTime = time; }} /></div>
+        <div className="trim-result-preview"><div className="preview-heading"><strong>Edited audio preview</strong><span>{previewUrl ? `${outputDuration.toFixed(3)} s · updates with your selection` : "Preparing preview…"}</span></div><div className="custom-transport"><button type="button" className="transport-play" onClick={togglePlayback} aria-label={playing ? "Pause preview" : "Play preview"}>{playing ? "Ⅱ" : "▶"}</button><span className="transport-time">{previewTime.toFixed(3)} / {outputDuration.toFixed(3)} s</span><input className="transport-scrub" type="range" min="0" max={outputDuration || 1} step="0.001" value={Math.min(previewTime, outputDuration)} aria-label="Edited audio preview playhead" onChange={(event) => { const time = event.currentTarget.valueAsNumber; setPreviewTime(time); setPlayhead(trimMode === "keep" ? start + time : time < start ? time : time + selectedDuration); if (player.current) player.current.currentTime = time; }} /></div></div>
       </div>
     </section>}
   </main>;

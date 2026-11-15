@@ -594,3 +594,10 @@
 - Replaced the misleading standalone editor headers with a shared navigation header: linked Home and media-workspace breadcrumbs, the current tool name, and hover/focus/click dropdowns for audio, video, and image tools.
 - Added the Creative Studio breadcrumb at the multitrack editor route while keeping it outside the Video Tools category. Existing project and storage headers remain unchanged.
 - Verification: `npm.cmd run typecheck` passed. Browser pointer, keyboard, and narrow-screen navigation review remains pending.
+
+## 2026-11-15 — Audio Trim: keep or remove selection
+
+- Added Keep only selection and Remove only selection modes to Audio Trim. The output WAV is assembled from one or two source ranges, so removing a middle selection joins the surrounding audio.
+- The edited WAV preview refreshes when the selection or mode changes and has its own app transport and seek control. The source waveform indicates the selected region as kept or removed.
+- Time fields, waveform labels, status, and preview transport now display three decimal places; time fields use a 1 ms step.
+- Verification: `npm.cmd run typecheck` and `git diff --check` passed. Playback and export interaction review remains pending.
