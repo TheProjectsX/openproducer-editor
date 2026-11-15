@@ -35,6 +35,7 @@ function pcmToWav(left: Float32Array, right: Float32Array, sampleRate: number) {
 
 export default function AudioSpeed() {
   const nodeRef = useRef<BungeeNode | null>(null);
+  const nodeListenersRef = useRef<Array<() => void>>([]);
   const moduleRef = useRef<WebAssembly.Module | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -42,11 +43,14 @@ export default function AudioSpeed() {
   const [sampleRate, setSampleRate] = useState(0);
   const [speed, setSpeed] = useState(1);
   const [ready, setReady] = useState(false);
+  const [playhead, setPlayhead] = useState(0);
+  const [playing, setPlaying] = useState(false);
   const [working, setWorking] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => () => {
+    nodeListenersRef.current.forEach((unsubscribe) => unsubscribe());
     nodeRef.current?.close();
     void contextRef.current?.close();
   }, []);
@@ -55,6 +59,7 @@ export default function AudioSpeed() {
     if (!next) return;
     if (!next.type.startsWith("audio/")) { setError("Choose an audio file."); return; }
     setWorking(true); setError(""); setReady(false); setStatus("Decoding audio locally…");
+    nodeListenersRef.current.forEach((unsubscribe) => unsubscribe()); nodeListenersRef.current = [];
     nodeRef.current?.close(); nodeRef.current = null;
     await contextRef.current?.close();
     try {
@@ -69,7 +74,11 @@ export default function AudioSpeed() {
       node.load(decoded.length, [{ id: "source", left, right }]);
       node.node.connect(context.destination);
       node.setSpeed(speed);
-      nodeRef.current = node; setFile(next); setDuration(decoded.duration); setSampleRate(decoded.sampleRate); setReady(true); setStatus("Ready. Audio remains on this device.");
+      nodeRef.current = node; setFile(next); setDuration(decoded.duration); setSampleRate(decoded.sampleRate); setPlayhead(0); setPlaying(false); setReady(true); setStatus("Ready. Audio remains on this device.");
+      nodeListenersRef.current = [
+        node.on("position", (report) => { setPlayhead(Math.max(0, Math.min(decoded.duration, report.position / decoded.sampleRate))); setPlaying(report.playing); }),
+        node.on("ended", () => { setPlayhead(decoded.duration); setPlaying(false); }),
+      ];
     } catch (cause) {
       const reason = cause instanceof Error ? cause.message : "Unknown processing error";
       setError(`Could not prepare this file for pitch-preserved playback: ${reason}`);
@@ -139,7 +148,7 @@ export default function AudioSpeed() {
         {!exportFitsMemory && <p className="resize-error" role="alert">Estimated WAV output exceeds the 512 MB prototype limit. Use a shorter clip or a faster rate.</p>}
         {status && <p className="resize-note" role="status">{status}</p>}{error && <p className="resize-error" role="alert">{error}</p>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Speed preview</strong><span>{ready ? `${speed}×` : "Choose audio to begin"}</span></div><div className="empty-preview audio-preview"><strong>{ready ? "Pitch-preserved audio is ready" : "Audio will be processed locally"}</strong><span>Set a custom speed, preview, then export a WAV.</span></div></div>
+      <div className="resize-preview"><div className="preview-heading"><strong>Speed preview</strong><span>{ready ? `${speed}× · pitch preserved` : "Choose audio to begin"}</span></div>{ready ? <div className="audio-speed-player"><div className="custom-audio-art"><span className="custom-audio-glyph" aria-hidden="true">♫</span><div className="custom-audio-copy"><span className="custom-audio-label">LOCAL AUDIO</span><strong>{file?.name}</strong><small>Pitch-preserved preview · {duration.toFixed(2)} s source</small></div></div><div className="custom-media-transport"><button type="button" className="transport-play" aria-label={playing ? "Pause speed preview" : "Play speed preview"} onClick={() => { const node = nodeRef.current; if (!node) return; if (playing) node.pause(); else { if (playhead >= duration) { node.seek(0); setPlayhead(0); } node.play(); } }}>{playing ? "Ⅱ" : "▶"}</button><span className="transport-time">{playhead.toFixed(2)} / {duration.toFixed(2)} s</span><input className="transport-scrub" type="range" min="0" max={duration} step="any" value={Math.min(playhead, duration)} aria-label="Pitch-preserved audio timeline" onChange={(event) => { const time = event.currentTarget.valueAsNumber; setPlayhead(time); nodeRef.current?.seek(Math.round(time * sampleRate)); }} /></div></div> : <div className="empty-preview">Choose an audio file to begin.</div>}</div>
     </section>}
   </main>;
 }

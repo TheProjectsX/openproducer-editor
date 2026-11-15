@@ -392,11 +392,12 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .custom-media-preview { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px; border: 1px solid #2b3c54; border-radius: 10px; background: #0b1320; }
 .custom-video-stage { min-height: 160px; max-height: 48vh; display: grid; place-items: center; overflow: hidden; border-radius: 7px; background: radial-gradient(ellipse at center, #1b2a40, #060a11 78%); }
 .custom-video-stage video { display: block; max-width: 100%; max-height: 46vh; object-fit: contain; }
-.custom-audio-art { min-height: 150px; display: grid; grid-template-columns: 50px 1fr; grid-template-rows: 1fr 56px; align-items: center; gap: 7px 14px; padding: 16px 18px; overflow: hidden; border: 1px solid #24364e; border-radius: 8px; background: radial-gradient(ellipse at 18% 20%, #15344a 0, transparent 55%), linear-gradient(140deg, #101c2d, #0c1421); }
-.custom-audio-glyph { width: 46px; height: 46px; display: grid; place-items: center; border: 1px solid #4c8f9a; border-radius: 13px; background: #16313a; color: #83e3d3; font-size: 25px; }
+.custom-audio-art { min-height: 150px; display: grid; grid-template-columns: 54px minmax(0, 1fr); align-items: center; gap: 16px; padding: 20px; overflow: hidden; border: 1px solid #24364e; border-radius: 8px; background: radial-gradient(ellipse at 18% 20%, #15344a 0, transparent 55%), linear-gradient(140deg, #101c2d, #0c1421); }
+.custom-audio-glyph { width: 50px; height: 50px; display: grid; place-items: center; border: 1px solid #4c8f9a; border-radius: 15px; background: linear-gradient(145deg, #1c4548, #132b3c); box-shadow: 0 0 0 8px #1b424322; color: #a0f0df; font-size: 24px; }
 .custom-audio-label { color: #8195ad; font-size: 9px; font-weight: 700; letter-spacing: .16em; }
-.custom-audio-bars { grid-column: 1 / -1; height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 3px; overflow: hidden; }
-.custom-audio-bars i { flex: 1; height: var(--bar); max-height: 100%; border-radius: 3px; background: linear-gradient(180deg, #6ed8c6, #377aa0); opacity: .78; }
+.custom-audio-copy { min-width: 0; display: grid; gap: 6px; }
+.custom-audio-copy strong { overflow: hidden; color: #e6f0ff; font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.custom-audio-copy small { color: #8195ad; font-size: 10px; }
 .custom-media-transport { display: grid; grid-template-columns: 40px max-content minmax(90px, 1fr); align-items: center; gap: 11px; }
 .custom-media-transport .transport-time { color: #a5b5c9; font-size: 11px; font-variant-numeric: tabular-nums; }
 .custom-media-transport .transport-time i { padding: 0 4px; color: #586b84; font-style: normal; }
