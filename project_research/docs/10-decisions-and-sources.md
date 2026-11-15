@@ -156,3 +156,11 @@ Added `sync-markers-24fps.mp4`, a synthetic four-second H.264/AAC fixture with a
 - The post-hydration-fix production build was previewed on localhost port 4177. A new project with sync-marker video/audio, transparent image and text overlays, detached audio, and 320×180/24 fps output rendered a downloadable MP4 link on initial load. The output was not downloaded before the user asked to pause.
 - A preceding static preview export was inspected externally: H.264/AAC, 320×180, 24 fps, 5.013 s; FFmpeg decoded all streams and VLC exited successfully. Narrow-band pulse peaks were measured at approximately 1.001, 2.001, and 3.001 seconds.
 - All task-started local preview/development sessions were stopped. The development server does not serve `/sw.js`; service-worker install, offline reload, and offline export remain unverified. No result here closes M6 or establishes support for a named browser/OS combination.
+
+## M6 trim, ripple, reload, and offline route check (2026-11-15)
+
+- Environment: production static preview at `127.0.0.1:4178`, isolated headless Chrome 157.0.8103.79 on Windows, with two local video fixtures: H.264/AAC MP4 (4.000 s) and VP9/Opus WebM (4.008 s). The service worker was installed from the generated production build and controlled the studio page.
+- At 60 px/s, dragging the first clip's right handle 30 px left changed its timeline width from 240 px (4.0 s) to 210 px (3.5 s) and moved the following Video 1 clip from 240 px to 210 px. Ctrl+Z restored both positions with one action.
+- Dragging the first clip's left handle 30 px right moved its timeline start from 0 to 0.5 s and reduced its width to 210 px, preserving the prior 4.0 s end. The following clip stayed at 4.0 s. Refresh restored those positions; no route alerts appeared.
+- With the service worker controlling the project page, network emulation was switched offline and the direct project URL was force-reloaded. The Video Studio shell and both locally persisted fixture clips reopened without alerts.
+- A following offline export attempt disconnected the isolated headless Chrome DevTools target before output metadata could be collected. It is not an export pass. Offline editing/saving and offline export remain open; this local headless check does not establish installed-device or cross-browser support.
