@@ -634,3 +634,10 @@
 - Pinned model revision `0e95d93e454cf6b5de9bdf5a1c9e7ec340d38231`; bundled 2.4 MB FP16 and 4.9 MB FP32 model assets plus the BSD-3-Clause license. Added `.onnx` files to the service-worker asset precache so installation includes the model.
 - Documented that generative enhancement can invent texture and requires review. Updated the feature matrix and decision log with source, design choice, and validation limits.
 - Verification: `npm.cmd run typecheck` passed; `npm.cmd run build` passed and verified 27 prerendered routes. The generated worker precaches both model files (105 assets total). WebGPU/CPU inference, visual quality, alpha edges, memory ceiling, and offline browser interaction remain to validate.
+
+## 2026-11-15 — Video Replace Audio multitrack mix
+
+- Reworked Replace Audio into a source-video audio controller plus multiple added audio lanes. The source video audio is extracted locally to a 48 kHz waveform; added lanes show waveforms, have typed offset and dB controls, can be enabled/removed, and can be moved by dragging them on the timeline.
+- Corrected export so enabled lanes are actually rendered together into one AAC audio track instead of being muxed as separate selectable tracks. A light compressor reduces clipping; AAC encoder capability is checked before work. Export result replaces the source video in the custom preview. Processing UI communicates the mix render stages.
+- Added memory limits: eight added tracks, 128 MiB aggregate added audio, eight-minute source duration, and 192 MiB PCM output buffer. Documented the current constraints and Mediabunny API sources in the feature matrix and decision log.
+- Verification: `npm.cmd run typecheck` passed. `npm.cmd run build` passed and verified 27 prerendered routes with 106 service-worker assets. Listening, real-world source combinations, output file playback, AAC capability failures, and memory use remain pending browser validation.

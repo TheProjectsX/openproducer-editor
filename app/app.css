@@ -463,9 +463,27 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .merge-timeline-clip { min-width: 92px; height: 48px; display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; padding: 6px 9px; border: 1px solid #4d8f86; border-radius: 6px; background: linear-gradient(120deg, #194a48, #17374c); color: #ddfff7; }
 .merge-timeline-clip strong, .merge-timeline-clip small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.merge-timeline-clip strong { font-size: 11px; }.merge-timeline-clip small { color: #9bc6c1; font-size: 9px; }
 .replace-audio-timeline { display: grid; gap: 10px; padding-top: 4px; }
-.replace-lane { position: relative; height: 52px; overflow: hidden; border: 1px solid #2b405a; border-radius: 7px; background: #0b1320; }
+.replace-lane { position: relative; min-height: 52px; overflow: hidden; border: 1px solid #2b405a; border-radius: 7px; background: #0b1320; }
 .replace-video-lane { position: absolute; inset: 5px; display: flex; align-items: start; padding: 4px 6px; border: 1px solid #3e5b80; border-radius: 4px; color: #93b4e6; font-size: 8px; font-weight: 700; letter-spacing: .12em; }
 .replace-audio-lane { position: absolute; top: 19px; bottom: 5px; z-index: 1; display: flex; align-items: center; overflow: hidden; padding: 0 7px; border: 1px solid #4a9a86; border-radius: 4px; background: linear-gradient(90deg, #205e55, #246e79); color: #d8fff5; font-size: 8px; font-weight: 700; letter-spacing: .12em; white-space: nowrap; }
+.replace-audio-lane:not(.source-audio-lane) { bottom: auto; height: 14px; cursor: grab; touch-action: none; }
+.replace-audio-lane:not(.source-audio-lane):active { cursor: grabbing; }
+.source-audio-lane { top: 19px; bottom: auto; height: 17px; background: linear-gradient(90deg, #24436b, #315b8c); border-color: #5c82b4; color: #e6f0ff; }
+.replace-audio-lane.mix-track-color-0 { background: linear-gradient(90deg, #205e55, #246e79); }
+.replace-audio-lane.mix-track-color-1 { background: linear-gradient(90deg, #654a24, #8b6530); border-color: #c39551; }
+.replace-audio-lane.mix-track-color-2 { background: linear-gradient(90deg, #4c3769, #674c87); border-color: #9674bc; }
+.replace-audio-lane.mix-track-color-3 { background: linear-gradient(90deg, #6d3547, #8d4359); border-color: #c8778d; }
+.mix-controller, .mix-track-panel { min-width: 0; display: grid; gap: 10px; padding: 12px; border: 1px solid #293d56; border-radius: 9px; background: #0d1624; }
+.mix-controller legend, .mix-track-panel legend { padding: 0 6px; color: #d9e6f7; font-size: 11px; font-weight: 700; }
+.mix-controller .resize-note { margin: 0; }
+.mix-track-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mix-track-name { overflow: hidden; color: #d9e6f7; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.mix-track-wave, .source-audio-wave { display: grid; gap: 8px; }
+.mix-track-wave .custom-media-preview, .source-audio-wave .custom-media-preview { width: 100%; }
+.source-audio-wave, .mix-preview-lanes { margin-top: 12px; padding: 12px; border: 1px solid #293d56; border-radius: 9px; background: #0d1624; }
+.mix-preview-lanes { display: grid; gap: 10px; }
+.mix-preview-lane { display: grid; gap: 6px; color: #91a6c1; font-size: 10px; }
+.mix-preview-lane canvas { max-height: 68px; }
 
 /* Keep focused editors on the available screen after a source is loaded. */
 .resize-page.has-media { height: 100dvh; min-height: 0; display: flex; flex-direction: column; overflow: auto; padding-bottom: 10px; }
