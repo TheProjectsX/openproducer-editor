@@ -514,4 +514,11 @@
 - Added a deterministic CC0 noisy-tone fixture and a Core check that confirms background RMS reduction while retaining the 440 Hz tone.
 - Production browser check on Chrome 157: 4-second fixture produced a 4-second 48 kHz mono WAV; noise-only RMS fell to 3.9% of the source and tone-region RMS stayed at 88.4%. Repeated from a service-worker-controlled tab with the network offline and received the same-format WAV without an alert.
 - Typecheck passed, Core suite passed 18/18, and production build/static verification passed (27 routes, 22 indexable, 51 cached assets). Worker cancellation timing and external-listener quality review remain open.
-- Commit: `07da27c fix: explain detached audio speed behavior`.
+- Commit: `de6183c feat: add worker-based spectral noise reduction`.
+
+## 2026-11-15 — Audio Studio preview effect parity
+
+- Found that Audio Studio preview applied source range and playback speed but ignored saved gain, fade-in, and fade-out values that are applied during WAV rendering.
+- Routed the local audio element through a lazily created Web Audio gain node. Playback schedules the selected gain and fade envelope against the current source position and custom speed; the audio source remains local and no edit is applied to the original file.
+- Updated the feature matrix and phase status. Project save/reopen, preview/export listening parity, speed boundary cases, and WAV external-player checks remain open.
+- Verification: `npm.cmd run typecheck` passed; `npm.cmd run test:core` passed 18/18; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable) and 51 cached assets. The existing ~643 kB bundle warning and Bungee WASM dynamic-import notice remain. Browser listening and project reopen checks are still pending.

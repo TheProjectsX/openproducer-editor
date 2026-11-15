@@ -30,6 +30,9 @@ export default function AudioStudio() {
   const projectId = params.get("project") ?? "";
   const waveformRef = useRef<HTMLCanvasElement>(null);
   const playerRef = useRef<HTMLAudioElement>(null);
+  const previewContextRef = useRef<AudioContext | null>(null);
+  const previewGainRef = useRef<GainNode | null>(null);
+  const previewSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const cancelRef = useRef(false);
   const [document, setDocument] = useState<AudioProjectDocument>(EMPTY);
   const [file, setFile] = useState<File | null>(null);
@@ -94,6 +97,11 @@ export default function AudioStudio() {
 
   useEffect(() => () => { if (sourceUrl) URL.revokeObjectURL(sourceUrl); }, [sourceUrl]);
   useEffect(() => () => { if (resultUrl) URL.revokeObjectURL(resultUrl); }, [resultUrl]);
+  useEffect(() => () => {
+    previewSourceRef.current?.disconnect();
+    previewGainRef.current?.disconnect();
+    void previewContextRef.current?.close();
+  }, []);
 
   const sourceLength = document.sourceEnd - document.sourceStart;
   const outputDuration = sourceLength > 0 && document.speed > 0 ? sourceLength / document.speed : 0;
@@ -128,11 +136,51 @@ export default function AudioStudio() {
     setDocument((current) => ({ ...current, [key]: value })); setResultUrl("");
   }
 
+  function ensurePreviewGraph(player: HTMLAudioElement) {
+    let context = previewContextRef.current;
+    if (!context) {
+      context = new AudioContext();
+      const gain = context.createGain();
+      const source = context.createMediaElementSource(player);
+      source.connect(gain).connect(context.destination);
+      previewContextRef.current = context;
+      previewGainRef.current = gain;
+      previewSourceRef.current = source;
+    }
+    return context;
+  }
+
   function preview() {
     const player = playerRef.current; if (!player || !valid) return;
+    const context = ensurePreviewGraph(player);
     player.currentTime = document.sourceStart; player.playbackRate = document.speed;
     player.preservesPitch = document.pitchMode === "preserve";
-    void player.play().catch(() => setError("Audio preview was blocked. Press Play again to allow local audio playback."));
+    void context.resume().then(() => player.play()).catch(() => setError("Audio preview was blocked. Press Play again to allow local audio playback."));
+  }
+
+  function schedulePreviewEnvelope() {
+    const player = playerRef.current;
+    if (!player || !valid || !document.speed) return;
+    const context = ensurePreviewGraph(player), gain = previewGainRef.current;
+    void context.resume().catch(() => setError("Audio preview was blocked. Press Play again to allow local audio playback."));
+    if (!gain) return;
+    const now = context.currentTime;
+    const target = 10 ** (document.gainDb / 20);
+    const elapsed = Math.max(0, (player.currentTime - document.sourceStart) / document.speed);
+    const remaining = Math.max(0, (document.sourceEnd - player.currentTime) / document.speed);
+    const fadeInRemaining = Math.max(0, document.fadeIn - elapsed);
+    const fadeOut = Math.min(document.fadeOut, remaining);
+    const fadeOutStart = Math.max(0, remaining - fadeOut);
+    const param = gain.gain;
+    param.cancelScheduledValues(now);
+    if (fadeInRemaining > 0) {
+      param.setValueAtTime(target * (elapsed / document.fadeIn), now);
+      param.linearRampToValueAtTime(target, now + fadeInRemaining);
+    } else param.setValueAtTime(target, now);
+    if (fadeOut > 0 && fadeOutStart >= fadeInRemaining) {
+      param.setValueAtTime(target, now + fadeOutStart);
+      param.linearRampToValueAtTime(0, now + remaining);
+    }
   }
 
   async function exportWav() {
@@ -211,7 +259,7 @@ export default function AudioStudio() {
         {exporting && <><p role="status" className="source-info">Rendering audio: {progress}%</p><progress max="100" value={progress} aria-label="Audio export progress" /><button className="editor-action danger" onClick={() => { cancelRef.current = true; }}>Cancel export</button></>}
         <button className="export-button" disabled={!valid || busy} onClick={() => void exportWav()}>Render WAV</button>
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-edited.wav`}>Download WAV</a>}
-        {sourceUrl && <audio ref={playerRef} className="audio-player" controls src={sourceUrl} onTimeUpdate={() => { if (playerRef.current && playerRef.current.currentTime >= document.sourceEnd) playerRef.current.pause(); }} />}
+        {sourceUrl && <audio ref={playerRef} className="audio-player" controls src={sourceUrl} onPlay={schedulePreviewEnvelope} onTimeUpdate={() => { if (playerRef.current && playerRef.current.currentTime >= document.sourceEnd) playerRef.current.pause(); }} />}
       </div>
       <div className="resize-preview"><div className="preview-heading"><strong>Audio waveform</strong><span>{buffer ? `${buffer.duration.toFixed(2)} s` : "Import audio to begin"}</span></div>{buffer ? <canvas ref={waveformRef} className="audio-waveform" aria-label="Audio waveform and selected range" /> : <div className="empty-preview">The waveform and selected range will appear here.</div>}{resultUrl && <audio className="audio-player" controls src={resultUrl} aria-label="Rendered audio preview" />}</div>
     </section>
