@@ -478,3 +478,10 @@
 - Updated the interaction spec and feature matrix. Runtime interaction, save/reopen, and export sync checks remain open.
 - Verification: `npm.cmd run typecheck`, production build (27 routes verified, 22 indexable, service worker generated), and `git diff --check` passed. Runtime interaction and output sync were not verified.
 - Commit: `4acdc15 feat: add timeline source audio replacement`.
+
+## 2026-11-15 — M6 detached-audio relationship notice
+
+- Added a selected-audio-inspector notice that identifies the source video and explains that detached audio is independent from later video speed edits.
+- Updated the interaction guidance and feature matrix to reflect the user-visible behavior.
+- Verification: `npm.cmd run typecheck`, production build (27 routes verified, 22 indexable, service worker generated), and `git diff --check` passed. No browser interaction was performed.
+- Commit: pending.
