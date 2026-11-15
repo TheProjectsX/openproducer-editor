@@ -149,11 +149,11 @@ export default function ImageCollage() {
     setImages((current) => current.map((image) => image.id === id ? { ...image, ...patch } : image));
   }
 
-  function move(index: number, direction: -1 | 1) {
-    const destination = index + direction;
+  function moveTo(index: number, destination: number) {
     if (destination < 0 || destination >= images.length) return;
-    const next = [...images]; [next[index], next[destination]] = [next[destination], next[index]]; setImages(next);
+    setImages((current) => { const next = [...current]; const [image] = next.splice(index, 1); next.splice(destination, 0, image); return next; });
   }
+  function move(index: number, direction: -1 | 1) { moveTo(index, index + direction); }
 
   async function saveProject() {
     if (!projectLoaded || !images.length || !layout.valid || !projectTitle.trim()) return;
@@ -181,7 +181,7 @@ export default function ImageCollage() {
     }, "image/png");
   }
 
-  return <main className={`resize-page${images.length ? " has-media" : ""}`}>
+  return <main className={`resize-page image-collage-page${images.length ? " has-media" : ""}`}>
     <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">IMAGE · LOCAL PROCESSING</p><h1>Make an image collage</h1><p>Add, reorder, and arrange images into a custom canvas. Everything renders locally in this browser.</p></section>
     {!images.length ? projectLoaded ? <MediaImportScreen kind="image" accept="image/*" multiple onFiles={addFiles} error={error} /> : <div className="empty-preview import-loading" role="status">Opening collage project from this device…</div> : <section className="resize-workspace image-tool-workspace">
@@ -203,7 +203,7 @@ export default function ImageCollage() {
       </div>
       <div className="resize-preview"><div className="preview-heading"><strong>Collage preview</strong><span>{images.length ? `${layout.outputWidth} × ${layout.outputHeight} px` : "Add images to begin"}</span></div>{images.length ? <canvas ref={canvasRef} className="preview-canvas" aria-label="Image collage preview" /> : <div className="empty-preview">Add two or more images to start a collage.</div>}</div>
     </section>}
-    {images.length > 0 && <section className="resize-preview image-order"><div className="preview-heading"><strong>Image order</strong><span>Reorder, edit cells, or remove source images</span></div><ol className="clip-list">{images.map((image, index) => <li key={image.id} className={selectedImage?.id === image.id ? "selected" : ""}><button type="button" className="image-layer-select" aria-pressed={selectedImage?.id === image.id} onClick={() => setSelectedImageId(image.id)}><strong>{index + 1}. {image.file.name}</strong><small>{(image.file.size / 1024 / 1024).toFixed(1)} MiB</small></button><div><button type="button" aria-label={`Move ${image.file.name} up`} disabled={index === 0} onClick={() => move(index, -1)}>↑</button><button type="button" aria-label={`Move ${image.file.name} down`} disabled={index === images.length - 1} onClick={() => move(index, 1)}>↓</button><button type="button" aria-label={`Remove ${image.file.name}`} onClick={() => { const next = images.filter((item) => item.id !== image.id); setImages(next); if (selectedImage?.id === image.id) setSelectedImageId(next[0]?.id ?? ""); }}>×</button></div></li>)}</ol>
+    {images.length > 0 && <section className="resize-preview image-order"><div className="preview-heading"><strong>Image order</strong><span>Drag to arrange · select a cell to edit</span></div><ol className="clip-list">{images.map((image, index) => <li key={image.id} draggable className={selectedImage?.id === image.id ? "selected" : ""} onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", image.id); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const draggedId = event.dataTransfer.getData("text/plain"); const sourceIndex = images.findIndex((entry) => entry.id === draggedId); if (sourceIndex >= 0) moveTo(sourceIndex, index); }}><span className="clip-drag-handle" aria-hidden="true">⠿</span><button type="button" className="image-layer-select" aria-pressed={selectedImage?.id === image.id} onClick={() => setSelectedImageId(image.id)}><strong>{index + 1}. {image.file.name}</strong><small>{(image.file.size / 1024 / 1024).toFixed(1)} MiB</small></button><div><button type="button" aria-label={`Move ${image.file.name} up`} disabled={index === 0} onClick={() => move(index, -1)}>↑</button><button type="button" aria-label={`Move ${image.file.name} down`} disabled={index === images.length - 1} onClick={() => move(index, 1)}>↓</button><button type="button" aria-label={`Remove ${image.file.name}`} onClick={() => { const next = images.filter((item) => item.id !== image.id); setImages(next); if (selectedImage?.id === image.id) setSelectedImageId(next[0]?.id ?? ""); }}>×</button></div></li>)}</ol>
       {selectedImage && <div className="filter-fields two-column transform-fields" aria-label={`Edit collage cell for ${selectedImage.file.name}`}><strong>Cell: {selectedImage.file.name}</strong><label>Cell fit<select value={selectedImage.cellFit} onChange={(event) => updateCell(selectedImage.id, { cellFit: event.currentTarget.value as ImageFile["cellFit"] })}><option value="global">Use collage default</option><option value="contain">Contain</option><option value="cover">Cover</option></select></label><label>Cell scale <span>custom 0.25–4×</span><input type="number" min="0.25" max="4" step="any" value={selectedImage.cellScale} onChange={(event) => updateCell(selectedImage.id, { cellScale: event.currentTarget.value })} /></label><label>Cell position X <span>custom −100–100%</span><input type="number" min="-100" max="100" step="any" value={selectedImage.cellOffsetX} onChange={(event) => updateCell(selectedImage.id, { cellOffsetX: event.currentTarget.value })} /></label><label>Cell position Y <span>custom −100–100%</span><input type="number" min="-100" max="100" step="any" value={selectedImage.cellOffsetY} onChange={(event) => updateCell(selectedImage.id, { cellOffsetY: event.currentTarget.value })} /></label><p className="resize-note">Scale and position adjust this image within its clipped cell. Other collage cells keep their own settings.</p></div>}
     </section>}
   </main>;

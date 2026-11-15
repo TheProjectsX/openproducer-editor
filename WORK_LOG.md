@@ -615,3 +615,9 @@
 - Video Trim's range fields and direct timeline gestures now use millisecond precision, while the linked playhead slider is also movable at 1 ms increments. Audio/video tool time readouts now show three decimal places.
 - Custom media transport displays time in seconds to three decimals.
 - Verification: `npm.cmd run typecheck` and `git diff --check` passed. Visual review at desktop and mobile sizes remains pending.
+
+## 2026-11-15 — Interactive clip ordering and collage containment
+
+- Audio Merge now supports dragging clips in both the proportional timeline and its order list. Its WAV preview is regenerated after clip order or gap changes, and the same preview is used for download.
+- Image Collage image rows can be reordered by drag and drop with keyboard-friendly move buttons retained. Added a dedicated collage page class, clipped the canvas preview to its panel, and kept the image order area below the editor without allowing the canvas to paint over it.
+- Verification: `npm.cmd run typecheck` and `git diff --check` passed. Drag/drop and image canvas visual review remain pending.

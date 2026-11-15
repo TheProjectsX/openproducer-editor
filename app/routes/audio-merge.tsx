@@ -1,7 +1,8 @@
 import { ToolPageHeader } from "../components/tool-page-header";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/audio-merge";
 import { MediaImportScreen } from "../components/media-import-screen";
+import { CustomMediaPreview } from "../components/custom-media-preview";
 
 type Clip = { file: File; audio: AudioBuffer };
 const MAX_DECODED_BYTES = 512 * 1024 * 1024;
@@ -54,7 +55,22 @@ export default function AudioMerge() {
   const [clips, setClips] = useState<Clip[]>([]);
   const [gap, setGap] = useState("0");
   const [busy, setBusy] = useState(false);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [mergedUrl, setMergedUrl] = useState("");
   const [error, setError] = useState("");
+  const dragIndex = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (clips.length < 2 || !Number.isFinite(Number(gap)) || Number(gap) < 0 || Number(gap) > 600) { setMergedUrl(""); setPreviewBusy(false); return; }
+    let generatedUrl = "";
+    setMergedUrl(""); setPreviewBusy(true);
+    const timer = window.setTimeout(() => {
+      try { generatedUrl = URL.createObjectURL(makeWav(clips, Number(gap))); setMergedUrl(generatedUrl); }
+      catch (cause) { setError(cause instanceof Error ? cause.message : "Could not build the merged preview."); }
+      finally { setPreviewBusy(false); }
+    }, 80);
+    return () => { window.clearTimeout(timer); if (generatedUrl) URL.revokeObjectURL(generatedUrl); };
+  }, [clips, gap]);
 
   async function addFiles(files: FileList | File[] | null) {
     if (!files?.length) return;
@@ -79,21 +95,9 @@ export default function AudioMerge() {
     }
   }
 
-  function moveClip(index: number, direction: -1 | 1) {
-    const destination = index + direction;
+  function moveClipTo(index: number, destination: number) {
     if (destination < 0 || destination >= clips.length) return;
-    const reordered = [...clips]; [reordered[index], reordered[destination]] = [reordered[destination], reordered[index]];
-    setClips(reordered);
-  }
-
-  function exportMerge() {
-    const gapValue = Number(gap);
-    if (clips.length < 2 || !Number.isFinite(gapValue) || gapValue < 0 || gapValue > 600) return;
-    try {
-      const result = URL.createObjectURL(makeWav(clips, gapValue));
-      const link = document.createElement("a"); link.href = result; link.download = "merged-audio.wav"; link.click();
-      window.setTimeout(() => URL.revokeObjectURL(result), 1000);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not create the merged WAV."); }
+    setClips((current) => { const reordered = [...current]; const [clip] = reordered.splice(index, 1); reordered.splice(destination, 0, clip); return reordered; });
   }
 
   return <main className={`resize-page${clips.length ? " has-media" : ""}`}>
@@ -106,9 +110,10 @@ export default function AudioMerge() {
         <label className="speed-field">Gap between clips <span>seconds · custom</span><input type="number" min="0" max="600" step="0.1" value={gap} onChange={(event) => setGap(event.currentTarget.value)} /></label>
         <p className="resize-note">Output is 16-bit PCM WAV. Different sample rates are resampled to the highest source rate; mono channels are duplicated as needed. Rendering uses browser memory.</p>
         {error && <p className="resize-error" role="alert">{error}</p>}
-        <button className="export-button" disabled={clips.length < 2 || busy || !Number.isFinite(Number(gap)) || Number(gap) < 0 || Number(gap) > 600} onClick={exportMerge}>Download merged WAV</button>
+        {previewBusy && <p className="processing-indicator" role="status"><span className="processing-spinner" />Updating merged preview…</p>}
+        {mergedUrl && <a className="export-button download-link" href={mergedUrl} download="merged-audio.wav">Download merged WAV</a>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Merge timeline</strong><span>{clips.length} loaded · {clips.reduce((sum, clip) => sum + clip.audio.duration, 0).toFixed(3)} s audio</span></div>{clips.length ? <><div className="audio-merge-timeline" role="group" aria-label="Audio clips arranged in playback order">{clips.map((clip, index) => <span key={`${clip.file.name}-${index}`} className="merge-timeline-clip" style={{ flexGrow: Math.max(.1, clip.audio.duration) }}><strong>{clip.file.name}</strong><small>{clip.audio.duration.toFixed(3)} s</small></span>)}</div><ol className="clip-list">{clips.map((clip, index) => <li key={`${clip.file.name}-${index}`}><span><strong>{index + 1}. {clip.file.name}</strong><small>{clip.audio.duration.toFixed(3)} s · {clip.audio.sampleRate} Hz</small></span><div><button type="button" aria-label={`Move ${clip.file.name} up`} disabled={index === 0} onClick={() => moveClip(index, -1)}>↑</button><button type="button" aria-label={`Move ${clip.file.name} down`} disabled={index === clips.length - 1} onClick={() => moveClip(index, 1)}>↓</button><button type="button" aria-label={`Remove ${clip.file.name}`} onClick={() => setClips(clips.filter((_, clipIndex) => clipIndex !== index))}>×</button></div></li>)}</ol></> : <div className="empty-preview">Choose two or more audio files to arrange.</div>}</div>
+      <div className="resize-preview"><div className="preview-heading"><strong>Merge timeline</strong><span>{clips.length} loaded · {clips.reduce((sum, clip) => sum + clip.audio.duration, 0).toFixed(3)} s audio</span></div>{clips.length ? <><div className="audio-merge-timeline" role="list" aria-label="Audio clips arranged in playback order">{clips.map((clip, index) => <span key={`${clip.file.name}-${index}`} className="merge-timeline-clip" style={{ flexGrow: Math.max(.1, clip.audio.duration) }} draggable onDragStart={() => { dragIndex.current = index; }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (dragIndex.current !== null) moveClipTo(dragIndex.current, index); dragIndex.current = null; }} onDragEnd={() => { dragIndex.current = null; }}><i aria-hidden="true">⠿</i><strong>{clip.file.name}</strong><small>{clip.audio.duration.toFixed(3)} s</small></span>)}</div><ol className="clip-list">{clips.map((clip, index) => <li key={`${clip.file.name}-${index}`} draggable onDragStart={() => { dragIndex.current = index; }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (dragIndex.current !== null) moveClipTo(dragIndex.current, index); dragIndex.current = null; }} onDragEnd={() => { dragIndex.current = null; }}><span className="clip-drag-handle" aria-label="Drag to reorder">⠿</span><span><strong>{index + 1}. {clip.file.name}</strong><small>{clip.audio.duration.toFixed(3)} s · {clip.audio.sampleRate} Hz</small></span><div><button type="button" aria-label={`Move ${clip.file.name} up`} disabled={index === 0} onClick={() => moveClipTo(index, index - 1)}>↑</button><button type="button" aria-label={`Move ${clip.file.name} down`} disabled={index === clips.length - 1} onClick={() => moveClipTo(index, index + 1)}>↓</button><button type="button" aria-label={`Remove ${clip.file.name}`} onClick={() => setClips((current) => current.filter((_, clipIndex) => clipIndex !== index))}>×</button></div></li>)}</ol>{mergedUrl && <div className="merge-output-preview"><div className="preview-heading"><strong>Live merged preview</strong><span>Updates after reorder and gap changes</span></div><CustomMediaPreview kind="audio" src={mergedUrl} label="Merged audio" /></div>}</> : <div className="empty-preview">Choose two or more audio files to arrange.</div>}</div>
     </section>}
   </main>;
 }
