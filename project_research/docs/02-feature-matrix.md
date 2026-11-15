@@ -28,6 +28,8 @@ Legend: **Core** = first usable release; **AI** = subsequent downloaded-model re
 | AI | Speech cleanup | Stronger model-based speech noise reduction; separate from the Core noise tool. |
 | Later | EQ, reverb, batch processing | Add only after demand and performance review. |
 
+Audio runtime check (2026-11-15): On the production static preview in Chrome 157.0.8103.79, the 4-second 48 kHz/440 Hz fixture at custom 3.7× exported offline as a 48 kHz stereo WAV with 51,892 frames (1.0811 s). Active-signal analysis measured 1.0811 s and 439.85 Hz. This exposed and fixed Bungee transport truncation: 4,096-frame render calls exhausted its 16-grain-per-call budget and yielded only about 0.597 s of tone followed by silence; the shared pitch-preserving render block is now 2,048 frames. This covers the focused speed tool in this browser only; Audio Studio project save/reopen, both pitch modes, merge boundaries, and meaningful noise reduction remain open.
+
 ## Video: basic CapCut-like editor
 
 The video timeline is a Core feature. Standalone trim/merge cards are quick-entry workflows into this editor, not replacements for it.

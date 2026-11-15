@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router";
 import type { Route } from "./+types/studio-audio";
 import { getProject, readAudioAsset, saveAudioProject, type AudioProjectDocument } from "../lib/project-store";
 import { inspectMediaFile } from "../lib/media-inspection";
+import { PITCH_PRESERVE_RENDER_CHUNK_FRAMES } from "../lib/audio-speed";
 
 const MAX_SOURCE_BYTES = 256 * 1024 * 1024;
 const MAX_BUFFER_BYTES = 512 * 1024 * 1024;
@@ -152,9 +153,9 @@ export default function AudioStudio() {
           const rightSource = (buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : buffer.getChannelData(0)).slice(first, last);
           const transport = new Transport(stretcher, inputFrames); transport.setSource("source", { left: leftSource, right: rightSource }); transport.speed = document.speed; transport.play();
           left = new Float32Array(outputFrames); right = new Float32Array(outputFrames);
-          for (let offset = 0; offset < outputFrames; offset += 4096) {
+          for (let offset = 0; offset < outputFrames; offset += PITCH_PRESERVE_RENDER_CHUNK_FRAMES) {
             if (cancelRef.current) throw new Error("Export cancelled.");
-            const length = Math.min(4096, outputFrames - offset), blockLeft = new Float32Array(length), blockRight = new Float32Array(length);
+            const length = Math.min(PITCH_PRESERVE_RENDER_CHUNK_FRAMES, outputFrames - offset), blockLeft = new Float32Array(length), blockRight = new Float32Array(length);
             transport.render(blockLeft, blockRight, length); left.set(blockLeft, offset); right.set(blockRight, offset);
             setProgress(Math.round((offset / outputFrames) * 85)); await new Promise((resolve) => setTimeout(resolve, 0));
           }

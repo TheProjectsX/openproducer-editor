@@ -2,7 +2,7 @@ import { BungeeStretcher, compileBungee, instantiateBungee, Transport } from "bu
 import wasmUrl from "bungee-web/bungee.wasm?url";
 import type { VideoTimelineAsset, VideoTimelineClip } from "./project-store";
 import { evaluateClipTransition } from "./video-keyframes";
-import { renderNaturalSpeedChunk, shouldUsePitchPreservingStretcher } from "./audio-speed";
+import { PITCH_PRESERVE_RENDER_CHUNK_FRAMES, renderNaturalSpeedChunk, shouldUsePitchPreservingStretcher } from "./audio-speed";
 
 const OUTPUT_SAMPLE_RATE = 48_000;
 const MAX_SOURCE_AUDIO_SECONDS = 180;
@@ -59,7 +59,7 @@ export async function renderTimelineAudio(
         }
         const outputFrames = Math.min(Math.ceil(sourceFrames / clip.speed), sampleCount - Math.round(clip.start * OUTPUT_SAMPLE_RATE));
         const destination = Math.max(0, Math.round(clip.start * OUTPUT_SAMPLE_RATE));
-        const chunkSize = 4096;
+        const chunkSize = PITCH_PRESERVE_RENDER_CHUNK_FRAMES;
         for (let offset = 0; offset < outputFrames; offset += chunkSize) {
           if (isCancelled()) throw new Error("Export cancelled.");
           const length = Math.min(chunkSize, outputFrames - offset);

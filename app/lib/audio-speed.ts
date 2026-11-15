@@ -1,3 +1,5 @@
+export const PITCH_PRESERVE_RENDER_CHUNK_FRAMES = 2048;
+
 export function shouldUsePitchPreservingStretcher(pitchMode: "preserve" | "natural", speed: number) {
   return pitchMode === "preserve" && Math.abs(speed - 1) > 1e-6;
 }

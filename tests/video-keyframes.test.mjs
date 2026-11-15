@@ -5,7 +5,9 @@ import { migrateProjectRecord } from "../app/lib/project-store.ts";
 import { createPcmWavHeader, encodeNormalizedPcm16, normalizationGain } from "../app/lib/audio-normalization.ts";
 import { getClipLength } from "../app/lib/video-timing.ts";
 import { createImageHistory, recordImageEdit, redoImageEdit, undoImageEdit } from "../app/lib/image-history.ts";
-import { renderNaturalSpeedChunk, shouldUsePitchPreservingStretcher } from "../app/lib/audio-speed.ts";
+import { renderNaturalSpeedChunk, shouldUsePitchPreservingStretcher, PITCH_PRESERVE_RENDER_CHUNK_FRAMES } from "../app/lib/audio-speed.ts";
+import { BungeeStretcher, Transport, compileBungee, instantiateBungee } from "bungee-web";
+import { readFile } from "node:fs/promises";
 
 const transform = (x) => ({ x, y: 0, scale: 1, rotation: 0, opacity: 1 });
 const clip = (overrides = {}) => ({
@@ -76,6 +78,41 @@ test("schema 4 source metadata survives immutable source-ID migration", () => {
 
 test("project migrations reject a future schema instead of overwriting it", () => {
   assert.throws(() => migrateProjectRecord({ id: "p2", schemaVersion: 99, title: "Future", kind: "image", createdAt: 1, updatedAt: 1 }), /cannot be opened/);
+});
+
+test("pitch-preserved 3.7× export renders its full duration and retains a 440 Hz tone", async () => {
+  const sampleRate = 48_000;
+  const sourceFrames = sampleRate * 4;
+  const source = Float32Array.from({ length: sourceFrames }, (_, frame) => Math.sin(2 * Math.PI * 440 * frame / sampleRate) * 0.5);
+  const wasmBytes = await readFile(new URL("../node_modules/bungee-web/dist/bungee.wasm", import.meta.url));
+  const module = await compileBungee(wasmBytes);
+  const wasm = await instantiateBungee(module);
+  const stretcher = new BungeeStretcher(wasm, { sampleRate, channels: 2 });
+  try {
+    const speed = 3.7;
+    const outputFrames = Math.ceil(sourceFrames / speed);
+    const transport = new Transport(stretcher, sourceFrames);
+    transport.setSource("tone", { left: source, right: source });
+    transport.speed = speed;
+    transport.play();
+    const output = new Float32Array(outputFrames);
+    for (let offset = 0; offset < outputFrames; offset += PITCH_PRESERVE_RENDER_CHUNK_FRAMES) {
+      const length = Math.min(PITCH_PRESERVE_RENDER_CHUNK_FRAMES, outputFrames - offset);
+      transport.render(output.subarray(offset, offset + length), new Float32Array(length), length);
+    }
+    let first = output.length, last = -1, crossings = 0, previous = 0;
+    for (let index = 0; index < output.length; index++) {
+      const sample = output[index];
+      if (Math.abs(sample) > 0.003) { first = Math.min(first, index); last = index; }
+      if (index > 0 && ((previous < 0 && sample >= 0) || (previous >= 0 && sample < 0))) crossings++;
+      previous = sample;
+    }
+    const activeFrames = last - first;
+    const frequency = crossings / (2 * (activeFrames / sampleRate));
+    assert.ok(activeFrames >= outputFrames - 256, `expected about ${outputFrames} active frames, received ${activeFrames}`);
+    assert.ok(Math.abs(frequency - 440) < 8, `expected pitch near 440 Hz, received ${frequency.toFixed(2)} Hz`);
+    assert.equal(transport.stats.underruns, 0);
+  } finally { stretcher.destroy(); }
 });
 
 test("peak normalization gain reaches a custom dBFS target and leaves silence unchanged", () => {

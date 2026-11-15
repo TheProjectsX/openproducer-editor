@@ -499,4 +499,11 @@
 - Added validation for each per-cell numeric value and updated the data-pipeline and feature-matrix guidance.
 - Production browser verification: exact 400×340→300×300 resize output, PNG alpha retained, original aspect mode recalculated 300×255; two-image collage changed one cell to cover/2×/35% X, saved and refreshed with the settings intact, then reloaded offline and exported 1200×900 PNG while offline.
 - `npm.cmd run typecheck` and `npm.cmd run build` passed. Build verified 27 static routes (22 indexable) and generated the service worker. External viewer/color inspection and the image-studio layer/undo/save path remain open.
+
+## 2026-11-15 — M5 pitch-preserving speed truncation fix
+
+- A production-browser check of custom 3.7× found that the 4-second 440 Hz fixture exported only 0.597 s of tone inside a 1.081 s WAV. Isolating Bungee showed 4,096-frame `Transport.render()` calls could reach the library's 16-grain limit and stop output early; 2,048-frame requests rendered the full duration with no underruns.
+- Added a shared 2,048-frame constant and applied it to Audio Speed, Audio Studio, and Video Studio timeline audio. Added a regression test using the bundled Bungee WASM, a generated four-second 440 Hz signal, and the 3.7× setting.
+- Rebuilt the production app and repeated the Audio Speed export with network disabled. The resulting WAV had 51,892 stereo frames at 48 kHz (1.0811 s), active signal for 1.0811 s, and a measured pitch of 439.85 Hz. Typecheck passed, the Core suite passed 17/17, and build/static route verification passed (27 routes; 22 indexable; 50 cached assets).
+- Other M5 gates remain open: Audio Studio save/reopen, 0.1×/16× and 5×/6× output checks, pitch-mode listening comparison, merge boundaries/rates, noise-reduction quality, and external-player inspection.
 - Commit: `07da27c fix: explain detached audio speed behavior`.

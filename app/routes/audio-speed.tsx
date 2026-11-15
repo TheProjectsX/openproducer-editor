@@ -3,6 +3,7 @@ import { BungeeNode, BungeeStretcher, compileBungee, instantiateBungee, Transpor
 import wasmUrl from "bungee-web/bungee.wasm?url";
 import workletUrl from "bungee-web/worklet?url";
 import type { Route } from "./+types/audio-speed";
+import { PITCH_PRESERVE_RENDER_CHUNK_FRAMES } from "../lib/audio-speed";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -97,7 +98,7 @@ export default function AudioSpeed() {
       const outputFrames = Math.ceil(frameCount / speed) + Math.ceil(sampleRate * 0.2);
       const resultLeft = new Float32Array(outputFrames);
       const resultRight = new Float32Array(outputFrames);
-      const chunk = 4096;
+      const chunk = PITCH_PRESERVE_RENDER_CHUNK_FRAMES;
       for (let offset = 0; offset < outputFrames; offset += chunk) {
         const length = Math.min(chunk, outputFrames - offset);
         const blockLeft = new Float32Array(length); const blockRight = new Float32Array(length);
