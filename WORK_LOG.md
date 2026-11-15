@@ -627,3 +627,10 @@
 - Video Speed now switches its preview panel to the completed speed-adjusted WebM/MP4 after recording, and exposes a custom playback/seek transport for the actual output.
 - Remove Audio now previews the muted export and includes Mediabunny's track-discard reasons in compatibility errors. Video Trim, Extract Audio, Remove Audio, and Speed show an animated progress bar with a percentage during processing.
 - Verification: `npm.cmd run typecheck` and `git diff --check` passed. Actual source-file conversion behavior still requires browser interaction with representative MP4/WebM files.
+
+## 2026-11-15 — AI image upscaling with offline model assets
+
+- Replaced plain Canvas resizing in Image Upscale with tiled Real-ESRGAN general v3 ×4 inference through ONNX Runtime Web. WebGPU is preferred; WebAssembly CPU is the fallback. Users can choose any larger output dimensions within the 50 megapixel memory limit; the source alpha is composited at the final size.
+- Pinned model revision `0e95d93e454cf6b5de9bdf5a1c9e7ec340d38231`; bundled 2.4 MB FP16 and 4.9 MB FP32 model assets plus the BSD-3-Clause license. Added `.onnx` files to the service-worker asset precache so installation includes the model.
+- Documented that generative enhancement can invent texture and requires review. Updated the feature matrix and decision log with source, design choice, and validation limits.
+- Verification: `npm.cmd run typecheck` passed; `npm.cmd run build` passed and verified 27 prerendered routes. The generated worker precaches both model files (105 assets total). WebGPU/CPU inference, visual quality, alpha edges, memory ceiling, and offline browser interaction remain to validate.
