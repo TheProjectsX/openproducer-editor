@@ -565,3 +565,8 @@
 - Added a proportional audio merge sequence above its existing reorder list so users can see clip order and relative duration at a glance.
 - Added a video/audio placement lane to Video Replace Audio. Dragging its scrub input updates the same custom offset value used by the typed field; audio length is read from local metadata when available.
 - Verification: `npm.cmd run typecheck` passed; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable), with 97 service-worker assets. Browser interaction remains pending.
+
+## 2026-11-15 — Design: Image Studio viewport gate
+
+- Corrected the Image Studio shell to enter full-screen mode only after an image has loaded. Before import, its title and source-selection screen remain visible together.
+- Verification: `npm.cmd run typecheck` passed; `git diff --check` passed.

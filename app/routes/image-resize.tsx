@@ -330,7 +330,7 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
   }
 
   return (
-    <main className={`resize-page${workspace ? " has-media" : ""}`}>
+    <main className={`resize-page${workspace && source ? " has-media" : ""}`}>
       <header className="resize-header">
         <a href="/" className="brand">Local Studio</a>
         <nav aria-label="Main navigation"><a href="/projects">Projects</a></nav>
