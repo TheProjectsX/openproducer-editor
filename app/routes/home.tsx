@@ -55,6 +55,21 @@ export default function Home() {
         </nav>
       </header>
 
+      <section className="category-section home-workspaces" aria-labelledby="category-heading">
+        <div className="category-grid">
+          {categories.map((category) => <a className={`category-card category-${category.type}`} href={category.href} key={category.type}>
+            <div className="category-card-top"><span className="category-icon"><CategoryMark type={category.type} /></span><span className="category-number">{category.number}</span></div>
+            <div className="category-card-copy"><h2>{category.title}</h2><p>{category.description}</p></div>
+            <div className="category-card-bottom"><span>{category.tools}</span><span className="category-arrow" aria-hidden="true">↗</span></div>
+          </a>)}
+        </div>
+        <a className="creative-studio-card" href="/studio/video">
+          <span className="creative-studio-mark" aria-hidden="true">✦</span>
+          <span><strong>Creative Studio</strong><small>Multitrack editing for video, audio, and images</small></span>
+          <span className="category-arrow" aria-hidden="true">↗</span>
+        </a>
+      </section>
+
       <section className="home-hero">
         <div className="hero-copy">
           <span className="hero-kicker"><span className="status-dot" /> PRIVATE BY DESIGN · READY OFFLINE</span>
@@ -73,20 +88,6 @@ export default function Home() {
           </div>
           <div className="art-chip chip-a">✳ &nbsp; LOCAL FIRST</div>
           <div className="art-chip chip-b">NO UPLOADS. NO ACCOUNTS.</div>
-        </div>
-      </section>
-
-      <section className="category-section" aria-labelledby="category-heading">
-        <div className="section-heading">
-          <div><p className="eyebrow">CHOOSE YOUR WORKSPACE</p><h2 id="category-heading">What are you working on?</h2></div>
-          <span>Three focused spaces.<br />One private studio.</span>
-        </div>
-        <div className="category-grid">
-          {categories.map((category) => <a className={`category-card category-${category.type}`} href={category.href} key={category.type}>
-            <div className="category-card-top"><span className="category-icon"><CategoryMark type={category.type} /></span><span className="category-number">{category.number}</span></div>
-            <div className="category-card-copy"><h3>{category.title}</h3><p>{category.description}</p></div>
-            <div className="category-card-bottom"><span>{category.tools}</span><span className="category-arrow" aria-hidden="true">↗</span></div>
-          </a>)}
         </div>
       </section>
 

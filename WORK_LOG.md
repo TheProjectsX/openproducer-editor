@@ -581,3 +581,10 @@
 
 - Grouped Image Resize settings into canvas size, color adjustments, transform/export, and overlay-layer panels. Canvas size and adjustments start open; less frequent export and layer settings can be collapsed.
 - Updated the feature matrix. Verification: `npm.cmd run typecheck` and `git diff --check` passed; production build passed and verified 27 prerendered routes (22 indexable), with 97 service-worker assets.
+
+## 2026-11-15 — Design: homepage workspaces and Creative Studio placement
+
+- Moved the three media workspace cards to the top of the homepage, ahead of the marketing hero.
+- Added a distinct Creative Studio shortcut for multitrack audio, video, and image editing.
+- Removed the multitrack video editor from Video Tools and linked Audio Studio and Image Studio to their actual editor routes. Updated the displayed video tool count.
+- Verification: `npm.cmd run typecheck` passed. Visual review remains pending.

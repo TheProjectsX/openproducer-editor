@@ -13,7 +13,7 @@ const groups = {
       ["Normalize audio", "Choose a custom peak target and preview the result.", "/tools/audio/normalize", "06"],
       ["Reduce background noise", "Profile a quiet section and reduce matching noise locally.", "/tools/audio/noise-gate", "07"],
       ["Reduce centered vocals", "Try an adjustable stereo center-cancel effect.", "/tools/audio/vocal-reducer", "08"],
-      ["Audio editor", "Open a saved local project with source range, speed, gain, and fades.", "/projects", "09"],
+      ["Audio editor", "Open the multitrack audio editing workspace.", "/studio/audio", "09"],
     ],
   },
   video: {
@@ -26,8 +26,7 @@ const groups = {
       ["Extract video audio", "Save the primary audio track as a WAV file.", "/tools/video/extract-audio", "02"],
       ["Change video speed", "Use any supported custom playback rate for a local export.", "/tools/video/speed", "03"],
       ["Remove video audio", "Keep the picture and export a muted video copy.", "/tools/video/remove-audio", "04"],
-      ["Replace video audio", "Add a local soundtrack and set its start offset.", "/tools/video/replace-audio", "05"],
-      ["Multitrack video editor", "Build a local edit with multiple tracks, overlays, transitions, and audio.", "/projects", "06"],
+      ["Replace video audio", "Add and mix local audio tracks against a video.", "/tools/video/replace-audio", "05"],
     ],
   },
   image: {
@@ -40,14 +39,14 @@ const groups = {
       ["Upscale image", "Set custom output dimensions with local image resampling.", "/tools/image/upscale", "02"],
       ["Crop image", "Choose a crop rectangle directly in source-image pixels.", "/tools/image/crop", "03"],
       ["Make a collage", "Arrange, fit, and caption images on a custom canvas.", "/tools/image/collage", "04"],
-      ["Image editor project", "Open a saved local image workspace and its editable layers.", "/projects", "05"],
+      ["Image editor project", "Open a saved local image workspace and its editable layers.", "/studio/image", "05"],
     ],
   },
 } as const;
 
 const categories = [
   { key: "audio", title: "Audio editor tools", text: "Shape sound, clean recordings, adjust speed, and bring tracks together.", href: "/tools/audio", count: "09 TOOLS" },
-  { key: "video", title: "Video editor tools", text: "Make precise cuts, retime a clip, or compose a multitrack edit.", href: "/tools/video", count: "06 TOOLS" },
+  { key: "video", title: "Video editor tools", text: "Make precise cuts, retime a clip, or compose a multitrack edit.", href: "/tools/video", count: "05 TOOLS" },
   { key: "image", title: "Image tools", text: "Resize, crop, refine, and compose image projects.", href: "/tools/image", count: "05 TOOLS" },
 ] as const;
 
