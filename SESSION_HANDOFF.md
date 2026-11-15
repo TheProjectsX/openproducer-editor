@@ -3,7 +3,7 @@
 **Checkpoint date:** 2026-11-15 (Asia/Dhaka)  
 **Goal status:** Resumed by the user on 2026-11-15. Continue the same Core objective.
 **Repository:** `C:\Users\Modasser Hasan\Contents\openproducer-editor`
-**Branch/commit:** `main`, latest `4acdc15` (`feat: add timeline source audio replacement`). Resumed work added drag-trim/ripple (`c5e626f`), keyboard shortcuts (`6529d85`), and imported-audio replacement (`4acdc15`).
+**Branch/commit:** `main`, latest `07da27c` (`fix: explain detached audio speed behavior`). Resumed work added drag-trim/ripple (`c5e626f`), keyboard shortcuts (`6529d85`), imported-audio replacement (`4acdc15`), and detached-audio relationship guidance (`07da27c`).
 
 ## Objective and guardrails
 

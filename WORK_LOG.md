@@ -484,4 +484,4 @@
 - Added a selected-audio-inspector notice that identifies the source video and explains that detached audio is independent from later video speed edits.
 - Updated the interaction guidance and feature matrix to reflect the user-visible behavior.
 - Verification: `npm.cmd run typecheck`, production build (27 routes verified, 22 indexable, service worker generated), and `git diff --check` passed. No browser interaction was performed.
-- Commit: pending.
+- Commit: `07da27c fix: explain detached audio speed behavior`.
