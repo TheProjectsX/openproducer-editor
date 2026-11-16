@@ -22,13 +22,15 @@ Keyframes are supported for position, scale, rotation, opacity, and volume. A pr
 
 M6 browser fixture check (2026-11-14): the current editor exposes typed source in/out and timeline-start fields, track assignment, clip move, title/effect/transform controls, keyframes, dissolve, crossfade, per-clip speed and pitch mode, detach-audio, and render. A React event-value capture bug in the playhead field and a 1× Bungee transient-loss bug were found and fixed during the local fixture run. Drag-trim handles, primary-track ripple behavior, keyboard shortcuts, and imported-audio replacement are implemented, but direct interaction verification remains open. Ripple is enabled by default on Video 1 and can be switched off; it does not move overlays or audio. Cross-browser keyboard/accessibility coverage remains an implementation or release gap; this note does not waive the interaction requirements above.
 
+Timeline coordinates use the horizontally scrolling `.timeline-scroll` viewport when seeking or moving clips, and ruler zero aligns with the start of each track lane after the sticky track-label gutter. Clip drops preserve the pointer's grab offset within the clip. Regression tests cover scrolled pointer positions, ruler alignment, and drop positioning.
+
 Quick video tools (Trim, Merge, Remove Audio, Replace Audio) create or open a Video Studio project with a focused inspector and prearranged track state. Users can switch to the full timeline without losing changes. The first release includes text titles, basic filters/color adjustments, and export controls; it does not include auto captions or an effect marketplace.
 
 ## Image resize and collage
 
 Show original width/height and editable output width/height. Default **Match aspect ratio = off**. With it off, width and height are independent and the full image stretches to the exact output canvas with no crop or padding. Example: 400×340 to 300×300 gives an exactly 300×300 file, possibly with changed proportions. With it on, changing one dimension recalculates the other using the original aspect ratio and integer rounding. Toggling it on immediately reconciles dimensions using the last-edited field. Crop is a separate explicit tool.
 
-Collage begins from a layout template but remains editable: add/remove/reorder images, adjust cell fit, spacing, background, canvas size, and text. Save cell positions and source references rather than flattening until export. Provide a before/after or original/output comparison for filters and resizing.
+Collage begins from a layout template but remains editable: add/remove/reorder images, adjust cell fit, spacing, background, canvas size, and text. Dragging a photo within its cell pans it; dragging it across a cell boundary moves it into an empty cell or swaps it with the occupied destination. Provide a keyboard-operable cell-position selector for the same move/swap behavior. Offer a compact background preset palette while retaining the custom color picker. Save cell positions and source references rather than flattening until export. Provide a before/after or original/output comparison for filters and resizing.
 
 ## AI image upscaling
 

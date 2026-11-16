@@ -16,6 +16,16 @@ const TEMPLATES = [
   { id: "tall-column", label: "Tall strip", summary: "One vertical column" },
   { id: "custom", label: "Custom grid", summary: "Choose rows and columns" },
 ] as const;
+const BACKGROUND_SWATCHES = [
+  { name: "White", color: "#ffffff" },
+  { name: "Slate", color: "#111827" },
+  { name: "Soft gray", color: "#e5e7eb" },
+  { name: "Sky", color: "#dbeafe" },
+  { name: "Cream", color: "#fef3c7" },
+  { name: "Blush", color: "#fce7f3" },
+  { name: "Mint", color: "#dcfce7" },
+  { name: "Lavender", color: "#e0e7ff" },
+] as const;
 type TemplateId = typeof TEMPLATES[number]["id"];
 const MAX_SOURCE_BYTES = 512 * 1024 * 1024;
 const MAX_OUTPUT_PIXELS = 100_000_000;
@@ -58,6 +68,10 @@ function newImageEntry(file: File, slot: number): ImageFile {
   return { id: crypto.randomUUID(), file, slot, cellFit: "global", cellScale: "1", cellOffsetX: "0", cellOffsetY: "0", rotation: "0", flipHorizontal: false, brightness: "100", contrast: "100", saturation: "100" };
 }
 
+function compactImageSlots(images: ImageFile[]): ImageFile[] {
+  return [...images].sort((left, right) => left.slot - right.slot).map((image, slot) => image.slot === slot ? image : { ...image, slot });
+}
+
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Image collage maker | Local Studio" },
@@ -74,13 +88,15 @@ export default function ImageCollage() {
   const openingSlotPicker = useRef(false);
   const selectionCanvasRef = useRef<HTMLCanvasElement>(null);
   const bitmapCache = useRef(new Map<string, { file: File; bitmap: ImageBitmap }>());
-  const cellGesture = useRef<{ id: string; pointerId: number; clientX: number; clientY: number; startX: number; startY: number; cellWidth: number; cellHeight: number } | null>(null);
+  const cellGesture = useRef<{ id: string; pointerId: number; sourceSlot: number; clientX: number; clientY: number; startX: number; startY: number; cellWidth: number; cellHeight: number; draggingCell: boolean } | null>(null);
+  const suppressStageClick = useRef(false);
   const collageStageRef = useRef<HTMLDivElement>(null);
   const pendingReplaceSlot = useRef<number | null>(null);
   const [images, setImages] = useState<ImageFile[]>([]);
   const [editorOpened, setEditorOpened] = useState(false);
   const [deletedCellCount, setDeletedCellCount] = useState(0);
   const [selectedImageId, setSelectedImageId] = useState("");
+  const [dragTargetSlot, setDragTargetSlot] = useState<number | null>(null);
   const [cellMenu, setCellMenu] = useState<{ imageId: string; x: number; y: number } | null>(null);
   const [projectTitle, setProjectTitle] = useState("Untitled collage");
   const [projectLoaded, setProjectLoaded] = useState(false);
@@ -156,6 +172,8 @@ export default function ImageCollage() {
     const slotCount = template === "custom" ? Math.max(1, minimumSlots - deletedCellCount) : Math.max(1, Math.max(minimumSlots, filledRows, ...images.map((image) => image.slot + 1)) - deletedCellCount);
     const cells = collageCells(template, slotCount, geometryColumns, outputWidth, outputHeight, gapSize);
     const occupiedSlots = new Set(images.map((image) => image.slot));
+    const imagesOutsideGrid = images.some((image) => !cells[image.slot]);
+    const gridTooSmall = template === "custom" && images.length > geometryColumns * geometryRows;
     const cellGeometryValid = cells.length >= images.length && cells.every((cell) => cell.width > 0 && cell.height > 0)
       && occupiedSlots.size === images.length && images.every((image) => Number.isInteger(image.slot) && image.slot >= 0 && image.slot < cells.length);
     const cellsValid = images.every((image) => image.cellScale.trim() !== "" && Number.isFinite(Number(image.cellScale)) && Number(image.cellScale) >= 0.25 && Number(image.cellScale) <= 4
@@ -168,13 +186,27 @@ export default function ImageCollage() {
       && Number.isInteger(Number(cornerRadius)) && Number(cornerRadius) >= 0 && Number(cornerRadius) <= 256
       && Number.isInteger(outputWidth) && outputWidth > 0 && Number.isInteger(outputHeight) && outputHeight > 0
       && outputWidth <= 32768 && outputHeight <= 32768 && outputWidth * outputHeight <= MAX_OUTPUT_PIXELS
-      && (template !== "custom" || images.length <= geometryColumns * geometryRows)
+      && !gridTooSmall && !imagesOutsideGrid
       && (!caption || (Number.isFinite(Number(captionSize)) && Number(captionSize) >= 8 && Number(captionSize) <= 512)) && cellsValid && cellGeometryValid;
-    return { columnCount, gapSize, outputWidth, outputHeight, cells, valid };
+    return { columnCount, gapSize, outputWidth, outputHeight, cells, gridTooSmall, imagesOutsideGrid, valid };
   }, [columns, rows, gap, cornerRadius, width, height, images, caption, captionSize, template, deletedCellCount]);
 
   useEffect(() => {
-    if (!layout.valid || !canvasRef.current) return;
+    if (!canvasRef.current) return;
+    if (!layout.valid) {
+      const canvas = canvasRef.current;
+      canvas.width = Math.max(1, layout.outputWidth || 1);
+      canvas.height = Math.max(1, layout.outputHeight || 1);
+      const context = canvas.getContext("2d");
+      if (context) { context.fillStyle = background; context.fillRect(0, 0, canvas.width, canvas.height); }
+      const selectionCanvas = selectionCanvasRef.current;
+      if (selectionCanvas) {
+        selectionCanvas.width = canvas.width;
+        selectionCanvas.height = canvas.height;
+        selectionCanvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      return;
+    }
     let cancelled = false;
     void (async () => {
       try {
@@ -294,6 +326,26 @@ export default function ImageCollage() {
     setImages((current) => current.map((image) => image.id === id ? { ...image, ...patch } : image));
   }
 
+  function changeTemplate(nextTemplate: TemplateId) {
+    const templateChanged = nextTemplate !== template;
+    setTemplate(nextTemplate);
+    setDeletedCellCount(0);
+    if (templateChanged) setImages((current) => compactImageSlots(current));
+  }
+
+  function changeCustomGrid(nextColumns: string, nextRows: string) {
+    const dimensionsChanged = nextColumns !== columns || nextRows !== rows;
+    setColumns(nextColumns);
+    setRows(nextRows);
+    setDeletedCellCount(0);
+    const columnCount = Number(nextColumns), rowCount = Number(nextRows);
+    if (dimensionsChanged && Number.isInteger(columnCount) && columnCount >= 1 && columnCount <= 10
+      && Number.isInteger(rowCount) && rowCount >= 1 && rowCount <= 10
+      && columnCount * rowCount >= images.length) {
+      setImages((current) => compactImageSlots(current));
+    }
+  }
+
   function moveTo(index: number, destination: number) {
     if (destination < 0 || destination >= images.length) return;
     setImages((current) => {
@@ -379,7 +431,7 @@ export default function ImageCollage() {
     if (!cell || !image) return;
     setSelectedImageId(image.id);
     setActiveSidebarPanel("cell");
-    cellGesture.current = { id: image.id, pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, startX: Number(image.cellOffsetX) || 0, startY: Number(image.cellOffsetY) || 0, cellWidth: cell.width, cellHeight: cell.height };
+    cellGesture.current = { id: image.id, pointerId: event.pointerId, sourceSlot: index, clientX: event.clientX, clientY: event.clientY, startX: Number(image.cellOffsetX) || 0, startY: Number(image.cellOffsetY) || 0, cellWidth: cell.width, cellHeight: cell.height, draggingCell: false };
     canvas.setPointerCapture(event.pointerId); event.preventDefault();
   }
   function openEmptySlot(slot: number) {
@@ -392,10 +444,42 @@ export default function ImageCollage() {
   function moveCellDrag(event: React.PointerEvent<HTMLCanvasElement>) {
     const gesture = cellGesture.current;
     if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const distance = Math.hypot(event.clientX - gesture.clientX, event.clientY - gesture.clientY);
+    const destinationSlot = stageSlotAt(event.clientX, event.clientY);
+    if (gesture.draggingCell || (distance > 8 && destinationSlot !== gesture.sourceSlot)) {
+      if (!gesture.draggingCell) {
+        gesture.draggingCell = true;
+        updateCell(gesture.id, { cellOffsetX: String(gesture.startX), cellOffsetY: String(gesture.startY) });
+      }
+      const targetSlot = destinationSlot >= 0 && destinationSlot !== gesture.sourceSlot ? destinationSlot : null;
+      setDragTargetSlot((current) => current === targetSlot ? current : targetSlot);
+      event.preventDefault();
+      return;
+    }
+    if (distance <= 2) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     const dx = (event.clientX - gesture.clientX) / bounds.width * layout.outputWidth / gesture.cellWidth * 100;
     const dy = (event.clientY - gesture.clientY) / bounds.height * layout.outputHeight / gesture.cellHeight * 100;
     updateCell(gesture.id, { cellOffsetX: String(Math.max(-100, Math.min(100, Math.round((gesture.startX + dx) * 100) / 100))), cellOffsetY: String(Math.max(-100, Math.min(100, Math.round((gesture.startY + dy) * 100) / 100))) });
+  }
+
+  function finishCellDrag(event: React.PointerEvent<HTMLCanvasElement>) {
+    const gesture = cellGesture.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    if (gesture.draggingCell) {
+      suppressStageClick.current = true;
+      window.setTimeout(() => { suppressStageClick.current = false; }, 0);
+      const destinationSlot = stageSlotAt(event.clientX, event.clientY);
+      if (destinationSlot >= 0 && destinationSlot !== gesture.sourceSlot) placeImageInSlot(gesture.id, destinationSlot);
+    }
+    cellGesture.current = null;
+    setDragTargetSlot(null);
+  }
+
+  function cancelCellDrag(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (cellGesture.current?.pointerId !== event.pointerId) return;
+    cellGesture.current = null;
+    setDragTargetSlot(null);
   }
 
   async function saveProject() {
@@ -445,29 +529,43 @@ export default function ImageCollage() {
             </li>)}</ol>
             <p className="resize-note">Drag photos onto any cell to place or replace them. Click or right-click a placed photo for its actions.</p>
           </section>}
-          {activeSidebarPanel === "layouts" && <section className="collage-sidebar-section"><p className="resize-note">Choose a layout. Empty cells stay available for photos.</p><div className="collage-template-options">{TEMPLATES.map((option) => <button type="button" key={option.id} className={template === option.id ? "active" : ""} aria-pressed={template === option.id} onClick={() => { setTemplate(option.id as TemplateId); setDeletedCellCount(0); }}><span className={`collage-template-thumb ${option.id}`} aria-hidden="true"><i /><i /><i /><i /></span><strong>{option.label}</strong><small>{option.summary}</small></button>)}</div>{template === "custom" && <div className="dimension-fields"><label>Columns <span>1–10</span><input type="number" min="1" max="10" step="1" value={columns} onChange={(event) => { setColumns(event.currentTarget.value); setDeletedCellCount(0); }} /></label><label>Rows <span>1–10</span><input type="number" min="1" max="10" step="1" value={rows} onChange={(event) => { setRows(event.currentTarget.value); setDeletedCellCount(0); }} /></label></div>}</section>}
+          {activeSidebarPanel === "layouts" && <section className="collage-sidebar-section"><p className="resize-note">Choose a layout. Empty cells stay available for photos.</p><div className="collage-template-options">{TEMPLATES.map((option) => <button type="button" key={option.id} className={template === option.id ? "active" : ""} aria-pressed={template === option.id} onClick={() => changeTemplate(option.id)}><span className={`collage-template-thumb ${option.id}`} aria-hidden="true"><i /><i /><i /><i /></span><strong>{option.label}</strong><small>{option.summary}</small></button>)}</div>{template === "custom" && <div className="dimension-fields"><label>Columns <span>1–10</span><input type="number" min="1" max="10" step="1" value={columns} onChange={(event) => changeCustomGrid(event.currentTarget.value, rows)} /></label><label>Rows <span>1–10</span><input type="number" min="1" max="10" step="1" value={rows} onChange={(event) => changeCustomGrid(columns, event.currentTarget.value)} /></label></div>}</section>}
           {activeSidebarPanel === "customize" && <section className="collage-sidebar-section">
             <div className="dimension-fields"><label>Canvas width <span>px</span><input type="number" min="1" max="32768" step="1" value={width} onChange={(event) => setWidth(event.currentTarget.value)} /></label><label>Canvas height <span>px</span><input type="number" min="1" max="32768" step="1" value={height} onChange={(event) => setHeight(event.currentTarget.value)} /></label></div>
             <label className="collage-slider-field">Spacing <span>{gap} px</span><input type="range" min="0" max="256" step="1" value={gap} onChange={(event) => setGap(event.currentTarget.value)} /><input type="number" min="0" max="256" step="1" value={gap} onChange={(event) => setGap(event.currentTarget.value)} /></label>
             <label className="collage-slider-field">Corner Rounding <span>{cornerRadius} px</span><input type="range" min="0" max="256" step="1" value={cornerRadius} onChange={(event) => setCornerRadius(event.currentTarget.value)} /><input type="number" min="0" max="256" step="1" value={cornerRadius} onChange={(event) => setCornerRadius(event.currentTarget.value)} /></label>
             <label className="ratio-field">Cell fit<select value={fit} onChange={(event) => setFit(event.currentTarget.value)}><option value="contain">Contain · show full image</option><option value="cover">Cover · crop to fill</option></select></label>
-            <label className="ratio-field">Background color<input type="color" value={background} onChange={(event) => setBackground(event.currentTarget.value)} /></label>
+            <div className="collage-background-picker"><strong>Background color</strong><div className="collage-background-swatches" aria-label="Background color presets">{BACKGROUND_SWATCHES.map((swatch) => <button type="button" key={swatch.color} className={background.toLowerCase() === swatch.color ? "active" : ""} style={{ "--swatch-color": swatch.color } as React.CSSProperties} aria-label={`${swatch.name} background`} aria-pressed={background.toLowerCase() === swatch.color} title={swatch.name} onClick={() => setBackground(swatch.color)} />)}</div><label className="collage-custom-color">Custom color<input type="color" aria-label="Choose custom background color" value={background} onChange={(event) => setBackground(event.currentTarget.value)} /></label></div>
           </section>}
-          {activeSidebarPanel === "cell" && <section className="collage-sidebar-section">{selectedImage ? <div className="collage-selected-controls"><strong>Selected cell · {selectedImage.file.name}</strong><label>Cell fit<select value={selectedImage.cellFit} onChange={(event) => updateCell(selectedImage.id, { cellFit: event.currentTarget.value as ImageFile["cellFit"] })}><option value="global">Use collage default</option><option value="contain">Contain</option><option value="cover">Cover</option></select></label><label>Cell scale · 0.25–4×<input type="number" min="0.25" max="4" step="any" value={selectedImage.cellScale} onChange={(event) => updateCell(selectedImage.id, { cellScale: event.currentTarget.value })} /></label><label>Position X · −100–100%<input type="number" min="-100" max="100" step="any" value={selectedImage.cellOffsetX} onChange={(event) => updateCell(selectedImage.id, { cellOffsetX: event.currentTarget.value })} /></label><label>Position Y · −100–100%<input type="number" min="-100" max="100" step="any" value={selectedImage.cellOffsetY} onChange={(event) => updateCell(selectedImage.id, { cellOffsetY: event.currentTarget.value })} /></label><label>Rotate · −180–180°<input type="number" min="-180" max="180" step="any" value={selectedImage.rotation} onChange={(event) => updateCell(selectedImage.id, { rotation: event.currentTarget.value })} /></label><label className="collage-check-control"><input type="checkbox" checked={selectedImage.flipHorizontal} onChange={(event) => updateCell(selectedImage.id, { flipHorizontal: event.currentTarget.checked })} />Flip horizontally</label><label>Brightness · 0–200%<input type="number" min="0" max="200" step="any" value={selectedImage.brightness} onChange={(event) => updateCell(selectedImage.id, { brightness: event.currentTarget.value })} /></label><label>Contrast · 0–200%<input type="number" min="0" max="200" step="any" value={selectedImage.contrast} onChange={(event) => updateCell(selectedImage.id, { contrast: event.currentTarget.value })} /></label><label>Saturation · 0–200%<input type="number" min="0" max="200" step="any" value={selectedImage.saturation} onChange={(event) => updateCell(selectedImage.id, { saturation: event.currentTarget.value })} /></label><button type="button" className="secondary-button" onClick={() => updateCell(selectedImage.id, { cellFit: "global", cellScale: "1", cellOffsetX: "0", cellOffsetY: "0", rotation: "0", flipHorizontal: false, brightness: "100", contrast: "100", saturation: "100" })}>Reset image controls</button></div> : <p className="resize-note">Select a photo in the collage to edit its cell.</p>}</section>}
+          {activeSidebarPanel === "cell" && <section className="collage-sidebar-section">{selectedImage ? <div className="collage-selected-controls">
+            <strong>Selected cell · {selectedImage.file.name}</strong>
+            <label>Cell position<select aria-label="Move selected photo to cell" value={selectedImage.slot} onChange={(event) => placeImageInSlot(selectedImage.id, Number(event.currentTarget.value))}>{layout.cells.map((_, slot) => { const occupant = images.find((image) => image.slot === slot); const status = !occupant ? " · empty" : occupant.id === selectedImage.id ? " · current" : ` · swap with ${occupant.file.name}`; return <option key={slot} value={slot}>Cell {slot + 1}{status}</option>; })}</select></label>
+            <label>Cell fit<select value={selectedImage.cellFit} onChange={(event) => updateCell(selectedImage.id, { cellFit: event.currentTarget.value as ImageFile["cellFit"] })}><option value="global">Use collage default</option><option value="contain">Contain</option><option value="cover">Cover</option></select></label>
+            <label>Cell scale · 0.25–4×<input type="number" min="0.25" max="4" step="any" value={selectedImage.cellScale} onChange={(event) => updateCell(selectedImage.id, { cellScale: event.currentTarget.value })} /></label>
+            <label>Position X · −100–100%<input type="number" min="-100" max="100" step="any" value={selectedImage.cellOffsetX} onChange={(event) => updateCell(selectedImage.id, { cellOffsetX: event.currentTarget.value })} /></label>
+            <label>Position Y · −100–100%<input type="number" min="-100" max="100" step="any" value={selectedImage.cellOffsetY} onChange={(event) => updateCell(selectedImage.id, { cellOffsetY: event.currentTarget.value })} /></label>
+            <label>Rotate · −180–180°<input type="number" min="-180" max="180" step="any" value={selectedImage.rotation} onChange={(event) => updateCell(selectedImage.id, { rotation: event.currentTarget.value })} /></label>
+            <label className="collage-check-control"><input type="checkbox" checked={selectedImage.flipHorizontal} onChange={(event) => updateCell(selectedImage.id, { flipHorizontal: event.currentTarget.checked })} />Flip horizontally</label>
+            <label>Brightness · 0–200%<input type="number" min="0" max="200" step="any" value={selectedImage.brightness} onChange={(event) => updateCell(selectedImage.id, { brightness: event.currentTarget.value })} /></label>
+            <label>Contrast · 0–200%<input type="number" min="0" max="200" step="any" value={selectedImage.contrast} onChange={(event) => updateCell(selectedImage.id, { contrast: event.currentTarget.value })} /></label>
+            <label>Saturation · 0–200%<input type="number" min="0" max="200" step="any" value={selectedImage.saturation} onChange={(event) => updateCell(selectedImage.id, { saturation: event.currentTarget.value })} /></label>
+            <button type="button" className="secondary-button" onClick={() => updateCell(selectedImage.id, { cellFit: "global", cellScale: "1", cellOffsetX: "0", cellOffsetY: "0", rotation: "0", flipHorizontal: false, brightness: "100", contrast: "100", saturation: "100" })}>Reset image controls</button>
+          </div> : <p className="resize-note">Select a photo in the collage to edit its cell.</p>}</section>}
           {activeSidebarPanel === "text" && <section className="collage-sidebar-section"><label className="ratio-field">Collage text<input value={caption} maxLength={240} onChange={(event) => setCaption(event.currentTarget.value)} placeholder="Optional caption" /></label><div className="dimension-fields"><label>Text size <span>px</span><input type="number" min="8" max="512" step="any" value={captionSize} onChange={(event) => setCaptionSize(event.currentTarget.value)} /></label><label>Text color<input type="color" value={captionColor} onChange={(event) => setCaptionColor(event.currentTarget.value)} /></label></div></section>}
           <footer className="collage-sidebar-footer">
             <p className="resize-note">{images.length} image(s) · {layout.valid ? `${(layout.outputWidth * layout.outputHeight / 1_000_000).toFixed(1)} MP` : "Check settings"}. Limit: 20 images / 100 MP.</p>
-            {!layout.valid && <p className="resize-error" role="alert">Enter valid canvas, caption, and image values.</p>}{error && <p className="resize-error" role="alert">{error}</p>}{projectStatus && <p className="source-info" role="status">{projectStatus}</p>}
+            {!layout.valid && <p className="resize-error" role="alert">{layout.gridTooSmall ? "Add rows or columns so every photo has a cell." : layout.imagesOutsideGrid ? "Some photos are outside the current grid. Increase the grid size to fit them." : "Enter valid canvas, caption, and image values."}</p>}{error && <p className="resize-error" role="alert">{error}</p>}{projectStatus && <p className="source-info" role="status">{projectStatus}</p>}
             <button className="secondary-button export-button" disabled={!projectLoaded || !images.length || !layout.valid || !projectTitle.trim()} onClick={() => void saveProject()}>Save editable collage</button><button className="export-button" disabled={!images.length || !layout.valid} onClick={download}>Download collage PNG</button>
           </footer>
         </div>
       </aside>
       <div className="resize-preview collage-main-preview">
         <div className="preview-heading"><strong>Collage preview</strong><span>{`${layout.outputWidth} × ${layout.outputHeight} px · ${layout.cells.length} cells`}</span></div>
-        <div className="collage-canvas-stage" ref={collageStageRef} style={{ width: `min(100%, ${(layout.outputWidth / layout.outputHeight) * 75}dvh, ${(layout.outputWidth / layout.outputHeight) * 900}px)`, aspectRatio: `${layout.outputWidth} / ${layout.outputHeight}` }} onClick={(event) => openImageMenuAt(event.clientX, event.clientY)} onContextMenu={(event) => { event.preventDefault(); openImageMenuAt(event.clientX, event.clientY); }} onDragOver={(event) => event.preventDefault()} onDrop={dropOnStage}>
-          <canvas ref={canvasRef} className="preview-canvas collage-interactive-canvas" aria-label="Image collage preview. Drag a photo to reposition it." onPointerDown={beginCellDrag} onPointerMove={moveCellDrag} onPointerUp={(event) => { if (cellGesture.current?.pointerId === event.pointerId) cellGesture.current = null; }} onPointerCancel={() => { cellGesture.current = null; }} />
+        <div className="collage-canvas-stage" ref={collageStageRef} style={{ width: `min(100%, ${(layout.outputWidth / layout.outputHeight) * 75}dvh, ${(layout.outputWidth / layout.outputHeight) * 900}px)`, aspectRatio: `${layout.outputWidth} / ${layout.outputHeight}` }} onClick={(event) => { if (suppressStageClick.current) { suppressStageClick.current = false; return; } openImageMenuAt(event.clientX, event.clientY); }} onContextMenu={(event) => { event.preventDefault(); openImageMenuAt(event.clientX, event.clientY); }} onDragOver={(event) => event.preventDefault()} onDrop={dropOnStage}>
+          <canvas ref={canvasRef} className="preview-canvas collage-interactive-canvas" aria-label="Image collage preview. Drag a photo to reposition it within its cell or to another cell." onPointerDown={beginCellDrag} onPointerMove={moveCellDrag} onPointerUp={finishCellDrag} onPointerCancel={cancelCellDrag} />
           <canvas ref={selectionCanvasRef} className="preview-canvas collage-selection-overlay" aria-hidden="true" />
           {layout.cells.map((cell, slot) => !images.some((image) => image.slot === slot) && <button type="button" key={slot} className="collage-add-slot" style={{ left: `${cell.x / layout.outputWidth * 100}%`, top: `${cell.y / layout.outputHeight * 100}%`, width: `${cell.width / layout.outputWidth * 100}%`, height: `${cell.height / layout.outputHeight * 100}%`, borderRadius: `${Math.min(Number(cornerRadius) || 0, cell.width / 2, cell.height / 2) / cell.width * 100}% / ${Math.min(Number(cornerRadius) || 0, cell.width / 2, cell.height / 2) / cell.height * 100}%` }} onClick={(event) => { event.stopPropagation(); openEmptySlot(slot); }}><span aria-hidden="true">＋</span><strong>Add photo</strong><small>Cell {slot + 1}</small></button>)}
+          {dragTargetSlot !== null && layout.cells[dragTargetSlot] && <div className="collage-drop-target" aria-hidden="true" style={{ left: `${layout.cells[dragTargetSlot].x / layout.outputWidth * 100}%`, top: `${layout.cells[dragTargetSlot].y / layout.outputHeight * 100}%`, width: `${layout.cells[dragTargetSlot].width / layout.outputWidth * 100}%`, height: `${layout.cells[dragTargetSlot].height / layout.outputHeight * 100}%`, borderRadius: `${Math.min(Number(cornerRadius) || 0, layout.cells[dragTargetSlot].width / 2, layout.cells[dragTargetSlot].height / 2) / layout.cells[dragTargetSlot].width * 100}% / ${Math.min(Number(cornerRadius) || 0, layout.cells[dragTargetSlot].width / 2, layout.cells[dragTargetSlot].height / 2) / layout.cells[dragTargetSlot].height * 100}%` }} />}
           {cellMenu && <div className="collage-cell-context-menu" style={{ left: cellMenu.x, top: cellMenu.y }} onClick={(event) => event.stopPropagation()} onContextMenu={(event) => event.stopPropagation()}>
             <button type="button" onClick={() => { setSelectedImageId(cellMenu.imageId); setActiveSidebarPanel("cell"); setCellMenu(null); }}>Edit Image</button>
             <button type="button" onClick={() => removeImageAt(cellMenu.imageId, false)}>Remove Image</button>

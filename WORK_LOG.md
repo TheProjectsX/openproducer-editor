@@ -1,5 +1,29 @@
 # Work log
 
+## 2026-11-16 — Drag collage photos between cells and add background swatches
+
+- A drag that stays within a photo's source cell continues to pan the photo. Dragging across a cell boundary now highlights the target, swaps with an occupied cell, or moves into an empty cell. Added a Cell position selector as a keyboard alternative.
+- Added eight labeled background presets (White, Slate, Soft gray, Sky, Cream, Blush, Mint, Lavender) and kept the custom color input.
+- Verification: in the running app, dragging Cell 1 onto occupied Cell 2 swapped the images; dragging that photo to empty Cell 6 moved it and restored Add Photo in Cell 2. A short within-cell drag changed the photo position without moving cells; the selector moved it to Cell 3. Mint preset changed the canvas and the custom color picker remained available. Direct `tsc --noEmit` and `git diff --check` passed; no formal suite was run.
+
+## 2026-11-16 — Polish secondary editor buttons
+
+- Reset and utility buttons only had background, border, and text colors, so the browser's square default shape and control styling remained visible.
+- Added a shared outlined, rounded secondary-button treatment with consistent sizing, hover/pressed/focus/disabled states. Export buttons keep their existing primary sizing and colors.
+- Verification: the running collage editor showed the Reset image controls button with an 8 px radius, 36 px minimum height, and layered blue-gray surface. `git diff --check` passed; no formal test suite was run for this CSS-only change.
+
+## 2026-11-16 — Reflow collage photos when custom grid dimensions change
+
+- Reproduced the supplied screenshots by placing photos in Cells 5 and 9, then reducing the custom grid from 3×3 to 3×2. The stored cell slots no longer fit the new geometry, rendering was rejected as invalid, and the previous canvas remained underneath the newly positioned Add Photo buttons.
+- Custom grid dimension and template changes now compact photos in their prior cell order into the new cell geometry. When a grid has fewer cells than photos, the stale canvas is cleared and the message tells the user to add rows or columns.
+- Verification: the running app reflowed two photos into Cells 1 and 2 after changing to 3×2; all four remaining Add Photo cells aligned within the new grid. A 1×1 grid with two photos showed a blank preview, the specific capacity message, and disabled export. Expanding to 2×2 and choosing Big Photo Top restored the photos in the resized layout. Core tests passed 18/18 and direct `tsc --noEmit` passed. `npm.cmd run typecheck` could not load the existing Windows Tailwind native binding (EPERM); `git diff --check` passed.
+
+## 2026-11-16 — Keep collage Add Photo cells aligned to the canvas
+
+- At a 1096×738 browser viewport, the collage stage was 640.8×480.6 px while the generic image preview rule capped its canvas at 428 px high. Empty-cell buttons remained positioned against the full stage, so they visibly extended past the rendered collage.
+- Added a collage-specific max-height override so both preview canvases fill the stage and stay aligned with the Add Photo cells.
+- Verification: running app reproduced the mismatch and, after the override, measured a 640.8×480.6 px stage and canvas with all eight empty-cell buttons inside the stage at 1096×738. Repeated the requested one-image → custom 2×2, two-image → custom 4×2, and two-image → Big photo top changes; visible empty cells stayed inside the canvas in each state. No formal test suite was run.
+
 ## 2026-11-16 — Collage template geometry and studio sidebar
 
 - Diagnosed the malformed single-photo grid: template geometry was derived directly from uploaded image count, so a two-column layout with one image had only one row and stretched its cell across the canvas height. Layouts now retain at least two full rows (or their template-specific minimum), independently of photo count.
@@ -849,4 +873,11 @@
 - The overlay now exactly fills the preview stage and only draws the selection outline, handles, and dimming outside it. It no longer adds a second image or changes the preview image's appearance or layout.
 - Separated the draft crop rectangle from the applied crop. Dragging the selector no longer redraws the full-resolution output canvas on every pointer movement; the canvas updates only when the crop is applied.
 - Verification: TypeScript check run; browser visual validation not available in this turn.
+
+# 2026-11-17 — Fix Video Studio scrolled timeline coordinates
+
+- Fixed timeline seeking and clip drops to include the parent timeline viewport's horizontal scroll offset. The old handlers read `scrollLeft` from the inner ruler/lane, which stays at zero while the timeline itself scrolls.
+- Shifted ruler time marks and its click mapping by the sticky track-label gutter so second marks align with clip time zero and the playhead.
+- Clip drops now preserve where the user grabbed the clip instead of jumping its left edge to the pointer.
+- Added pure regression tests for scrolled coordinates, ruler alignment, grab-offset positioning, and invalid scales. Verification: core suite passed 22/22; direct `tsc --noEmit --pretty false` and `git diff --check` passed. The running browser initially rendered Video Studio's empty state, then a hot reload produced a React Router `useContext` runtime error that persisted after hard reload; populated timeline interactions could not be verified until the dev server is recovered.
 

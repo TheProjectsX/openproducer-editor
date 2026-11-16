@@ -15,6 +15,7 @@ Define semantic tokens for page background, editor background, panel surface, te
 ## Interaction and accessibility requirements
 
 - Every icon-only button has an accessible name and a tooltip. Focus is visible on all interactive controls.
+- Secondary editor actions use a consistent rounded, outlined surface, distinct from primary export actions, with visible hover, pressed, focus, and disabled states.
 - Tab order follows the visual workflow. Sliders have typed companions with units and bounds. Error messages identify the field and correction needed.
 - Provide keyboard operations for play/pause, seek, split, delete, undo/redo, and timeline zoom; show shortcuts in a help dialog. Users can also complete these actions using visible controls.
 - Drag/drop operations have a keyboard or menu alternative. Do not make track reorder or collage reorder pointer-only.

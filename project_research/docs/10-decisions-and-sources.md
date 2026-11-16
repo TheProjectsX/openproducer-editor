@@ -5,6 +5,8 @@
 | Decision | Choice and reason |
 |---|---|
 | Runtime | Frontend-only static PWA. User media and AI inference remain local. |
+| Collage preview sizing | Keep the output canvas and empty-cell hit targets on the same stage geometry; a shared image-preview height cap can distort the canvas while cell overlays still use full-stage coordinates. Reflow photos in prior cell order when a template or custom grid changes, and clear stale preview content for invalid capacity. Confirmed at 1096×738 on 2026-11-16. |
+| Collage direct manipulation | Keep in-cell dragging for photo pan; a drag crossing the source-cell boundary becomes a cell move or occupied-cell swap, with a keyboard cell selector as an alternative. Background presets supplement rather than replace the custom color picker. Browser checked on 2026-11-16 with two local fixture images. |
 | Audience | Everyday creators, desktop first. Responsive mobile UI with only tested processing features. |
 | Navigation | Home, Audio, Video, Image, Projects; category/tool overview pages and local editors. |
 | Video scope | Basic CapCut-like multitrack timeline in Core, with focused quick-tool entry points. Not full CapCut feature parity. |
@@ -227,3 +229,11 @@ Added `sync-markers-24fps.mp4`, a synthetic four-second H.264/AAC fixture with a
 - Browser testing exposed stale duration/current playback state in `CustomMediaPreview` when switching to a generated Blob URL. Reset state per source/kind and listen for loadedmetadata/durationchange; Video Speed retest showed a 2.07 s duration and advancing playback.
 - Measured fixture results: +6 dB volume export was +6.0 dB; noise-only RMS dropped from −35.23 to −63.36 dB while tone RMS moved from −15.01 to −16.08 dB. Video trim, muted output, replacement mix, and multitrack output decoded in FFmpeg. Exact resize and collage PNG save/reopen/export passed focused checks.
 - Open defects/limits: Audio Extract reports no exportable audio for AAC MP4 and Opus WebM fixtures despite their audio streams. Collage SVG fails late with a generic decode error. Split generated its ZIP link, but browser automation did not observe a download, so archive contents remain unverified. Offline export, external player, listening quality, cancellation/recovery, memory stress, and broad browser/accessibility review remain open. No Core release claim is made.
+
+## Video Studio timeline coordinates (2026-11-17)
+
+- Source inspection found ruler seeking, track seeking, and clip drops reading `scrollLeft` from their inner ruler/lane elements. Horizontal scrolling is owned by `.timeline-scroll`, so those calculations omitted the actual scroll offset. Ruler ticks also started at x=0 while clips start after a sticky 104 px track-label column.
+- Changed the shared coordinate calculation to read the enclosing scroll viewport, offset ruler positions by the track-label gutter, and clamp positions before timeline zero. The 104 px value is shared by ruler mapping and playhead positioning.
+- Evidence: four focused Node tests cover nonzero scroll, gutter mapping, invalid scale, and drag grab offset; full core suite passes 21/21, direct TypeScript check passes, and `git diff --check` passes. A populated-project browser drag/seek check remains pending.
+- Follow-up interaction polish: native clip drag/drop records the horizontal grab offset and subtracts it from the drop time, so grabbing a clip in its middle does not snap its left edge under the pointer. A unit test covers this placement calculation.
+- Browser limitation observed during this change: `/studio/video` first rendered its empty state, then after HMR showed `Cannot read properties of null (reading 'useContext')` in the React Router wrapper; hard reload did not recover it. The repository's local `npm run build` is also blocked by the existing Windows Tailwind native binding/EPERM issue. Do not claim browser interaction verification until the dev server is recovered and the populated-project workflow is retested.

@@ -366,6 +366,11 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .export-button:hover:not(:disabled) { background: linear-gradient(120deg, #588bf1, #4874ce); }
 .export-button:disabled { border-color: #33435c; background: #27364b; color: #74849b; }
 .secondary-button { border-color: #3a4d68; background: #192840; color: #d2e1f6; }
+.secondary-button:not(.export-button) { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 12px; border: 1px solid #3b5575; border-radius: 8px; background: linear-gradient(180deg, #203650, #182a40); color: #d8e7fa; font: inherit; font-size: 12px; font-weight: 600; line-height: 1.2; cursor: pointer; box-shadow: inset 0 1px 0 #ffffff0b, 0 2px 5px #0002; transition: border-color .16s ease, background .16s ease, box-shadow .16s ease, transform .16s ease; }
+.secondary-button:not(.export-button):hover:not(:disabled) { border-color: #6c98df; background: linear-gradient(180deg, #294567, #1d3551); color: #f2f7ff; box-shadow: inset 0 1px 0 #ffffff12, 0 3px 10px #0004; transform: translateY(-1px); }
+.secondary-button:not(.export-button):active:not(:disabled) { background: #182b42; box-shadow: inset 0 1px 3px #0004; transform: translateY(0); }
+.secondary-button:not(.export-button):focus-visible { outline: 2px solid #8db6ff; outline-offset: 2px; }
+.secondary-button:not(.export-button):disabled { border-color: #293a50; background: #131e2c; color: #65758a; cursor: not-allowed; box-shadow: none; }
 .audio-player { accent-color: var(--blue); }
 .audio-waveform { border: 1px solid #2c4160; background: #0b1220; }
 .audio-preview strong, .clip-list li > span strong { color: #dbe7f7; }.audio-preview span, .clip-list li small { color: #90a2ba; }
@@ -439,6 +444,14 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .collage-studio-panel .collage-template-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .collage-studio-panel .collage-template-options > button { padding: 8px; }
 .collage-studio-panel .collage-template-options > button strong { font-size: 10px; }
+.collage-background-picker { display: grid; gap: 8px; color: #b8c6d9; font-size: 11px; font-weight: 650; }
+.collage-background-swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.collage-background-swatches button { width: 100%; min-width: 0; min-height: 30px; aspect-ratio: 1.5; border: 1px solid #526783; border-radius: 7px; background: var(--swatch-color); cursor: pointer; box-shadow: inset 0 1px 2px #0002, 0 1px 3px #0003; }
+.collage-background-swatches button:hover { border-color: #b4d0ff; transform: translateY(-1px); }
+.collage-background-swatches button.active { outline: 2px solid #8db6ff; outline-offset: 2px; }
+.collage-background-swatches button:focus-visible { outline: 2px solid #e3efff; outline-offset: 2px; }
+.collage-custom-color { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #aebfd3; font-size: 10px; }
+.collage-custom-color input[type="color"] { width: 48px; height: 30px; padding: 2px; border: 1px solid #415773; border-radius: 6px; background: #111c2a; cursor: pointer; }
 .collage-selected-controls { display: grid; gap: 9px; padding-top: 12px; border-top: 1px solid #293b53; }
 .collage-selected-controls > strong { overflow-wrap: anywhere; color: #d9e7f8; font-size: 11px; }
 .collage-selected-controls > label { display: grid; gap: 5px; color: #aebfd3; font-size: 10px; font-weight: 650; }
@@ -453,6 +466,7 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .collage-add-slot { position: absolute; z-index: 3; display: grid; place-content: center; justify-items: center; gap: 5px; border: 1px dashed #77859a; background: #d9dee6; color: #334257; cursor: pointer; }
 .collage-add-slot:hover, .collage-add-slot:focus-visible { z-index: 4; border: 2px solid #6192e5; background: #e7edf6; outline: 0; }
 .collage-add-slot > span { font-size: 26px; line-height: 1; }.collage-add-slot strong { font-size: 12px; }.collage-add-slot small { font-size: 10px; color: #637189; }
+.collage-drop-target { position: absolute; z-index: 6; border: 3px dashed #70a4f7; background: #4a83d52e; box-shadow: inset 0 0 0 2px #eaf2ff55, 0 0 0 2px #598be188; pointer-events: none; }
 .collage-main-preview .collage-remove-cell { z-index: 5; }
 .collage-cell-context-menu { position: absolute; z-index: 8; width: 184px; display: grid; gap: 2px; padding: 7px; border: 1px solid #3b4b62; border-radius: 8px; background: #171923; box-shadow: 0 8px 24px #0009; }
 .collage-cell-context-menu button { min-height: 32px; padding: 7px 9px; border: 0; border-radius: 4px; background: transparent; color: #edf1fa; text-align: left; font: inherit; font-size: 12px; cursor: pointer; }
@@ -619,6 +633,7 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .resize-page.has-media .resize-preview { max-height: 100%; }
 .resize-page.has-media.image-collage-page { height: auto; min-height: 100dvh; display: block; overflow-y: auto; }
 .image-tool-workspace > .resize-preview { overflow: hidden; }.image-tool-workspace > .resize-preview .preview-canvas { max-height: min(58dvh, calc(100dvh - 250px)); }
+.image-tool-workspace > .resize-preview .collage-canvas-stage > canvas.preview-canvas { max-height: 100%; }
 .upscale-preview { min-width: 0; }
 .upscale-source-preview, .upscale-comparison { position: relative; width: 100%; max-height: min(58dvh, calc(100dvh - 250px)); margin: auto; overflow: hidden; border: 1px solid #2b3e57; border-radius: 9px; background: #080e18; }
 .upscale-source-preview { display: grid; place-items: center; min-height: 220px; }
