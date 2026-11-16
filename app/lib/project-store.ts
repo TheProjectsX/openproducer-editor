@@ -18,6 +18,7 @@ export type LocalProject = {
 
 export type CollageProjectDocument = {
   version: 1;
+  template?: string;
   width: string;
   height: string;
   columns: string;
@@ -27,7 +28,7 @@ export type CollageProjectDocument = {
   caption: string;
   captionSize: string;
   captionColor: string;
-  assets: { id: string; name: string; type: string; size: number; cellFit?: "global" | "contain" | "cover"; cellScale?: string; cellOffsetX?: string; cellOffsetY?: string }[];
+  assets: { id: string; name: string; type: string; size: number; cellFit?: "global" | "contain" | "cover"; cellScale?: string; cellOffsetX?: string; cellOffsetY?: string; rotation?: string; flipHorizontal?: boolean; brightness?: string; contrast?: string; saturation?: string }[];
 };
 
 export type AudioProjectDocument = {

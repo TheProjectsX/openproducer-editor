@@ -1,5 +1,12 @@
 # Work log
 
+## 2026-11-16 — Collage templates and per-image editing
+
+- Reviewed [BeFunky's collage workflow](https://www.befunky.com/create/collage/), which highlights customizable layouts, changing aspect ratio, adding/removing cells, and editing photos directly in the collage. Added classic grid, big-photo left/right/top, wide-row, and tall-column templates with adjustable canvas dimensions, grid columns, and spacing.
+- Made every cell directly selectable and draggable in the collage preview. Added an on-canvas remove-cell action plus per-image fit, zoom, X/Y placement, rotation, horizontal flip, brightness, contrast, and saturation controls. Image-list removal/reordering remains available.
+- Persisted the template and per-image controls in locally saved collage projects, with defaults when opening older saved projects. Export uses the same edited canvas rendering.
+- Verification: `git diff --check` and `tsc --noEmit` passed. Browser drag, template, save/reopen, and export review remain pending.
+
 ## 2026-11-16 — Interactive image crop selection
 
 - Added a crop overlay directly on the source image. Users can drag the crop area to move it, drag any of eight edge/corner handles to resize, or drag outside the current selection to draw a new rectangle.
