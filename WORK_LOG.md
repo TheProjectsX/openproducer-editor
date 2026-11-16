@@ -9,6 +9,7 @@
 ## 2026-11-16 — Preserve portrait ratio in Video Trim preview
 
 - Video Trim now reads the source video's encoded frame dimensions and constrains portrait preview stages to that aspect ratio. A 9:16 source displays in a narrow portrait stage instead of a wide landscape stage; the video frame is contained without stretching.
+- Capped the portrait preview to 24dvh (up to 360px) so it fits alongside the trim ruler, timeline, and transport inside the preview panel rather than overlapping the controls below.
 - Reset stored dimensions when a new source is chosen. Labels already embedded in a clip remain part of the source frame, not preview UI.
 - Verification: source and CSS diff reviewed; browser playback and aspect-ratio review remain pending.
 

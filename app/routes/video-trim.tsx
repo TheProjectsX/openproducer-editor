@@ -51,7 +51,8 @@ export default function VideoTrim() {
   const precise = (value: number) => (Math.round(value * 1000) / 1000).toFixed(3);
   const aspectRatio = videoDimensions ? videoDimensions.width / videoDimensions.height : 0;
   const portraitPreviewStyle = videoDimensions && aspectRatio < 1 ? {
-    width: `min(100%, ${aspectRatio * 53}vh, ${aspectRatio * 580}px)`,
+    width: `min(100%, ${aspectRatio * 24}dvh, ${aspectRatio * 360}px)`,
+    maxHeight: "min(24dvh, 360px)",
     aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}`,
     minHeight: 0,
     flex: "0 0 auto",
