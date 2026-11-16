@@ -1,5 +1,11 @@
 # Work log
 
+## 2026-11-16 — Interactive image crop selection
+
+- Added a crop overlay directly on the source image. Users can drag the crop area to move it, drag any of eight edge/corner handles to resize, or drag outside the current selection to draw a new rectangle.
+- The crop overlay and existing pixel fields stay synchronized; the generated cropped result remains visible below the source editor and is still the exported PNG.
+- Verification: source/CSS diff and `git diff --check` reviewed; pointer interaction and browser layout remain pending.
+
 ## 2026-11-16 — Give Video Trim result preview a full-height stage
 
 - Increased the trimmed-result video stage to a 350 px minimum, with the containing preview growing to at least 400 px. The result preview can now fit its video, custom transport, and edit action before the control panel begins, instead of overflowing over the controls.

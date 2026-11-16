@@ -12,6 +12,8 @@ export function meta({}: Route.MetaArgs) {
 
 export default function ImageCrop() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cropStageRef = useRef<HTMLDivElement>(null);
+  const cropGesture = useRef<{ pointerId: number; mode: "create" | "move" | `resize-${string}`; anchorX: number; anchorY: number; left: number; top: number; width: number; height: number; moved: boolean } | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -26,6 +28,58 @@ export default function ImageCrop() {
   const valid = Boolean(file && Number.isInteger(crop.x) && Number.isInteger(crop.y) && Number.isInteger(crop.width) && Number.isInteger(crop.height)
     && crop.x >= 0 && crop.y >= 0 && crop.width > 0 && crop.height > 0 && crop.x + crop.width <= size.width && crop.y + crop.height <= size.height
     && crop.width * crop.height <= 100_000_000);
+
+  function imagePoint(event: React.PointerEvent<HTMLDivElement>) {
+    const image = cropStageRef.current?.querySelector("img");
+    if (!image || !size.width || !size.height) return { x: 0, y: 0 };
+    const bounds = image.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(size.width, (event.clientX - bounds.left) / bounds.width * size.width)),
+      y: Math.max(0, Math.min(size.height, (event.clientY - bounds.top) / bounds.height * size.height)),
+    };
+  }
+  function setCropRect(x: number, y: number, width: number, height: number) {
+    const nextWidth = Math.max(1, Math.min(size.width, Math.round(width)));
+    const nextHeight = Math.max(1, Math.min(size.height, Math.round(height)));
+    setLeft(String(Math.max(0, Math.min(size.width - nextWidth, Math.round(x)))));
+    setTop(String(Math.max(0, Math.min(size.height - nextHeight, Math.round(y)))));
+    setCropWidth(String(nextWidth)); setCropHeight(String(nextHeight));
+  }
+  function beginCropGesture(event: React.PointerEvent<HTMLDivElement>) {
+    if (!size.width || !size.height) return;
+    const point = imagePoint(event), target = event.target as HTMLElement;
+    const handle = target.closest<HTMLElement>("[data-crop-handle]")?.dataset.cropHandle;
+    const isSelection = target.closest("[data-crop-selection]");
+    const mode = handle ? `resize-${handle}` as const : isSelection ? "move" as const : "create" as const;
+    cropGesture.current = { pointerId: event.pointerId, mode, anchorX: point.x, anchorY: point.y, left: crop.x, top: crop.y, width: crop.width, height: crop.height, moved: false };
+    event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault();
+  }
+  function moveCropGesture(event: React.PointerEvent<HTMLDivElement>) {
+    const gesture = cropGesture.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const point = imagePoint(event);
+    if (!gesture.moved && Math.hypot(point.x - gesture.anchorX, point.y - gesture.anchorY) < 2) return;
+    gesture.moved = true;
+    if (gesture.mode === "create") {
+      setCropRect(Math.min(gesture.anchorX, point.x), Math.min(gesture.anchorY, point.y), Math.abs(point.x - gesture.anchorX), Math.abs(point.y - gesture.anchorY));
+      return;
+    }
+    if (gesture.mode === "move") {
+      setCropRect(Math.max(0, Math.min(size.width - gesture.width, gesture.left + point.x - gesture.anchorX)), Math.max(0, Math.min(size.height - gesture.height, gesture.top + point.y - gesture.anchorY)), gesture.width, gesture.height);
+      return;
+    }
+    const handle = gesture.mode.slice(7);
+    const originalRight = gesture.left + gesture.width, originalBottom = gesture.top + gesture.height;
+    let x = gesture.left, y = gesture.top, right = originalRight, bottom = originalBottom;
+    if (handle.includes("w")) x = Math.max(0, Math.min(originalRight - 1, point.x));
+    if (handle.includes("e")) right = Math.max(gesture.left + 1, Math.min(size.width, point.x));
+    if (handle.includes("n")) y = Math.max(0, Math.min(originalBottom - 1, point.y));
+    if (handle.includes("s")) bottom = Math.max(gesture.top + 1, Math.min(size.height, point.y));
+    setCropRect(x, y, right - x, bottom - y);
+  }
+  function endCropGesture(event: React.PointerEvent<HTMLDivElement>) {
+    if (cropGesture.current?.pointerId === event.pointerId) cropGesture.current = null;
+  }
 
   useEffect(() => {
     if (!url || !valid || !canvasRef.current) return;
@@ -66,7 +120,7 @@ export default function ImageCrop() {
     }, "image/png");
   }
 
-  return <main className={`resize-page${file ? " has-media" : ""}`}>
+  return <main className={`resize-page image-crop-page${file ? " has-media" : ""}`}>
     <ToolPageHeader />
     <section className="resize-intro"><p className="eyebrow">IMAGE · LOCAL PROCESSING</p><h1>Crop by exact pixels</h1><p>Set a crop rectangle in source-image coordinates. Cropping is an explicit separate action; the resize tool keeps the full frame.</p></section>
     {!file ? <MediaImportScreen kind="image" accept="image/*" onFile={chooseFile} error={error} /> : <section className="resize-workspace">
@@ -79,7 +133,21 @@ export default function ImageCrop() {
         {error && <p className="resize-error" role="alert">{error}</p>}
         <button className="export-button" disabled={!valid} onClick={download}>Download cropped PNG</button>
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Cropped result</strong><span>{valid ? `${crop.width} × ${crop.height} px` : "Choose an image to begin"}</span></div>{file ? <canvas ref={canvasRef} className="preview-canvas" aria-label="Cropped image preview" /> : <div className="empty-preview">The cropped image will appear here.</div>}</div>
+      <div className="resize-preview image-crop-preview">
+        <div className="preview-heading"><strong>Select crop area</strong><span>{size.width} × {size.height} px source · drag handles to resize, drag inside to move</span></div>
+        <div className="image-crop-stage" ref={cropStageRef} onPointerDown={beginCropGesture} onPointerMove={moveCropGesture} onPointerUp={endCropGesture} onPointerCancel={endCropGesture}>
+          <img src={url} alt="Source image with an interactive crop selection" draggable={false} />
+          <span className="crop-shade top" style={{ height: `${crop.y / size.height * 100}%` }} />
+          <span className="crop-shade left" style={{ left: 0, top: `${crop.y / size.height * 100}%`, width: `${crop.x / size.width * 100}%`, height: `${crop.height / size.height * 100}%` }} />
+          <span className="crop-shade right" style={{ left: `${(crop.x + crop.width) / size.width * 100}%`, top: `${crop.y / size.height * 100}%`, width: `${(size.width - crop.x - crop.width) / size.width * 100}%`, height: `${crop.height / size.height * 100}%` }} />
+          <span className="crop-shade bottom" style={{ height: `${(size.height - crop.y - crop.height) / size.height * 100}%` }} />
+          <div className="crop-selection" data-crop-selection="true" style={{ left: `${crop.x / size.width * 100}%`, top: `${crop.y / size.height * 100}%`, width: `${crop.width / size.width * 100}%`, height: `${crop.height / size.height * 100}%` }}>
+            {(["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const).map((handle) => <span key={handle} className={`crop-selection-handle ${handle}`} data-crop-handle={handle} aria-hidden="true" />)}
+          </div>
+        </div>
+        <div className="preview-heading crop-result-heading"><strong>Cropped result</strong><span>{valid ? `${crop.width} × ${crop.height} px` : "Adjust the crop selection"}</span></div>
+        {file ? <canvas ref={canvasRef} className="preview-canvas crop-result-canvas" aria-label="Cropped image preview" /> : <div className="empty-preview">The cropped image will appear here.</div>}
+      </div>
     </section>}
   </main>;
 }
