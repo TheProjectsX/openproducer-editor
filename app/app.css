@@ -523,6 +523,24 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .resize-page.has-media .resize-preview { max-height: 100%; }
 .resize-page.has-media.image-collage-page { height: auto; min-height: 100dvh; display: block; overflow-y: auto; }
 .image-tool-workspace > .resize-preview { overflow: hidden; }.image-tool-workspace > .resize-preview .preview-canvas { max-height: min(58dvh, calc(100dvh - 250px)); }
+.upscale-preview { min-width: 0; }
+.upscale-source-preview, .upscale-comparison { position: relative; width: 100%; max-height: min(58dvh, calc(100dvh - 250px)); margin: auto; overflow: hidden; border: 1px solid #2b3e57; border-radius: 9px; background: #080e18; }
+.upscale-source-preview { display: grid; place-items: center; min-height: 220px; }
+.upscale-source-preview > img { display: block; max-width: 100%; max-height: min(58dvh, calc(100dvh - 250px)); object-fit: contain; }
+.upscale-processing-overlay { position: absolute; inset: auto 12px 12px; padding: 10px 12px; border: 1px solid #304761; border-radius: 8px; background: #09111ee8; backdrop-filter: blur(8px); }
+.upscale-comparison { flex: 0 1 auto; min-height: 220px; }
+.upscale-comparison-enhanced, .upscale-comparison-original, .upscale-comparison-original img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.upscale-comparison-enhanced { object-fit: fill; }
+.upscale-comparison-original { overflow: hidden; pointer-events: none; }
+.upscale-comparison-original img { object-fit: fill; user-select: none; }
+.upscale-comparison-label { position: absolute; z-index: 2; top: 12px; padding: 5px 9px; border: 1px solid #7187a477; border-radius: 20px; background: #07101dcc; color: #e8f1ff; font-size: 11px; font-weight: 700; pointer-events: none; }
+.upscale-comparison-label.before { left: 12px; }.upscale-comparison-label.after { right: 12px; }
+.upscale-comparison-divider { position: absolute; z-index: 3; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: #e8f1ff; box-shadow: 0 0 10px #000b; pointer-events: none; }
+.upscale-comparison-divider i { position: absolute; top: 50%; left: 50%; width: 32px; height: 32px; transform: translate(-50%, -50%); border: 2px solid #fff; border-radius: 50%; background: #396fc5; box-shadow: 0 2px 10px #0008; }
+.upscale-comparison-divider i::before, .upscale-comparison-divider i::after { position: absolute; top: 8px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; content: ""; }
+.upscale-comparison-divider i::before { left: 4px; border-right: 5px solid white; }.upscale-comparison-divider i::after { right: 4px; border-left: 5px solid white; }
+.upscale-comparison-range { position: absolute; z-index: 4; inset: 0; width: 100%; height: 100%; margin: 0; appearance: none; background: transparent; opacity: .001; cursor: ew-resize; touch-action: pan-y; }
+.upscale-comparison:has(.upscale-comparison-range:focus-visible) .upscale-comparison-divider i { outline: 3px solid #8cb9ff; outline-offset: 3px; }
 .image-crop-preview { overflow: auto; }
 .image-crop-stage { position: relative; width: fit-content; max-width: 100%; max-height: min(58dvh, calc(100dvh - 280px)); flex: 0 1 auto; margin: auto; touch-action: none; user-select: none; }
 .image-crop-stage > img { display: block; max-width: 100%; max-height: min(58dvh, calc(100dvh - 280px)); object-fit: contain; pointer-events: none; }

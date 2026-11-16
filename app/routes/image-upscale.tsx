@@ -34,6 +34,7 @@ export default function ImageUpscale() {
   const [phase, setPhase] = useState("");
   const [backend, setBackend] = useState("");
   const [upscaleReady, setUpscaleReady] = useState(false);
+  const [comparePosition, setComparePosition] = useState(50);
   const [error, setError] = useState("");
 
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
@@ -56,7 +57,7 @@ export default function ImageUpscale() {
   function chooseFile(next?: File) {
     if (!next) return;
     if (!next.type.startsWith("image/")) { setError("Choose an image file."); return; }
-    setUpscaleReady(false); setError("");
+    setUpscaleReady(false); setComparePosition(50); setError("");
     const nextUrl = URL.createObjectURL(next);
     const image = new Image();
     image.onload = () => {
@@ -192,7 +193,16 @@ export default function ImageUpscale() {
         {!upscaleReady ? <button className="export-button" disabled={!file || !valid || upscaling} onClick={() => void upscale()}>{upscaling ? "Enhancing image…" : "AI upscale image"}</button> : <button className="export-button" disabled={!file || !valid} onClick={download}>Download enhanced PNG</button>}
         {upscaleReady && <p className="source-info" role="status">{phase || `AI enhancement complete · ${backend}`}. This model and your image stay on this device.</p>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>{upscaleReady ? "AI-enhanced preview" : "Upscaled preview"}</strong><span>{file && valid ? `${output.width} × ${output.height} px` : "Choose an image to begin"}</span></div><canvas ref={canvasRef} className="preview-canvas" style={{ display: upscaleReady ? "" : "none" }} aria-label="AI-enhanced output preview" />{!upscaleReady && <div className="empty-preview">{upscaling ? "Enhancing the image…" : "Choose output dimensions, then run AI Upscale."}</div>}</div>
+      <div className="resize-preview upscale-preview"><div className="preview-heading"><strong>{upscaleReady ? "Before / after comparison" : "Upscaled preview"}</strong><span>{file && valid ? `${output.width} × ${output.height} px` : "Choose an image to begin"}</span></div>
+        {url && <div className="upscale-comparison" style={{ display: upscaleReady ? "" : "none", width: `min(100%, ${(output.width / output.height) * 58}dvh, calc(${(output.width / output.height) * 100}dvh - ${(output.width / output.height) * 250}px))`, aspectRatio: `${output.width} / ${output.height}` }}>
+          <canvas ref={canvasRef} className="upscale-comparison-enhanced" aria-label="AI-enhanced image" />
+          <div className="upscale-comparison-original" style={{ clipPath: `inset(0 ${100 - comparePosition}% 0 0)` }}><img src={url} alt="Original image before enhancement" draggable={false} /></div>
+          <span className="upscale-comparison-label before">Original</span><span className="upscale-comparison-label after">Enhanced</span>
+          <span className="upscale-comparison-divider" style={{ left: `${comparePosition}%` }} aria-hidden="true"><i /></span>
+          <input className="upscale-comparison-range" type="range" min="0" max="100" step="1" value={comparePosition} aria-label="Drag to compare original and enhanced image" onChange={(event) => setComparePosition(event.currentTarget.valueAsNumber)} />
+        </div>}
+        {!upscaleReady && (url ? <div className="upscale-source-preview"><img src={url} alt="Original image to enhance" draggable={false} />{upscaling && <div role="status" className="upscale-processing-overlay"><ProcessingProgress label={phase || "Enhancing image locally"} value={progress} /></div>}</div> : <div className="empty-preview">Choose an image to begin.</div>)}
+      </div>
     </section>}
   </main>;
 }

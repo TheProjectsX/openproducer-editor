@@ -1,5 +1,11 @@
 # Work log
 
+## 2026-11-16 — Upscale before/after comparison slider
+
+- Added a synchronized before/after viewer for Image Upscale. The AI result fills the comparison stage, the original is clipped over it, and a keyboard-accessible range control moves the visible split line from 0 to 100 percent.
+- Show the uploaded original before processing; show the existing progress component over it during enhancement. Comparison resets to the center when a new source image is chosen.
+- Verification: `git diff --check` and typecheck pending; drag/keyboard/browser layout review remains pending.
+
 ## 2026-11-16 — Collage templates and per-image editing
 
 - Reviewed [BeFunky's collage workflow](https://www.befunky.com/create/collage/), which highlights customizable layouts, changing aspect ratio, adding/removing cells, and editing photos directly in the collage. Added classic grid, big-photo left/right/top, wide-row, and tall-column templates with adjustable canvas dimensions, grid columns, and spacing.
