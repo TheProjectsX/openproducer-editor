@@ -22,13 +22,16 @@ export type CollageProjectDocument = {
   width: string;
   height: string;
   columns: string;
+  rows?: string;
   gap: string;
+  cornerRadius?: string;
+  deletedCells?: number;
   background: string;
   fit: string;
   caption: string;
   captionSize: string;
   captionColor: string;
-  assets: { id: string; name: string; type: string; size: number; cellFit?: "global" | "contain" | "cover"; cellScale?: string; cellOffsetX?: string; cellOffsetY?: string; rotation?: string; flipHorizontal?: boolean; brightness?: string; contrast?: string; saturation?: string }[];
+  assets: { id: string; name: string; type: string; size: number; slot?: number; cellFit?: "global" | "contain" | "cover"; cellScale?: string; cellOffsetX?: string; cellOffsetY?: string; rotation?: string; flipHorizontal?: boolean; brightness?: string; contrast?: string; saturation?: string }[];
 };
 
 export type AudioProjectDocument = {

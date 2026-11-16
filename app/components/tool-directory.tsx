@@ -36,10 +36,11 @@ const groups = {
     color: "image",
     tools: [
       ["Image editor and resize", "Set exact pixel dimensions and make non-destructive adjustments.", "/tools/image/resize", "01"],
-      ["Upscale image", "Set custom output dimensions with local image resampling.", "/tools/image/upscale", "02"],
-      ["Crop image", "Choose a crop rectangle directly in source-image pixels.", "/tools/image/crop", "03"],
-      ["Make a collage", "Arrange, fit, and caption images on a custom canvas.", "/tools/image/collage", "04"],
-      ["Image editor project", "Open a saved local image workspace and its editable layers.", "/studio/image", "05"],
+      ["Downscale image", "Scale by a custom percentage or reduction factor while preserving proportions.", "/tools/image/downscale", "02"],
+      ["Upscale image", "Enlarge images with browser-based AI upscaling.", "/tools/image/upscale", "03"],
+      ["Crop image", "Choose a crop rectangle directly in source-image pixels.", "/tools/image/crop", "04"],
+      ["Make a collage", "Arrange, fit, and caption images on a custom canvas.", "/tools/image/collage", "05"],
+      ["Image editor project", "Open a saved local image workspace and its editable layers.", "/studio/image", "06"],
     ],
   },
 } as const;
@@ -47,7 +48,7 @@ const groups = {
 const categories = [
   { key: "audio", title: "Audio editor tools", text: "Shape sound, clean recordings, adjust speed, and bring tracks together.", href: "/tools/audio", count: "09 TOOLS" },
   { key: "video", title: "Video editor tools", text: "Make precise cuts, retime a clip, or compose a multitrack edit.", href: "/tools/video", count: "05 TOOLS" },
-  { key: "image", title: "Image tools", text: "Resize, crop, refine, and compose image projects.", href: "/tools/image", count: "05 TOOLS" },
+  { key: "image", title: "Image tools", text: "Resize, downscale, crop, refine, and compose image projects.", href: "/tools/image", count: "06 TOOLS" },
 ] as const;
 
 function Icon({ type }: { type: "audio" | "video" | "image" }) {

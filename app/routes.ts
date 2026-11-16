@@ -7,6 +7,7 @@ export default [
   route("tools/video", "routes/tools-video.tsx"),
   route("tools/image", "routes/tools-image.tsx"),
   route("tools/image/resize", "routes/image-resize.tsx"),
+  route("tools/image/downscale", "routes/image-downscale.tsx"),
   route("tools/image/upscale", "routes/image-upscale.tsx"),
   route("tools/image/collage", "routes/image-collage.tsx"),
   route("tools/image/crop", "routes/image-crop.tsx"),

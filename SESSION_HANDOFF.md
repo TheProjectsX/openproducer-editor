@@ -1,5 +1,22 @@
 # Session handoff — Local Studio Core
 
+## Latest continuation — 2026-11-16 (Asia/Dhaka)
+
+### Resize crop selector fix
+
+- The latest request was to make the Resize tool's Crop Image toggle reveal its own crop selector immediately, keep the original preview visually unchanged beneath it, dim only the area outside the selection, and avoid lag while dragging.
+- Implemented and committed as `e5c74e6` (`Fix resize crop selector interaction`) on `main`.
+- The toggle now activates/deactivates the selection directly. Removed the intermediate Crop Selection activation button. The selector overlay fills the preview stage and renders only its outline, handles, and outside dimming; it does not duplicate the source image.
+- Separated the draft crop rectangle from the applied crop so pointer movement no longer redraws the full-resolution output canvas. Applying a crop commits the rectangle and then renders the changed output.
+- TypeScript validation (`tsc --noEmit`) passed. No browser visual/interaction check was performed, so confirm the immediate selector placement, unchanged image appearance, dimming, pointer responsiveness, and apply/reset behavior in the running app.
+
+### Working tree and next steps
+
+- Preserve the existing uncommitted changes. At the time of this handoff, unrelated changes remain in the collage, navigation, project-store, route, and downscale files; inspect `git status --short` before editing. Do not reset or clean the worktree.
+- Continue from the current `main` branch and commit. First review this change in Chrome on `/tools/image/resize` with a large image and a non-square image; test toggle-on/off, selection draw/move/resize, custom aspect/dimensions, apply, and reset. Check that the image does not shift, resize, or recolor while toggling or dragging.
+- If the overlay is misaligned with the displayed canvas at tall/narrow preview sizes or when output dimensions differ from source dimensions, correct the overlay-to-canvas coordinate mapping without adding a duplicate image layer.
+
+---
 **Checkpoint date:** 2026-11-16 (Asia/Dhaka)
 **Goal status:** Resumed by the user on 2026-11-15. Continue the same Core objective.
 **Repository:** `E:\Coding_Practice\Live Projects\openproducer-editor`

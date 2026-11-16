@@ -7,6 +7,7 @@ export function MediaImportScreen({
   onFiles,
   multiple = false,
   error = "",
+  secondaryAction,
 }: {
   kind: "audio" | "video" | "image";
   accept: string;
@@ -14,6 +15,7 @@ export function MediaImportScreen({
   onFiles?: (files: File[]) => void;
   multiple?: boolean;
   error?: string;
+  secondaryAction?: { label: string; onClick: () => void };
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -29,6 +31,7 @@ export function MediaImportScreen({
       <h2>Start with your {noun}.</h2>
       <p>Choose a file from this device to open the editor. Your media stays in this browser.</p>
       <button type="button" className="import-primary" onClick={() => inputRef.current?.click()}>{multiple ? `Choose ${noun} files` : `Choose ${noun} file`}</button>
+      {secondaryAction && <button type="button" className="import-secondary" onClick={secondaryAction.onClick}>{secondaryAction.label}</button>}
       <input ref={inputRef} className="visually-hidden" type="file" accept={accept} multiple={multiple} onChange={(event) => { receive(event.currentTarget.files); event.currentTarget.value = ""; }} />
       <span className="import-or">OR DROP A FILE HERE</span>
       <a className="import-library-link" href="/projects">Open a saved local project <span aria-hidden="true">↗</span></a>
