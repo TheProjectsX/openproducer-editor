@@ -152,8 +152,7 @@ export default function AudioTrim() {
     const startX = start / audio.duration * bounds.width;
     const endX = end / audio.duration * bounds.width;
     const nearHandle = Math.min(Math.abs(x - startX), Math.abs(x - endX)) <= 7;
-    event.currentTarget.style.cursor = nearHandle ? "ew-resize"
-      : x > startX && x < endX ? "grab" : "crosshair";
+    event.currentTarget.style.cursor = nearHandle ? "ew-resize" : "auto";
   }
   function beginSelection(event: React.PointerEvent<HTMLCanvasElement>) {
     if (!audio) return;
@@ -163,7 +162,7 @@ export default function AudioTrim() {
       : Math.abs(value - end) <= handleTolerance ? "end"
         : value > start && value < end ? "move" : "create";
     selectionGesture.current = { pointerId: event.pointerId, mode, anchor: value, start, end, originX: event.clientX, moved: false };
-    event.currentTarget.style.cursor = mode === "start" || mode === "end" ? "ew-resize" : mode === "move" ? "grabbing" : "crosshair";
+    event.currentTarget.style.cursor = mode === "start" || mode === "end" ? "ew-resize" : "auto";
     event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault();
   }
   function moveSelection(event: React.PointerEvent<HTMLCanvasElement>) {
@@ -171,6 +170,7 @@ export default function AudioTrim() {
     if (!gesture || gesture.pointerId !== event.pointerId || !duration) return;
     if (!gesture.moved && Math.abs(event.clientX - gesture.originX) < 3) return;
     gesture.moved = true;
+    if (gesture.mode === "move") event.currentTarget.style.cursor = "grabbing";
     const value = timeFromPointer(event), minimum = Math.min(.01, duration);
     if (gesture.mode === "start") setStart(Math.max(0, Math.min(gesture.end - minimum, value)));
     else if (gesture.mode === "end") setEnd(Math.max(gesture.start + minimum, Math.min(duration, value)));
@@ -203,6 +203,7 @@ export default function AudioTrim() {
   function beginWaveformSeek(event: React.PointerEvent<HTMLButtonElement>) {
     if (!audio) return;
     playheadGesture.current = event.pointerId; event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault(); event.stopPropagation();
+    event.currentTarget.style.cursor = "grabbing";
     seekSourceToTime(sourceTimeAt(event.clientX));
   }
   function moveWaveformSeek(event: React.PointerEvent<HTMLButtonElement>) {
@@ -211,6 +212,7 @@ export default function AudioTrim() {
   }
   function finishWaveformSeek(event: React.PointerEvent<HTMLButtonElement>) {
     if (playheadGesture.current === event.pointerId) playheadGesture.current = null;
+    event.currentTarget.style.cursor = "grab";
     event.stopPropagation();
   }
   function finishSelection(event: React.PointerEvent<HTMLCanvasElement>) {

@@ -1,9 +1,9 @@
 # Work log
 
-## 2026-11-16 — Localize trim resize cursors
+## 2026-11-16 — Localize trim resize and drag cursors
 
-- Audio and video trim timelines now show `ew-resize` only when the pointer is within 7 px of a range boundary. The selected audio/video region uses a grab cursor, and the rest of the timeline uses a crosshair for seeking/new range selection.
-- Changed the draggable playhead targets to use a grab cursor, since they seek playback rather than resize the trim range.
+- Audio and video trim timelines now show `ew-resize` only within 7 px of a trim boundary. The default/selected-area cursor stays normal for click-to-seek; dragging the selected range changes to a grabbing cursor only after the pointer moves.
+- Video timeline clicks now seek, while a drag moves the selected range. Audio timeline clicks continue to seek, and dragging inside the range moves it. Both dedicated playheads remain draggable and show grabbing only while held.
 - Verification: `git diff --check` passed. Browser pointer review was not run.
 
 ## 2026-11-16 — Seekable audio waveform and continuous video trim playhead
