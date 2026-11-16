@@ -1,5 +1,11 @@
 # Work log
 
+## 2026-11-16 — Skip service-worker registration in development
+
+- The service worker is generated into the production client output after the static build. The app previously attempted to register `/sw.js` during the dev server session too, where that file does not exist, causing React Router's “No route matches” error.
+- Limited registration/update handling to production. Production builds and installed PWAs continue to register the generated worker.
+- Verification: source and `git diff --check` reviewed; browser dev-server check remains pending.
+
 ## 2026-11-16 — Preserve portrait ratio in Video Trim preview
 
 - Video Trim now reads the source video's encoded frame dimensions and constrains portrait preview stages to that aspect ratio. A 9:16 source displays in a narrow portrait stage instead of a wide landscape stage; the video frame is contained without stretching.

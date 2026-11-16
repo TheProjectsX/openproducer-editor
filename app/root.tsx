@@ -46,7 +46,10 @@ export default function App() {
   const applyUpdateRef = useRef(false);
 
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
+    // The worker is generated after the static production build. It does not
+    // exist in Vite/React Router development mode, so registering it there
+    // would send /sw.js through the app route handler and produce a 404.
+    if (!("serviceWorker" in navigator) || import.meta.env.DEV) return;
     let disposed = false;
     let registration: ServiceWorkerRegistration | null = null;
     const timers = new Set<number>();
