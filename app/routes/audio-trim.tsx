@@ -145,14 +145,25 @@ export default function AudioTrim() {
     const bounds = timeline.current?.getBoundingClientRect();
     return bounds && audio ? Math.max(0, Math.min(audio.duration, (clientX - bounds.left) / bounds.width * audio.duration)) : 0;
   }
+  function updateSelectionCursor(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (!audio || selectionGesture.current?.pointerId === event.pointerId) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - bounds.left;
+    const startX = start / audio.duration * bounds.width;
+    const endX = end / audio.duration * bounds.width;
+    const nearHandle = Math.min(Math.abs(x - startX), Math.abs(x - endX)) <= 7;
+    event.currentTarget.style.cursor = nearHandle ? "ew-resize"
+      : x > startX && x < endX ? "grab" : "crosshair";
+  }
   function beginSelection(event: React.PointerEvent<HTMLCanvasElement>) {
     if (!audio) return;
     const value = timeFromPointer(event), bounds = event.currentTarget.getBoundingClientRect();
-    const handleTolerance = audio.duration * 14 / Math.max(1, bounds.width);
+    const handleTolerance = audio.duration * 7 / Math.max(1, bounds.width);
     const mode = Math.abs(value - start) <= handleTolerance ? "start"
       : Math.abs(value - end) <= handleTolerance ? "end"
         : value > start && value < end ? "move" : "create";
     selectionGesture.current = { pointerId: event.pointerId, mode, anchor: value, start, end, originX: event.clientX, moved: false };
+    event.currentTarget.style.cursor = mode === "start" || mode === "end" ? "ew-resize" : mode === "move" ? "grabbing" : "crosshair";
     event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault();
   }
   function moveSelection(event: React.PointerEvent<HTMLCanvasElement>) {
@@ -206,6 +217,7 @@ export default function AudioTrim() {
     const gesture = selectionGesture.current;
     if (gesture?.pointerId === event.pointerId && !gesture.moved) seekSourceToTime(timeFromPointer(event));
     if (gesture?.pointerId === event.pointerId) selectionGesture.current = null;
+    updateSelectionCursor(event);
   }
   function updatePlaybackPosition() {
     const element = player.current;
@@ -252,7 +264,7 @@ export default function AudioTrim() {
       </div>
       <div className="resize-preview audio-trim-preview"><div className="preview-heading"><strong>Source waveform</strong><span>{valid ? `${start.toFixed(3)} — ${end.toFixed(3)} s · ${trimMode === "keep" ? "kept" : "removed"}` : "Adjust selection"}</span></div>
         <div className="timeline-time-labels"><span>0.000 s</span><span>{audio.duration.toFixed(3)} s</span></div>
-        <div className="audio-waveform-stage"><canvas ref={timeline} className="audio-trim-waveform" role="img" aria-label="Full-source waveform timeline. Click to seek. Drag near either selection edge to trim, drag inside the selection to move it, or drag outside the selection to create a new range." onPointerDown={beginSelection} onPointerMove={moveSelection} onPointerUp={finishSelection} onPointerCancel={(event) => { if (selectionGesture.current?.pointerId === event.pointerId) selectionGesture.current = null; }} /><button type="button" className="waveform-playhead" style={{ left: `${playhead / audio.duration * 100}%` }} aria-label="Drag to seek source waveform playhead" onPointerDown={beginWaveformSeek} onPointerMove={moveWaveformSeek} onPointerUp={finishWaveformSeek} onPointerCancel={finishWaveformSeek}><span /></button></div>
+        <div className="audio-waveform-stage"><canvas ref={timeline} className="audio-trim-waveform" role="img" aria-label="Full-source waveform timeline. Click to seek. Drag near either selection edge to trim, drag inside the selection to move it, or drag outside the selection to create a new range." onPointerDown={beginSelection} onPointerMove={(event) => { updateSelectionCursor(event); moveSelection(event); }} onPointerLeave={(event) => { if (!selectionGesture.current) event.currentTarget.style.cursor = "crosshair"; }} onPointerUp={finishSelection} onPointerCancel={(event) => { if (selectionGesture.current?.pointerId === event.pointerId) selectionGesture.current = null; }} /><button type="button" className="waveform-playhead" style={{ left: `${playhead / audio.duration * 100}%` }} aria-label="Drag to seek source waveform playhead" onPointerDown={beginWaveformSeek} onPointerMove={moveWaveformSeek} onPointerUp={finishWaveformSeek} onPointerCancel={finishWaveformSeek}><span /></button></div>
         <div className="trim-result-preview"><div className="preview-heading"><strong>Edited audio preview</strong><span>{previewUrl ? `${outputDuration.toFixed(3)} s output · full ${audio.duration.toFixed(3)} s source timeline` : "Preparing preview…"}</span></div><div className="custom-transport"><button type="button" className="transport-play" onClick={togglePlayback} aria-label={playing ? "Pause preview" : "Play preview"}>{playing ? "Ⅱ" : "▶"}</button><span className="transport-time">{playhead.toFixed(3)} / {audio.duration.toFixed(3)} s</span><input className="transport-scrub" type="range" min="0" max={audio.duration} step="0.001" value={Math.min(playhead, audio.duration)} aria-label="Full-source timeline playhead" onChange={(event) => seekSourceToTime(event.currentTarget.valueAsNumber)} /></div></div>
       </div>
     </section>}

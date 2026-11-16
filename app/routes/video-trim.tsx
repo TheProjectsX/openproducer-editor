@@ -56,11 +56,22 @@ export default function VideoTrim() {
     const bounds = trimTimelineRef.current?.getBoundingClientRect();
     return bounds && duration ? Math.max(0, Math.min(duration, (clientX - bounds.left) / bounds.width * duration)) : 0;
   }
+  function updateTimelineCursor(event: React.PointerEvent<HTMLDivElement>) {
+    if (!duration || timelineGesture.current?.pointerId === event.pointerId) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - bounds.left;
+    const startX = from / duration * bounds.width;
+    const endX = to / duration * bounds.width;
+    const nearHandle = Math.min(Math.abs(x - startX), Math.abs(x - endX)) <= 7;
+    event.currentTarget.style.cursor = nearHandle ? "ew-resize"
+      : x > startX && x < endX ? "grab" : "crosshair";
+  }
   function beginTimeline(event: React.PointerEvent<HTMLDivElement>) {
     if (!duration || progress !== null) return;
-    const value = timeFromTimeline(event), tolerance = duration * 14 / Math.max(1, event.currentTarget.clientWidth);
+    const value = timeFromTimeline(event), tolerance = duration * 7 / Math.max(1, event.currentTarget.clientWidth);
     const mode = Math.abs(value - from) <= tolerance ? "start" : Math.abs(value - to) <= tolerance ? "end" : value > from && value < to ? "move" : "create";
     timelineGesture.current = { pointerId: event.pointerId, mode, anchor: value, start: from, end: to };
+    event.currentTarget.style.cursor = mode === "start" || mode === "end" ? "ew-resize" : mode === "move" ? "grabbing" : "crosshair";
     event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault();
   }
   function moveTimeline(event: React.PointerEvent<HTMLDivElement>) {
@@ -165,7 +176,7 @@ export default function VideoTrim() {
       <div className="resize-preview video-trim-preview">
         <div className="preview-heading"><strong>{resultUrl ? "Trimmed video result" : "Video preview"}</strong><span>{resultUrl ? `${(to - from).toFixed(3)} s · updated selection` : duration ? `${playhead.toFixed(3)} / ${duration.toFixed(3)} s` : "Loading video metadata…"}</span></div>
         {resultUrl ? <><CustomMediaPreview kind="video" src={resultUrl} label="Trimmed video result" /><button type="button" className="editor-action" onClick={() => { setResultUrl(""); setResultName(""); }}>Edit selection</button></> : <><div className="trim-video-stage">{sourceUrl && <video ref={videoRef} className="trim-video-surface" src={sourceUrl} playsInline preload="metadata" onLoadedMetadata={(event) => { const length = event.currentTarget.duration; if (Number.isFinite(length)) { setDuration(length); setEnd(precise(length)); } }} onTimeUpdate={(event) => { const time = event.currentTarget.currentTime; setPlayhead(time); if (stopAtRef.current !== null && time >= stopAtRef.current) { event.currentTarget.pause(); stopAtRef.current = null; setPlaying(false); } }} onPlay={() => { setPlaying(true); startPlayheadSync(); }} onPause={() => { setPlaying(false); stopPlayheadSync(); }} onEnded={() => { setPlaying(false); stopPlayheadSync(); }} />}</div>
-        {duration > 0 && <><div className="video-trim-ruler"><span>0.000 s</span><span>{duration.toFixed(3)} s</span></div><div className="video-trim-timeline" ref={trimTimelineRef} role="group" aria-label="Video trim timeline. Drag the range edges to trim, drag inside the range to move it, or drag outside to create a new selection." onPointerDown={beginTimeline} onPointerMove={moveTimeline} onPointerUp={(event) => { if (timelineGesture.current?.pointerId === event.pointerId) timelineGesture.current = null; }} onPointerCancel={(event) => { if (timelineGesture.current?.pointerId === event.pointerId) timelineGesture.current = null; }}>
+        {duration > 0 && <><div className="video-trim-ruler"><span>0.000 s</span><span>{duration.toFixed(3)} s</span></div><div className="video-trim-timeline" ref={trimTimelineRef} role="group" aria-label="Video trim timeline. Drag the range edges to trim, drag inside the range to move it, or drag outside to create a new selection." onPointerDown={beginTimeline} onPointerMove={(event) => { updateTimelineCursor(event); moveTimeline(event); }} onPointerLeave={(event) => { if (!timelineGesture.current) event.currentTarget.style.cursor = "crosshair"; }} onPointerUp={(event) => { if (timelineGesture.current?.pointerId === event.pointerId) timelineGesture.current = null; updateTimelineCursor(event); }} onPointerCancel={(event) => { if (timelineGesture.current?.pointerId === event.pointerId) timelineGesture.current = null; updateTimelineCursor(event); }}>
           <div className="video-trim-track" /><div className="video-trim-selected" style={{ left: `${Math.max(0, from / duration * 100)}%`, width: `${Math.max(0, (to - from) / duration * 100)}%` }} /><span className="video-range-handle start" style={{ left: `${Math.max(0, Math.min(100, from / duration * 100))}%` }} /><span className="video-range-handle end" style={{ left: `${Math.max(0, Math.min(100, to / duration * 100))}%` }} /><button type="button" className="video-trim-playhead" style={{ left: `${Math.max(0, Math.min(100, playhead / duration * 100))}%` }} aria-label="Drag to seek video trim playhead" onPointerDown={beginPlayheadDrag} onPointerMove={movePlayheadDrag} onPointerUp={finishPlayheadDrag} onPointerCancel={finishPlayheadDrag}><span /></button>
         </div><div className="video-custom-transport"><button type="button" className="transport-play" onClick={togglePlayback} aria-label={playing ? "Pause video preview" : "Play video preview"}>{playing ? "Ⅱ" : "▶"}</button><button type="button" className="transport-step" onClick={() => seekTo(playhead - 1 / 30)} aria-label="Step back one frame">−1f</button><button type="button" className="transport-step" onClick={() => seekTo(playhead + 1 / 30)} aria-label="Step forward one frame">+1f</button><input className="transport-scrub" type="range" min="0" max={duration} step="0.001" value={playhead} aria-label="Video preview playhead" onChange={(event) => seekTo(event.currentTarget.valueAsNumber)} /></div></>}
         </>}
