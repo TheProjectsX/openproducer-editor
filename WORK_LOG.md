@@ -1,5 +1,31 @@
 # Work log
 
+## 2026-11-16 — Collage template geometry and studio sidebar
+
+- Diagnosed the malformed single-photo grid: template geometry was derived directly from uploaded image count, so a two-column layout with one image had only one row and stretched its cell across the canvas height. Layouts now retain at least two full rows (or their template-specific minimum), independently of photo count.
+- Added visible empty cell placeholders with direct Add photo actions. Photos occupy stable cell slots; remove/reorder and saved/reopened collage projects preserve those slots, including older projects without slot metadata.
+- Reorganized collage tools into an Image Manager, Layouts, Customize, and Text sidebar. Moved image order and per-photo controls into their relevant panels and removed the long settings stack below the canvas.
+- Took interaction cues from BeFunky's documented layout customization, cell add/remove, and in-collage image editing workflow. Verification: `tsc --noEmit` passed; browser visual and pointer interaction review remain pending because browser/computer-use controls are unavailable in this session. Git status/add still fail with “this operation must be run in a work tree,” so this feature could not be committed.
+
+## 2026-11-16 — Distinguish proportional downscaling from exact resize
+
+- Reworked Downscale Image into a proportional scale tool with custom percentage and 1 ÷ n reduction-factor modes. Switching modes preserves the same effective scale (for example, 50% ↔ 2× smaller).
+- Output dimensions are derived from the original pixels, rounded to the nearest pixel, and always preserve the source aspect ratio. Removed the exact width/height and aspect-ratio editor from this tool; those remain in Resize.
+- Updated Downscale page description and catalog copy. Verification: `tsc --noEmit` and manual trailing-whitespace checks passed; browser UI review remains pending.
+
+## 2026-11-16 — Crop aspect and exact-dimension controls
+
+- Added free, keep-current-selection, common preset, and custom crop ratios. Aspect locking constrains drag-to-draw and all eight resize handles while preserving the opposite edge/corner; the crop can still be moved freely.
+- Added custom ratio inputs and exact crop width/height fields. Editing either dimension follows the selected ratio, and the selection stays inside the source image.
+- Verification: `tsc --noEmit` and manual trailing-whitespace checks passed; interactive browser review remains pending.
+
+## 2026-11-16 — Crop inside Image Resize
+
+- Removed the color-adjustment and overlay-layer control groups from the standalone Resize and Downscale tools; those controls remain in the Image Studio project workspace.
+- Added an in-place crop view to `/tools/image/resize`: users can draw a selection, move it, resize it from eight handles, apply it, then set output pixels. The output canvas and download now resample the applied source rectangle without an intermediate file. Reset restores the full source image and dimensions.
+- Added Crop and Output preview tabs so the source selection and resulting resized image are both available in the same editor.
+- Verification: `tsc --noEmit` and manual trailing-whitespace validation passed. The app-level typecheck is still blocked by the checkout's missing Rolldown native binding; browser pointer interaction and crop/export fidelity remain pending.
+
 ## 2026-11-16 — Upscale before/after comparison slider
 
 - Added a synchronized before/after viewer for Image Upscale. The AI result fills the comparison stage, the original is clipped over it, and a keyboard-accessible range control moves the visible split line from 0 to 100 percent.
@@ -744,3 +770,83 @@
 - Confirmed the follow-up changes: cached Audio Trim waveform peaks and debounced preview rebuilds to reduce drag lag; corrected edge-drag bounds; synchronized custom-player metadata on source changes; kept the upscale canvas mounted before inference; and changed video extraction to include all tracks while discarding video.
 - The handoff records targeted Chrome fixture results and remaining gaps. Audio Extract still needs browser retest on AAC MP4 and Opus WebM; Audio Split ZIP integrity/download, collage SVG messaging, small-output title fitting, offline operation, and recovery/accessibility checks remain open.
 - Corrected the handoff's stale latest-commit line. No application code was modified during this sync.
+## 2026-11-16 — Dedicated image downscale tool
+
+- Added `/tools/image/downscale` as a focused entry point over the existing local canvas resampling/export pipeline. It initializes to half the source dimensions, preserves the original aspect ratio by default, and requires output dimensions to stay within the source with at least one dimension reduced.
+- Added Downscale Image to the image workspace catalog and image tool dropdown; updated the workspace count and corrected the Upscale catalog description to identify its AI processing.
+- Verification: `tsc --noEmit` passed. `npm run typecheck` could not start because the installed Rolldown package is missing its optional native binding. Git status/diff/add commands are currently failing with “this operation must be run in a work tree,” so no commit was created.
+
+## 2026-11-16 — Resize crop controls moved into sidebar
+
+- Restored the Resize tool's single output preview canvas and removed the in-flow crop workspace/tabs that displaced the preview and controls.
+- Added a dedicated Crop Image sidebar section with an on/off toggle. When enabled, it exposes crop aspect, custom ratio, crop dimensions, Crop Selection, apply, close, and reset controls.
+- Crop selection now overlays the existing preview canvas only after Crop Selection is clicked; the overlay is absolutely positioned within the preview stage so it does not add layout height or shift neighboring content.
+- Verification: `tsc --noEmit` passed. Browser visual validation was not available in this turn.
+
+## 2026-11-16 — Crop tool spacing locks and aspect controls
+
+- Replaced the plain Left/Top coordinate fields with horizontal and vertical inset controls. Optional spacing locks keep the crop margins equal on both sides as the inset changes and when the corresponding crop edge is dragged.
+- Added one-time Center horizontally and Center vertically buttons.
+- Added an aspect-ratio selector with original, common presets, free selection, and custom ratio. Crop width/height inputs and edge resizing respect the chosen ratio.
+- Verification: `tsc --noEmit` passed. Browser interaction checks were not available in this turn.
+
+## 2026-11-16 — Tool title placement in loaded image editors
+
+- Hid the large title/description intro whenever Resize, Downscale, or Crop has an image loaded; upload screens continue to show the full introduction.
+- Added compact tool-name headings at the top of each loaded editor sidebar. Resize, Downscale, Image Editor, and Crop Image get context-specific labels.
+- Verification: `tsc --noEmit` passed. Browser visual validation was not available in this turn.
+
+## 2026-11-16 — Downscale before/after comparison
+
+- Added a before/after comparison slider to the Downscale preview, matching the Upscale comparison interaction and visual treatment.
+- The divider reveals the original source on one side and the actual resampled output on the other. Labels identify each side, and the range control is keyboard accessible.
+- Verification: `tsc --noEmit` passed. Browser visual validation was not available in this turn.
+
+## 2026-11-16 — Blank collage editor entry
+
+- Added a collage-only “Open blank collage editor” action on the collage upload screen. It opens the editor without requiring a source image.
+- The blank editor draws the selected canvas layout with interactive Add photo cells. Once opened or used with images, it stays in the editor if all photos are removed.
+- The existing file picker remains available in the sidebar, and the blank editor cannot be exported or saved until images are added.
+- Verification: `tsc --noEmit` passed. Browser visual validation was not available in this turn.
+
+## 2026-11-16 — Collage studio behavior and layout fixes
+
+- Made Add Images available regardless of the active collage sidebar panel. Corrected the preview frame sizing so canvas pixels, empty-cell buttons, hit-testing, and drag/drop cells share the same aspect-ratio frame; empty layouts now open as a 3×3 grid.
+- Added click/right-click cell context actions (Edit Image, Remove Image, Replace Image, Delete Cell), file drops onto any cell, and drag/drop of Image Manager assets to fill or swap cells. Remove Image leaves its cell empty; Delete Cell removes the slot and shifts later cells up. Removed the preview's floating cross control.
+- Added a dedicated Cell Edit sidebar tab, moved per-image controls out of Customize, removed Columns from Customize, and added a Custom layout with row/column inputs.
+- Set Crop to Fill as the default and constrained cover-mode image scale/position so a photo cannot be dragged out of its cell and reveal gaps.
+- Added a draggable Spacing range control and per-cell Corner Rounding, included in the rendered/exported canvas and empty-cell preview. Changed layout thumbnails to white cells with colored outlines.
+- Persisted custom rows, corner radius, and deleted-cell count in local collage projects.
+- Verification: `tsc --noEmit` passed. Browser interaction/visual checks were not available in this turn.
+
+## 2026-11-16 — Resize crop controls and sidebar expansion
+
+- Fixed the loaded Resize sidebar's flex shrinking: expandable control groups and the crop section retain their full content height and scroll within the sidebar, so opening Transform & Export no longer collapses it.
+- Restored comfortable crop-control padding and moved the Crop Selection action directly after the crop dimensions so it remains visible without scrolling. The action activates the crop overlay over the existing preview; selecting a preset also updates the crop rectangle and displays the interactive selection.
+- Verification: `tsc --noEmit` passed. Browser visual validation was not available in this turn.
+
+## 2026-11-16 — Separate crop spacing and centering controls
+
+- Split the Crop tool sidebar into distinct Lock Spacing and Center Crop groups. Horizontal/vertical inset fields now sit directly under their corresponding toggle switches.
+- Styled centering actions as bordered, rounded buttons with directional SVG icons, padding, hover/pressed feedback, and visible keyboard focus.
+- Verification: `tsc --noEmit` passed. Browser visual validation was not available in this turn.
+
+## 2026-11-16 — Inline crop inset values
+
+- Kept each horizontal/vertical inset label on the same row as its numeric pixel input and `px` unit.
+- Verification: `tsc --noEmit` passed.
+
+## 2026-11-16 — Crop Selection placement and preview sizing
+
+- Moved Crop Selection immediately below the Crop Image toggle, ahead of aspect and dimension controls.
+- Sized the absolute crop overlay to the rendered output aspect and preview bounds so enabling selection does not enlarge or reflow the image preview.
+- Verification: `tsc --noEmit` passed. Browser visual validation was not available in this turn.
+
+
+## 2026-11-16 — Resize crop selector immediate activation
+
+- The Crop Image toggle now immediately displays the Resize tool's own selector over the existing preview; removed the extra Crop Selection activation button from the expanded controls.
+- The overlay now exactly fills the preview stage and only draws the selection outline, handles, and dimming outside it. It no longer adds a second image or changes the preview image's appearance or layout.
+- Separated the draft crop rectangle from the applied crop. Dragging the selector no longer redraws the full-resolution output canvas on every pointer movement; the canvas updates only when the crop is applied.
+- Verification: TypeScript check run; browser visual validation not available in this turn.
+

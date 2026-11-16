@@ -7,6 +7,7 @@ import { createImageHistory, recordImageEdit, redoImageEdit, undoImageEdit } fro
 import { MediaImportScreen } from "../components/media-import-screen";
 
 type SourceImage = { file: File; url: string; width: number; height: number };
+type CropRect = { x: number; y: number; width: number; height: number };
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -19,18 +20,31 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export function ImageResizeTool({ workspace = false }: { workspace?: boolean } = {}) {
+export function ImageResizeTool({ workspace = false, downscale = false }: { workspace?: boolean; downscale?: boolean } = {}) {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("project");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const interactionCanvasRef = useRef<HTMLCanvasElement>(null);
   const layerGestureRef = useRef<{ id: string; pointerId: number; startX: number; startY: number; layer: ImageLayer; last: ImageLayer; mode: "move" | "resize" } | null>(null);
+  const cropGestureRef = useRef<{ pointerId: number; mode: "draw" | "move" | "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w"; startX: number; startY: number; initial: CropRect } | null>(null);
   const [source, setSource] = useState<SourceImage | null>(null);
+  const [cropRect, setCropRect] = useState<CropRect>({ x: 0, y: 0, width: 1, height: 1 });
+  const [appliedCropRect, setAppliedCropRect] = useState<CropRect | null>(null);
+  const [cropApplied, setCropApplied] = useState(false);
+  const [cropEnabled, setCropEnabled] = useState(false);
+  const [cropSelectionActive, setCropSelectionActive] = useState(false);
+  const [cropAspectMode, setCropAspectMode] = useState("free");
+  const [lockedCropRatio, setLockedCropRatio] = useState(1);
+  const [customCropRatioWidth, setCustomCropRatioWidth] = useState("1");
+  const [customCropRatioHeight, setCustomCropRatioHeight] = useState("1");
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
   const [ratioMode, setRatioMode] = useState("free");
   const [customRatioWidth, setCustomRatioWidth] = useState("1");
   const [customRatioHeight, setCustomRatioHeight] = useState("1");
+  const [downscaleMode, setDownscaleMode] = useState<"percent" | "factor">("percent");
+  const [downscaleAmount, setDownscaleAmount] = useState("50");
+  const [downscaleComparePosition, setDownscaleComparePosition] = useState(50);
   const [brightness, setBrightness] = useState("100");
   const [contrast, setContrast] = useState("100");
   const [saturation, setSaturation] = useState("100");
@@ -46,7 +60,11 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
   const [projectTitle, setProjectTitle] = useState("");
   const [projectStatus, setProjectStatus] = useState("");
 
-  const originalRatio = source ? source.width / source.height : 1;
+  const originalRatio = cropApplied ? cropRect.width / cropRect.height : source ? source.width / source.height : 1;
+  const downscaleValue = Number(downscaleAmount);
+  const scaleMultiplier = downscaleMode === "percent" ? downscaleValue / 100 : 1 / downscaleValue;
+  const renderWidth = downscale && source ? Math.max(1, Math.round(source.width * scaleMultiplier)) : width;
+  const renderHeight = downscale && source ? Math.max(1, Math.round(source.height * scaleMultiplier)) : height;
   const selectedRatio = ratioMode === "free" ? null
     : ratioMode === "original" ? originalRatio
       : ratioMode === "custom" ? Number(customRatioWidth) / Number(customRatioHeight)
@@ -56,9 +74,10 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
   const degrees = Number(rotation), radians = degrees * Math.PI / 180;
   const sin = Math.abs(Math.sin(radians)) < 1e-10 ? 0 : Math.abs(Math.sin(radians));
   const cos = Math.abs(Math.cos(radians)) < 1e-10 ? 0 : Math.abs(Math.cos(radians));
-  const rotatedWidth = Math.ceil(Math.abs(width * cos) + Math.abs(height * sin));
-  const rotatedHeight = Math.ceil(Math.abs(width * sin) + Math.abs(height * cos));
-  const outputValid = Number.isInteger(width) && width > 0 && Number.isInteger(height) && height > 0
+  const rotatedWidth = Math.ceil(Math.abs(renderWidth * cos) + Math.abs(renderHeight * sin));
+  const rotatedHeight = Math.ceil(Math.abs(renderWidth * sin) + Math.abs(renderHeight * cos));
+  const outputValid = Number.isInteger(renderWidth) && renderWidth > 0 && Number.isInteger(renderHeight) && renderHeight > 0
+    && (!downscale || Boolean(source && Number.isFinite(scaleMultiplier) && scaleMultiplier > 0 && scaleMultiplier <= 1 && downscaleValue > 0))
     && Number.isFinite(degrees) && degrees >= -180 && degrees <= 180
     && rotatedWidth <= 32768 && rotatedHeight <= 32768 && rotatedWidth * rotatedHeight <= 100_000_000;
   const ratioText = useMemo(
@@ -91,7 +110,8 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
       context.rotate(radians);
       if (flipHorizontal) context.scale(-1, 1);
       context.filter = `brightness(${amount(brightness)}%) contrast(${amount(contrast)}%) saturate(${amount(saturation)}%)`;
-      context.drawImage(image, -width / 2, -height / 2, width, height);
+      const drawCrop = appliedCropRect ?? { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
+      context.drawImage(image, drawCrop.x, drawCrop.y, drawCrop.width, drawCrop.height, -renderWidth / 2, -renderHeight / 2, renderWidth, renderHeight);
       context.filter = "none";
       for (const layer of layers) {
         if (!layer.visible) continue;
@@ -105,7 +125,7 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
     };
     image.onerror = () => setError("The selected image could not be decoded.");
     image.src = source.url;
-  }, [source, width, height, rotatedWidth, rotatedHeight, radians, flipHorizontal, outputValid, brightness, contrast, saturation, layers]);
+  }, [source, appliedCropRect, renderWidth, renderHeight, rotatedWidth, rotatedHeight, radians, flipHorizontal, outputValid, brightness, contrast, saturation, layers]);
 
   useEffect(() => {
     const canvas = canvasRef.current, overlay = interactionCanvasRef.current;
@@ -189,8 +209,19 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
     const image = new Image();
     image.onload = () => {
       setSource({ file, url, width: image.naturalWidth, height: image.naturalHeight });
+      setCropRect({ x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight });
+      setAppliedCropRect(null);
+      setCropApplied(false);
+      setCropEnabled(false);
+      setCropSelectionActive(false);
+      setCropAspectMode("free");
+      if (downscale) setDownscaleComparePosition(50);
       if (settings) applySettings(settings);
-      else { setWidth(image.naturalWidth); setHeight(image.naturalHeight); setLayers([]); setSelectedLayerId(""); }
+      else {
+        setWidth(image.naturalWidth);
+        setHeight(image.naturalHeight);
+        setRatioMode("free"); setLayers([]); setSelectedLayerId("");
+      }
       setError("");
       if (projectId && !restoring) {
         setProjectStatus("Saving source image…");
@@ -288,6 +319,168 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
     }
   }
 
+  function changeDownscaleMode(mode: "percent" | "factor") {
+    if (mode === downscaleMode) return;
+    const amount = Number(downscaleAmount);
+    if (Number.isFinite(amount) && amount > 0) setDownscaleAmount(String(100 / amount));
+    setDownscaleMode(mode);
+  }
+
+  function cropPoint(event: React.PointerEvent<HTMLDivElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (!source || !bounds.width || !bounds.height) return null;
+    return {
+      x: Math.max(0, Math.min(source.width, (event.clientX - bounds.left) / bounds.width * source.width)),
+      y: Math.max(0, Math.min(source.height, (event.clientY - bounds.top) / bounds.height * source.height)),
+    };
+  }
+
+  function cropRatioFor(mode: string) {
+    if (mode === "free") return null;
+    if (mode === "selection") return lockedCropRatio;
+    if (mode === "custom") return Number(customCropRatioWidth) / Number(customCropRatioHeight);
+    const [ratioWidth, ratioHeight] = mode.split(":").map(Number);
+    return ratioWidth / ratioHeight;
+  }
+
+  function fitCropToRatio(ratio: number) {
+    if (!source || !Number.isFinite(ratio) || ratio <= 0) return;
+    const width = Math.min(cropRect.width, cropRect.height * ratio, source.width);
+    const height = Math.min(cropRect.height, cropRect.width / ratio, source.height);
+    const fittedWidth = Math.min(width, height * ratio);
+    const fittedHeight = fittedWidth / ratio;
+    const centerX = cropRect.x + cropRect.width / 2, centerY = cropRect.y + cropRect.height / 2;
+    const x = Math.max(0, Math.min(source.width - fittedWidth, centerX - fittedWidth / 2));
+    const y = Math.max(0, Math.min(source.height - fittedHeight, centerY - fittedHeight / 2));
+    setCropRect({ x, y, width: fittedWidth, height: fittedHeight });
+  }
+
+  function chooseCropAspect(mode: string) {
+    if (mode === "selection") setLockedCropRatio(cropRect.width / cropRect.height);
+    setCropAspectMode(mode);
+    if (cropEnabled) setCropSelectionActive(true);
+    const ratio = mode === "selection" ? cropRect.width / cropRect.height
+      : mode === "custom" ? Number(customCropRatioWidth) / Number(customCropRatioHeight)
+        : mode === "free" ? null : Number(mode.split(":")[0]) / Number(mode.split(":")[1]);
+    if (ratio) fitCropToRatio(ratio);
+  }
+
+  function changeCustomCropRatio(widthText: string, heightText: string) {
+    setCustomCropRatioWidth(widthText);
+    setCustomCropRatioHeight(heightText);
+    const ratio = Number(widthText) / Number(heightText);
+    if (cropAspectMode === "custom" && Number.isFinite(ratio) && ratio > 0) fitCropToRatio(ratio);
+  }
+
+  function changeCropDimension(axis: "width" | "height", value: number) {
+    if (!source || !Number.isFinite(value) || value < 1) return;
+    const ratio = cropRatioFor(cropAspectMode);
+    let width = Math.min(source.width, axis === "width" ? value : cropRect.width);
+    let height = Math.min(source.height, axis === "height" ? value : cropRect.height);
+    if (ratio) {
+      if (axis === "width") height = width / ratio;
+      else width = height * ratio;
+      const scale = Math.min(1, source.width / width, source.height / height);
+      width *= scale;
+      height *= scale;
+    }
+    const centerX = cropRect.x + cropRect.width / 2, centerY = cropRect.y + cropRect.height / 2;
+    setCropRect({ x: Math.max(0, Math.min(source.width - width, centerX - width / 2)), y: Math.max(0, Math.min(source.height - height, centerY - height / 2)), width, height });
+  }
+
+  function beginCropGesture(event: React.PointerEvent<HTMLDivElement>) {
+    if (!source || workspace || downscale) return;
+    const point = cropPoint(event);
+    if (!point) return;
+    const handle = (event.target as HTMLElement).closest<HTMLElement>("[data-resize-crop-handle]")?.dataset.resizeCropHandle;
+    const selection = (event.target as HTMLElement).closest("[data-resize-crop-selection]");
+    const fullImageSelected = cropRect.x <= 0 && cropRect.y <= 0 && cropRect.width >= source.width && cropRect.height >= source.height;
+    const mode = handle && !fullImageSelected ? handle as NonNullable<typeof cropGestureRef.current>["mode"] : selection && !fullImageSelected ? "move" : "draw";
+    cropGestureRef.current = { pointerId: event.pointerId, mode, startX: point.x, startY: point.y, initial: cropRect };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+
+  function moveCropGesture(event: React.PointerEvent<HTMLDivElement>) {
+    const gesture = cropGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId || !source) return;
+    const point = cropPoint(event);
+    if (!point) return;
+    const { initial, mode, startX, startY } = gesture;
+    let next: CropRect;
+    const cropRatio = cropRatioFor(cropAspectMode);
+    if (mode === "draw") {
+      let width = Math.abs(point.x - startX), height = Math.abs(point.y - startY);
+      if (cropRatio) {
+        if (height === 0 || width / Math.max(height, 0.0001) > cropRatio) height = width / cropRatio;
+        else width = height * cropRatio;
+        const maxWidth = point.x < startX ? startX : source.width - startX;
+        const maxHeight = point.y < startY ? startY : source.height - startY;
+        const scale = Math.min(1, maxWidth / Math.max(width, 0.0001), maxHeight / Math.max(height, 0.0001));
+        width *= scale; height *= scale;
+      }
+      next = { x: point.x < startX ? startX - width : startX, y: point.y < startY ? startY - height : startY, width, height };
+    } else if (mode === "move") {
+      next = {
+        ...initial,
+        x: Math.max(0, Math.min(source.width - initial.width, initial.x + point.x - startX)),
+        y: Math.max(0, Math.min(source.height - initial.height, initial.y + point.y - startY)),
+      };
+    } else {
+      let left = initial.x, top = initial.y, right = initial.x + initial.width, bottom = initial.y + initial.height;
+      if (mode.includes("w")) left = Math.max(0, Math.min(point.x, right - 1));
+      if (mode.includes("e")) right = Math.min(source.width, Math.max(point.x, left + 1));
+      if (mode.includes("n")) top = Math.max(0, Math.min(point.y, bottom - 1));
+      if (mode.includes("s")) bottom = Math.min(source.height, Math.max(point.y, top + 1));
+      next = { x: left, y: top, width: right - left, height: bottom - top };
+      if (cropRatio) {
+        let width = next.width, height = next.height;
+        const horizontal = mode.includes("w") || mode.includes("e"), vertical = mode.includes("n") || mode.includes("s");
+        if (horizontal && !vertical) height = width / cropRatio;
+        else if (vertical && !horizontal) width = height * cropRatio;
+        else { width = Math.max(width, height * cropRatio); height = width / cropRatio; }
+        const anchorX = mode.includes("w") ? initial.x + initial.width : mode.includes("e") ? initial.x : initial.x + initial.width / 2;
+        const anchorY = mode.includes("n") ? initial.y + initial.height : mode.includes("s") ? initial.y : initial.y + initial.height / 2;
+        const maxWidth = mode.includes("w") ? anchorX : mode.includes("e") ? source.width - anchorX : 2 * Math.min(anchorX, source.width - anchorX);
+        const maxHeight = mode.includes("n") ? anchorY : mode.includes("s") ? source.height - anchorY : 2 * Math.min(anchorY, source.height - anchorY);
+        const scale = Math.min(1, maxWidth / Math.max(width, 0.0001), maxHeight / Math.max(height, 0.0001));
+        width *= scale; height *= scale;
+        const x = mode.includes("w") ? anchorX - width : mode.includes("e") ? anchorX : anchorX - width / 2;
+        const y = mode.includes("n") ? anchorY - height : mode.includes("s") ? anchorY : anchorY - height / 2;
+        next = { x, y, width, height };
+      }
+    }
+    setCropRect(next);
+  }
+
+  function endCropGesture(event: React.PointerEvent<HTMLDivElement>) {
+    if (cropGestureRef.current?.pointerId === event.pointerId) cropGestureRef.current = null;
+  }
+
+  function applyCrop() {
+    if (!source) return;
+    const nextWidth = Math.max(1, Math.round(cropRect.width));
+    const nextHeight = Math.max(1, Math.round(cropRect.height));
+    setAppliedCropRect({ ...cropRect });
+    setCropApplied(true);
+    setWidth(nextWidth);
+    setHeight(nextHeight);
+    setRatioMode("original");
+    setCropSelectionActive(false);
+  }
+
+  function resetCrop() {
+    if (!source) return;
+    setCropRect({ x: 0, y: 0, width: source.width, height: source.height });
+    setAppliedCropRect(null);
+    setCropApplied(false);
+    setCropAspectMode("free");
+    setWidth(source.width);
+    setHeight(source.height);
+    setRatioMode("free");
+    setCropSelectionActive(false);
+  }
+
   function chooseRatio(value: string) {
     setRatioMode(value);
     if (value !== "free" && source) {
@@ -331,44 +524,64 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
   }
 
   return (
-    <main className={`resize-page${workspace && source ? " has-media" : ""}`}>
+    <main className={`resize-page${source ? " has-media" : ""}${downscale ? " downscale-page" : ""}`}>
       <ToolPageHeader />
       <section className="resize-intro">
         <p className="eyebrow">{workspace ? "IMAGE STUDIO · LOCAL PROJECT" : "IMAGE TOOL · PRIVATE BY DESIGN"}</p>
-        <h1>{workspace ? "Edit your image project." : "Resize and adjust your image."}</h1>
-        <p>{workspace ? "Resize, rotate, flip, adjust color, and arrange editable text and shape layers. Project instructions and source image stay on this device." : "Set exact output pixels and tune brightness, contrast, and saturation. Your image stays in this browser."}</p>
+        <h1>{workspace ? "Edit your image project." : downscale ? "Downscale your image." : "Resize and adjust your image."}</h1>
+        <p>{workspace ? "Resize, rotate, flip, adjust color, and arrange editable text and shape layers. Project instructions and source image stay on this device." : downscale ? "Scale an image to a custom percentage or reduction factor while preserving its original proportions." : "Crop the image in place, then resize it to exact output pixels. Your image stays in this browser."}</p>
       </section>
       {!source ? <MediaImportScreen kind="image" accept="image/*" onFile={(next) => importImage(next)} error={error} /> : <section className="resize-workspace" aria-label="Image resizing workspace" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); importImage(event.dataTransfer.files?.[0]); }}>
         <div className="resize-controls">
+          <h2 className="editor-sidebar-title">{downscale ? "Downscale Image" : workspace ? "Image Editor" : "Resize Image"}</h2>
           <label className="file-picker">
             <span>{source ? "Choose another image" : "Choose an image"}</span>
             <input type="file" accept="image/*" onChange={(event) => importImage(event.currentTarget.files?.[0])} />
           </label>
           {projectId && <p className="resize-note" role="status">Project: {projectTitle || "Loading…"}. {projectStatus}</p>}
           {source && <p className="source-info">Original: {ratioText} px</p>}
-          <details className="editor-control-group" open><summary>Canvas size <span>{source ? `${ratioText} px original` : ""}</span></summary><div className="editor-control-content">
-          <div className="dimension-fields">
-            <label>Width <span>px</span><input type="number" min="1" step="1" value={width || ""} onChange={(event) => changeWidth(event.currentTarget.valueAsNumber)} /></label>
-            <label>Height <span>px</span><input type="number" min="1" step="1" value={height || ""} onChange={(event) => changeHeight(event.currentTarget.valueAsNumber)} /></label>
-          </div>
-          <label className="ratio-field">Aspect ratio<select value={ratioMode} onChange={(event) => chooseRatio(event.currentTarget.value)}><option value="free">Custom dimensions (stretch)</option><option value="original">Original ratio</option><option value="1:1">1:1 · Square</option><option value="4:3">4:3</option><option value="3:2">3:2</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="custom">Custom ratio</option></select></label>
-          {ratioMode === "custom" && <div className="dimension-fields"><label>Ratio width<input type="number" min="1" step="any" value={customRatioWidth} onChange={(event) => { setCustomRatioWidth(event.currentTarget.value); if (Number(event.currentTarget.value) > 0) setHeight(Math.max(1, Math.round(width * Number(customRatioHeight) / Number(event.currentTarget.value)))); }} /></label><label>Ratio height<input type="number" min="1" step="any" value={customRatioHeight} onChange={(event) => { setCustomRatioHeight(event.currentTarget.value); if (Number(event.currentTarget.value) > 0) setHeight(Math.max(1, Math.round(width * Number(event.currentTarget.value) / Number(customRatioWidth)))); }} /></label></div>}
-          <p className="resize-note">{ratio ? "Changing either dimension keeps the selected ratio. The full image is stretched to fit; no crop or padding is added." : "Custom dimensions resize the full image without cropping or padding."} Exports are limited to 100 megapixels and 32,768 px per side.</p>
+          <details className="editor-control-group" open><summary>{downscale ? "Scale image" : "Canvas size"}<span>{downscale && source ? `${renderWidth} × ${renderHeight} px output` : source ? cropApplied && !workspace ? `${Math.round(cropRect.width)} × ${Math.round(cropRect.height)} px crop` : `${ratioText} px original` : ""}</span></summary><div className="editor-control-content">
+          {downscale ? <>
+            <label className="ratio-field">Scale method<select value={downscaleMode} onChange={(event) => changeDownscaleMode(event.currentTarget.value as "percent" | "factor")}><option value="percent">Percentage of original</option><option value="factor">Reduction factor (1 ÷ n)</option></select></label>
+            <label className="speed-field">{downscaleMode === "percent" ? "Scale percentage" : "Downscale factor"}<span>{downscaleMode === "percent" ? "custom · 0.1% to 100%" : "custom · 1× to 1000× smaller"}</span><input type="number" min={downscaleMode === "percent" ? "0.1" : "1"} max={downscaleMode === "percent" ? "100" : "1000"} step="any" value={downscaleAmount} onChange={(event) => setDownscaleAmount(event.currentTarget.value)} /></label>
+            <p className="resize-note">{downscaleMode === "percent" ? `${downscaleAmount || "0"}% of the original dimensions` : `${downscaleAmount || "0"}× smaller than the original`} · Aspect ratio is preserved. Output: {renderWidth} × {renderHeight} px.</p>
+          </> : <>
+            <div className="dimension-fields">
+              <label>Width <span>px</span><input type="number" min="1" step="1" value={width || ""} onChange={(event) => changeWidth(event.currentTarget.valueAsNumber)} /></label>
+              <label>Height <span>px</span><input type="number" min="1" step="1" value={height || ""} onChange={(event) => changeHeight(event.currentTarget.valueAsNumber)} /></label>
+            </div>
+            <label className="ratio-field">Aspect ratio<select value={ratioMode} onChange={(event) => chooseRatio(event.currentTarget.value)}><option value="free">Custom dimensions (stretch)</option><option value="original">Original ratio</option><option value="1:1">1:1 · Square</option><option value="4:3">4:3</option><option value="3:2">3:2</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="custom">Custom ratio</option></select></label>
+            {ratioMode === "custom" && <div className="dimension-fields"><label>Ratio width<input type="number" min="1" step="any" value={customRatioWidth} onChange={(event) => { setCustomRatioWidth(event.currentTarget.value); if (Number(event.currentTarget.value) > 0) setHeight(Math.max(1, Math.round(width * Number(customRatioHeight) / Number(event.currentTarget.value)))); }} /></label><label>Ratio height<input type="number" min="1" step="any" value={customRatioHeight} onChange={(event) => { setCustomRatioHeight(event.currentTarget.value); if (Number(event.currentTarget.value) > 0) setHeight(Math.max(1, Math.round(width * Number(event.currentTarget.value) / Number(customRatioWidth)))); }} /></label></div>}
+            <p className="resize-note">{cropApplied ? "The selected crop is resampled to these output dimensions. No extra crop or padding is added." : ratio ? "Changing either dimension keeps the selected ratio. The full image is stretched to fit; no crop or padding is added." : "Custom dimensions resize the full image without cropping or padding."} Exports are limited to 100 megapixels and 32,768 px per side.</p>
+          </>}
           </div></details>
-          <details className="editor-control-group" open><summary>Color adjustments</summary><div className="editor-control-content"><div className="filter-fields" aria-label="Image adjustments">
+          {!workspace && !downscale && <section className="editor-control-group crop-sidebar-section" aria-label="Crop image controls">
+            <button type="button" className="crop-sidebar-toggle" aria-expanded={cropEnabled} onClick={() => { const nextEnabled = !cropEnabled; setCropEnabled(nextEnabled); setCropSelectionActive(nextEnabled); }}>
+              <strong>Crop Image</strong><span className={`crop-switch${cropEnabled ? " on" : ""}`} aria-hidden="true"><i /></span>
+            </button>
+            {cropEnabled && <div className="editor-control-content crop-sidebar-content">
+              <label className="ratio-field">Crop aspect<select value={cropAspectMode} onChange={(event) => chooseCropAspect(event.currentTarget.value)}><option value="free">Free selection</option><option value="selection">Keep current selection ratio</option><option value="1:1">1:1 · Square</option><option value="4:3">4:3</option><option value="3:2">3:2</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="custom">Custom ratio</option></select></label>
+              {cropAspectMode === "custom" && <div className="dimension-fields"><label>Ratio width<input type="number" min="0.001" step="any" value={customCropRatioWidth} onChange={(event) => changeCustomCropRatio(event.currentTarget.value, customCropRatioHeight)} /></label><label>Ratio height<input type="number" min="0.001" step="any" value={customCropRatioHeight} onChange={(event) => changeCustomCropRatio(customCropRatioWidth, event.currentTarget.value)} /></label></div>}
+              <div className="dimension-fields"><label>Crop width <span>px</span><input type="number" min="1" max={source.width} step="1" value={Math.round(cropRect.width)} onChange={(event) => changeCropDimension("width", event.currentTarget.valueAsNumber)} /></label><label>Crop height <span>px</span><input type="number" min="1" max={source.height} step="1" value={Math.round(cropRect.height)} onChange={(event) => changeCropDimension("height", event.currentTarget.valueAsNumber)} /></label></div>
+              <p className="resize-note">Drag inside the preview selection to move it, or drag a handle to resize. The selector stays over the original preview until you apply it.</p>
+              <button type="button" className="export-button" onClick={applyCrop}>{cropApplied ? "Apply updated crop" : "Apply crop to resize"}</button>
+              {cropApplied && <button type="button" className="secondary-button" onClick={resetCrop}>Reset to full image</button>}
+            </div>}
+          </section>}
+          {workspace && <details className="editor-control-group" open><summary>Color adjustments</summary><div className="editor-control-content"><div className="filter-fields" aria-label="Image adjustments">
             <label>Brightness <span>0–300%</span><input type="number" min="0" max="300" step="any" value={brightness} onChange={(event) => setBrightness(event.currentTarget.value)} /></label>
             <label>Contrast <span>0–300%</span><input type="number" min="0" max="300" step="any" value={contrast} onChange={(event) => setContrast(event.currentTarget.value)} /></label>
             <label>Saturation <span>0–300%</span><input type="number" min="0" max="300" step="any" value={saturation} onChange={(event) => setSaturation(event.currentTarget.value)} /></label>
           </div>
           <div className="speed-presets" aria-label="Common image filter presets"><button type="button" onClick={() => { setBrightness("100"); setContrast("100"); setSaturation("0"); }}>Grayscale</button><button type="button" onClick={() => { setBrightness("105"); setContrast("115"); setSaturation("135"); }}>Vivid</button><button type="button" onClick={() => { setBrightness("100"); setContrast("92"); setSaturation("75"); }}>Muted</button><button type="button" onClick={() => { setBrightness("100"); setContrast("100"); setSaturation("100"); }}>Reset filters</button></div>
-          </div></details>
+          </div></details>}
           <details className="editor-control-group"><summary>Transform & export</summary><div className="editor-control-content">
           <label className="speed-field">Rotation <span>custom degrees · −180 to 180</span><input type="number" min="-180" max="180" step="any" value={rotation} onChange={(event) => setRotation(event.currentTarget.value)} /></label>
           <label className="ratio-toggle"><input type="checkbox" checked={flipHorizontal} onChange={(event) => setFlipHorizontal(event.currentTarget.checked)} /> Flip horizontally</label>
           <label className="ratio-field">Export format<select value={exportFormat} onChange={(event) => setExportFormat(event.currentTarget.value as "png" | "jpeg")}><option value="png">PNG (lossless, transparency)</option><option value="jpeg">JPEG (white background)</option></select></label>
           {exportFormat === "jpeg" && <label className="speed-field">JPEG quality <span>custom value from 0 to 1</span><input type="number" min="0" max="1" step="any" value={jpegQuality} onChange={(event) => setJpegQuality(event.currentTarget.value)} /></label>}
           </div></details>
-          <details className="image-layers" open aria-label="Image layers">
+          {workspace && <details className="image-layers" open aria-label="Image layers">
             <summary>Overlay layers <span>{layers.length} item(s)</span></summary>
             <div className="image-layer-actions"><button type="button" className="secondary-button" disabled={!source} onClick={() => addLayer("text")}>Add text</button><button type="button" className="secondary-button" disabled={!source} onClick={() => addLayer("rectangle")}>Add rectangle</button><button type="button" className="secondary-button" disabled={!source} onClick={() => addLayer("ellipse")}>Add ellipse</button></div>
             <div className="image-layer-list">{layers.map((layer, index) => <div className={`image-layer-row ${selectedLayerId === layer.id ? "selected" : ""}`} key={layer.id}><button type="button" className="image-layer-select" onClick={() => setSelectedLayerId(layer.id)}>{index + 1}. {layer.kind === "text" ? layer.text || "Text" : layer.kind}</button><button type="button" aria-label={`Move layer ${index + 1} up`} disabled={index === 0} onClick={() => reorderLayer(layer.id, -1)}>↑</button><button type="button" aria-label={`Move layer ${index + 1} down`} disabled={index === layers.length - 1} onClick={() => reorderLayer(layer.id, 1)}>↓</button><button type="button" aria-label={`Remove layer ${index + 1}`} onClick={() => { updateLayers(layers.filter((item) => item.id !== layer.id)); if (selectedLayerId === layer.id) setSelectedLayerId(""); }}>×</button></div>)}</div>
@@ -383,18 +596,30 @@ export function ImageResizeTool({ workspace = false }: { workspace?: boolean } =
               <label className="ratio-toggle"><input type="checkbox" checked={selectedLayer.visible} onChange={(event) => updateLayer(selectedLayer.id, { visible: event.currentTarget.checked })} />Show layer</label>
             </div>}
             <div className="image-layer-actions"><button type="button" className="secondary-button" disabled={historyRef.current.undo.length === 0} onClick={undoEdit}>Undo</button><button type="button" className="secondary-button" disabled={historyRef.current.redo.length === 0} onClick={redoEdit}>Redo</button></div>
-          </details>
-          <button className="export-button" type="button" disabled={!source || !outputValid} onClick={download}>Download {exportFormat.toUpperCase()}</button>
+          </details>}
+          <button className="export-button" type="button" disabled={!source || !outputValid} onClick={download}>Download {downscale ? "downscaled " : ""}{exportFormat.toUpperCase()}</button>
           {error && <p className="resize-error" role="alert">{error}</p>}
         </div>
         <div className="resize-preview">
-          <div className="preview-heading"><strong>Output preview</strong><span>{source && outputValid ? `${rotatedWidth} × ${rotatedHeight} px` : "Choose an image to begin"}</span></div>
+          <div className="preview-heading"><strong>{downscale ? "Original / downscaled comparison" : "Output preview"}</strong><span>{source && outputValid ? `${rotatedWidth} × ${rotatedHeight} px` : downscale && source ? "Set smaller dimensions within the source size" : "Choose an image to begin"}</span></div>
           {!source && <div className="empty-preview">Your image preview will appear here.</div>}
-          <div className={`image-editor-canvas-stage${source ? "" : " hidden"}`}>
-            <canvas ref={canvasRef} className="preview-canvas" aria-label="Resized image preview" />
-            {source && <canvas ref={interactionCanvasRef} className="image-layer-interaction" aria-label="Image overlay layers. Drag a selected layer to move it or drag its corner to resize." onPointerDown={beginLayerGesture} onPointerMove={moveLayerGesture} onPointerUp={endLayerGesture} onPointerCancel={endLayerGesture} />}
-          </div>
-          {!source && <div className="empty-preview">Your image preview will appear here.</div>}
+          {downscale && source && outputValid && <div className="upscale-comparison downscale-comparison" style={{ width: `min(100%, ${(rotatedWidth / rotatedHeight) * 58}dvh, calc(${(rotatedWidth / rotatedHeight) * 100}dvh - ${(rotatedWidth / rotatedHeight) * 250}px))`, aspectRatio: `${rotatedWidth} / ${rotatedHeight}` }}>
+            <canvas ref={canvasRef} className="upscale-comparison-enhanced" aria-label="Downscaled image preview" />
+            <div className="upscale-comparison-original" style={{ clipPath: `inset(0 ${100 - downscaleComparePosition}% 0 0)` }}><img src={source.url} alt="Original image before downscaling" draggable={false} /></div>
+            <span className="upscale-comparison-label before">Original</span><span className="upscale-comparison-label after">Downscaled</span>
+            <span className="upscale-comparison-divider" style={{ left: `${downscaleComparePosition}%` }} aria-hidden="true"><i /></span>
+            <input className="upscale-comparison-range" type="range" min="0" max="100" step="1" value={downscaleComparePosition} aria-label="Drag to compare original and downscaled image" onChange={(event) => setDownscaleComparePosition(event.currentTarget.valueAsNumber)} />
+          </div>}
+          {(!downscale || !source || !outputValid) && <div className="image-editor-canvas-stage">
+            {!downscale && <canvas ref={canvasRef} className="preview-canvas" aria-label="Resized image preview" />}
+            {downscale && source && !outputValid && <div className="empty-preview">Choose a valid scale amount to compare the result.</div>}
+            {workspace && source && <canvas ref={interactionCanvasRef} className="image-layer-interaction" aria-label="Image overlay layers. Drag a selected layer to move it or drag its corner to resize." onPointerDown={beginLayerGesture} onPointerMove={moveLayerGesture} onPointerUp={endLayerGesture} onPointerCancel={endLayerGesture} />}
+            {source && !workspace && !downscale && cropEnabled && cropSelectionActive && <div className="image-resize-crop-overlay" aria-label="Crop selection overlay"><div className="image-resize-crop-frame" onPointerDown={beginCropGesture} onPointerMove={moveCropGesture} onPointerUp={endCropGesture} onPointerCancel={endCropGesture}>
+              <div className="resize-crop-selection" data-resize-crop-selection="true" style={{ left: `${cropRect.x / source.width * 100}%`, top: `${cropRect.y / source.height * 100}%`, width: `${cropRect.width / source.width * 100}%`, height: `${cropRect.height / source.height * 100}%` }} aria-label={`Crop selection ${Math.round(cropRect.width)} by ${Math.round(cropRect.height)} pixels`}>
+                {(["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const).map((handle) => <span key={handle} className={`resize-crop-handle ${handle}`} data-resize-crop-handle={handle} aria-hidden="true" />)}
+              </div>
+            </div></div>}
+          </div>}
         </div>
       </section>}
     </main>
