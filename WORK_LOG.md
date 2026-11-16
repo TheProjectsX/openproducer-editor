@@ -686,3 +686,10 @@
 - Fixture checks: gain measured +6 dB; noise-only RMS fell −35.23→−63.36 dB while tone region changed −15.01→−16.08 dB. Trim, mute, replacement mix, multitrack H.264/AAC, resize, upscale, and collage outputs were probed/decoded with FFmpeg. Image resize preserved RGBA; CPU upscale produced 800×680 with transparent pixels; collage PNG save/reload restored ordering and cell edits.
 - Remaining observed gaps: Audio Extract incorrectly rejects AAC MP4 and Opus WebM containing audio streams. Collage SVG import fails late with generic decode feedback. Audio Split created a ZIP link, but the browser harness did not observe a download event; archive integrity remains unverified. A 72 px title was clipped in the 320 px-wide test export. Offline export, external player review, listening, cancellation/recovery, quota handling, full accessibility/browser coverage remain open.
 - Verification ran in an isolated audit copy because Windows blocked removal of locked root native modules. `npm.cmd run test:core` passed 18/18, `npm.cmd run typecheck` passed, and production build passed (27 route pages, 106 precache assets). The pre-existing root `package-lock.json` edit was preserved.
+
+## 2026-11-16 — Sync with follow-up session commits
+
+- Read the updated handoff, work log, current branch/status, and commits after the prior checkpoint. `main` was at `907e0a8`, matching `origin/main`, with a clean worktree at inspection time.
+- Confirmed the follow-up changes: cached Audio Trim waveform peaks and debounced preview rebuilds to reduce drag lag; corrected edge-drag bounds; synchronized custom-player metadata on source changes; kept the upscale canvas mounted before inference; and changed video extraction to include all tracks while discarding video.
+- The handoff records targeted Chrome fixture results and remaining gaps. Audio Extract still needs browser retest on AAC MP4 and Opus WebM; Audio Split ZIP integrity/download, collage SVG messaging, small-output title fitting, offline operation, and recovery/accessibility checks remain open.
+- Corrected the handoff's stale latest-commit line. No application code was modified during this sync.
