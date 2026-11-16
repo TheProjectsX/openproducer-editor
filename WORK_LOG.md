@@ -1,5 +1,11 @@
 # Work log
 
+## 2026-11-16 — Give Video Trim result preview a full-height stage
+
+- Increased the trimmed-result video stage to a 350 px minimum, with the containing preview growing to at least 400 px. The result preview can now fit its video, custom transport, and edit action before the control panel begins, instead of overflowing over the controls.
+- Kept the result video contained at its source aspect ratio and let the workspace scroll when the larger preview and controls exceed the viewport.
+- Verification: source/CSS diff and `git diff --check` reviewed; browser layout verification remains pending.
+
 ## 2026-11-16 — Skip service-worker registration in development
 
 - The service worker is generated into the production client output after the static build. The app previously attempted to register `/sw.js` during the dev server session too, where that file does not exist, causing React Router's “No route matches” error.
