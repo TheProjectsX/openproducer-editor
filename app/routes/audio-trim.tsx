@@ -35,7 +35,9 @@ export default function AudioTrim() {
   const player = useRef<HTMLAudioElement>(null);
   const timeline = useRef<HTMLCanvasElement>(null);
   const stopAt = useRef<number | null>(null);
-  const selectionGesture = useRef<{ pointerId: number; mode: "start" | "end" | "move" | "create"; anchor: number; start: number; end: number } | null>(null);
+  const selectionGesture = useRef<{ pointerId: number; mode: "start" | "end" | "move" | "create"; anchor: number; start: number; end: number; originX: number; moved: boolean } | null>(null);
+  const playheadGesture = useRef<number | null>(null);
+  const playbackRaf = useRef<number | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
@@ -90,6 +92,10 @@ export default function AudioTrim() {
       setPreviewUrl((previous) => { if (previous) URL.revokeObjectURL(previous); previewUrlRef.current = ""; return ""; });
       return;
     }
+    if (player.current && !player.current.paused) player.current.pause();
+    stopAt.current = null; setPlaying(false);
+    if (playbackRaf.current !== null) cancelAnimationFrame(playbackRaf.current);
+    playbackRaf.current = null;
     // Pointer movement can produce dozens of range updates per second. Building a
     // complete WAV synchronously for every update blocks the pointer event loop.
     const timer = window.setTimeout(() => {
@@ -100,6 +106,7 @@ export default function AudioTrim() {
         return nextUrl;
       });
       setPreviewTime(0);
+      setPlayhead(trimMode === "keep" ? start : 0);
       if (player.current) player.current.currentTime = 0;
     }, selectionGesture.current ? 180 : 0);
     previewTimer.current = timer;
@@ -109,6 +116,7 @@ export default function AudioTrim() {
   useEffect(() => () => {
     if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    if (playbackRaf.current !== null) cancelAnimationFrame(playbackRaf.current);
   }, []);
 
   useEffect(() => {
@@ -133,6 +141,10 @@ export default function AudioTrim() {
     const bounds = event.currentTarget.getBoundingClientRect();
     return Math.max(0, Math.min(audio?.duration ?? 0, (event.clientX - bounds.left) / bounds.width * (audio?.duration ?? 0)));
   }
+  function sourceTimeAt(clientX: number) {
+    const bounds = timeline.current?.getBoundingClientRect();
+    return bounds && audio ? Math.max(0, Math.min(audio.duration, (clientX - bounds.left) / bounds.width * audio.duration)) : 0;
+  }
   function beginSelection(event: React.PointerEvent<HTMLCanvasElement>) {
     if (!audio) return;
     const value = timeFromPointer(event), bounds = event.currentTarget.getBoundingClientRect();
@@ -140,12 +152,14 @@ export default function AudioTrim() {
     const mode = Math.abs(value - start) <= handleTolerance ? "start"
       : Math.abs(value - end) <= handleTolerance ? "end"
         : value > start && value < end ? "move" : "create";
-    selectionGesture.current = { pointerId: event.pointerId, mode, anchor: value, start, end };
+    selectionGesture.current = { pointerId: event.pointerId, mode, anchor: value, start, end, originX: event.clientX, moved: false };
     event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault();
   }
   function moveSelection(event: React.PointerEvent<HTMLCanvasElement>) {
     const gesture = selectionGesture.current, duration = audio?.duration ?? 0;
     if (!gesture || gesture.pointerId !== event.pointerId || !duration) return;
+    if (!gesture.moved && Math.abs(event.clientX - gesture.originX) < 3) return;
+    gesture.moved = true;
     const value = timeFromPointer(event), minimum = Math.min(.01, duration);
     if (gesture.mode === "start") setStart(Math.max(0, Math.min(gesture.end - minimum, value)));
     else if (gesture.mode === "end") setEnd(Math.max(gesture.start + minimum, Math.min(duration, value)));
@@ -155,12 +169,65 @@ export default function AudioTrim() {
       setStart(nextStart); setEnd(nextStart + length);
     }
   }
+  function seekSourceToTime(value: number) {
+    if (!audio) return;
+    const sourceTime = Math.max(0, Math.min(audio.duration, value));
+    let outputTime: number, mappedSourceTime: number;
+    if (trimMode === "keep") {
+      mappedSourceTime = Math.max(start, Math.min(end, sourceTime));
+      outputTime = mappedSourceTime - start;
+    } else if (sourceTime <= start) {
+      mappedSourceTime = sourceTime; outputTime = sourceTime;
+    } else if (sourceTime >= end) {
+      mappedSourceTime = sourceTime; outputTime = sourceTime - selectedDuration;
+    } else if (sourceTime - start <= end - sourceTime) {
+      mappedSourceTime = start; outputTime = start;
+    } else {
+      mappedSourceTime = end; outputTime = start;
+    }
+    const clampedOutputTime = Math.max(0, Math.min(outputDuration, outputTime));
+    setPlayhead(mappedSourceTime); setPreviewTime(clampedOutputTime);
+    if (player.current) player.current.currentTime = clampedOutputTime;
+  }
+  function beginWaveformSeek(event: React.PointerEvent<HTMLButtonElement>) {
+    if (!audio) return;
+    playheadGesture.current = event.pointerId; event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault(); event.stopPropagation();
+    seekSourceToTime(sourceTimeAt(event.clientX));
+  }
+  function moveWaveformSeek(event: React.PointerEvent<HTMLButtonElement>) {
+    if (playheadGesture.current !== event.pointerId) return;
+    event.stopPropagation(); seekSourceToTime(sourceTimeAt(event.clientX));
+  }
+  function finishWaveformSeek(event: React.PointerEvent<HTMLButtonElement>) {
+    if (playheadGesture.current === event.pointerId) playheadGesture.current = null;
+    event.stopPropagation();
+  }
+  function finishSelection(event: React.PointerEvent<HTMLCanvasElement>) {
+    const gesture = selectionGesture.current;
+    if (gesture?.pointerId === event.pointerId && !gesture.moved) seekSourceToTime(timeFromPointer(event));
+    if (gesture?.pointerId === event.pointerId) selectionGesture.current = null;
+  }
+  function updatePlaybackPosition() {
+    const element = player.current;
+    if (!element) return;
+    const time = Math.min(outputDuration, element.currentTime);
+    setPreviewTime(time);
+    setPlayhead(trimMode === "keep" ? start + time : time < start ? time : time + selectedDuration);
+    if (stopAt.current !== null && time >= stopAt.current) {
+      element.pause(); stopAt.current = null; setPlaying(false); playbackRaf.current = null; return;
+    }
+    if (!element.paused) {
+      if (playbackRaf.current !== null) cancelAnimationFrame(playbackRaf.current);
+      playbackRaf.current = requestAnimationFrame(updatePlaybackPosition);
+    }
+    else playbackRaf.current = null;
+  }
   function togglePlayback() {
     if (!player.current || !valid) return;
-    if (!player.current.paused) { player.current.pause(); setPlaying(false); return; }
-    if (player.current.currentTime >= outputDuration) { player.current.currentTime = 0; setPreviewTime(0); setPlayhead(trimMode === "keep" ? start : 0); }
+    if (!player.current.paused) { player.current.pause(); setPlaying(false); if (playbackRaf.current !== null) cancelAnimationFrame(playbackRaf.current); playbackRaf.current = null; return; }
+    if (player.current.currentTime >= outputDuration) seekSourceToTime(trimMode === "keep" ? start : 0);
     stopAt.current = outputDuration;
-    void player.current.play().then(() => setPlaying(true)).catch(() => setError("Audio playback was blocked. Press Play again to start the preview."));
+    void player.current.play().then(() => { setPlaying(true); playbackRaf.current = requestAnimationFrame(updatePlaybackPosition); }).catch(() => setError("Audio playback was blocked. Press Play again to start the preview."));
   }
   function exportSelection() {
     if (!audio || !file || !valid) return;
@@ -181,12 +248,12 @@ export default function AudioTrim() {
         <p className="resize-note">{valid ? `Selected: ${selectedDuration.toFixed(3)} s · Output: ${outputDuration.toFixed(3)} s` : "Select a valid range that leaves audio to export."}</p>
         <button className="export-button secondary-button" type="button" disabled={!valid || loading} onClick={exportSelection}>Download {trimMode === "keep" ? "selection" : "edited audio"} WAV</button>
         {loading && <p role="status" className="resize-note">Loading and decoding audio…</p>}{error && <p role="alert" className="resize-error">{error}</p>}
-        {previewUrl && <audio ref={player} className="media-source-hidden" src={previewUrl} onTimeUpdate={(event) => { const time = event.currentTarget.currentTime; setPreviewTime(time); setPlayhead(trimMode === "keep" ? start + time : time < start ? time : time + selectedDuration); if (stopAt.current !== null && time >= stopAt.current) { event.currentTarget.pause(); stopAt.current = null; setPlaying(false); } }} onPause={() => { stopAt.current = null; setPlaying(false); }} onEnded={() => setPlaying(false)} />}
+        {previewUrl && <audio ref={player} className="media-source-hidden" src={previewUrl} onTimeUpdate={updatePlaybackPosition} onPause={() => { stopAt.current = null; setPlaying(false); if (playbackRaf.current !== null) cancelAnimationFrame(playbackRaf.current); playbackRaf.current = null; }} onEnded={() => { setPlaying(false); playbackRaf.current = null; }} />}
       </div>
       <div className="resize-preview audio-trim-preview"><div className="preview-heading"><strong>Source waveform</strong><span>{valid ? `${start.toFixed(3)} — ${end.toFixed(3)} s · ${trimMode === "keep" ? "kept" : "removed"}` : "Adjust selection"}</span></div>
         <div className="timeline-time-labels"><span>0.000 s</span><span>{audio.duration.toFixed(3)} s</span></div>
-        <div className="audio-waveform-stage"><canvas ref={timeline} className="audio-trim-waveform" role="img" aria-label="Waveform timeline. Drag near either edge to trim, drag inside the selected range to move it, or drag outside to choose a new range." onPointerDown={beginSelection} onPointerMove={moveSelection} onPointerUp={(event) => { if (selectionGesture.current?.pointerId === event.pointerId) selectionGesture.current = null; }} onPointerCancel={(event) => { if (selectionGesture.current?.pointerId === event.pointerId) selectionGesture.current = null; }} />{audio.duration > 0 && <span className="waveform-playhead" style={{ left: `${playhead / audio.duration * 100}%` }} aria-hidden="true" />}</div>
-        <div className="trim-result-preview"><div className="preview-heading"><strong>Edited audio preview</strong><span>{previewUrl ? `${outputDuration.toFixed(3)} s · updates with your selection` : "Preparing preview…"}</span></div><div className="custom-transport"><button type="button" className="transport-play" onClick={togglePlayback} aria-label={playing ? "Pause preview" : "Play preview"}>{playing ? "Ⅱ" : "▶"}</button><span className="transport-time">{previewTime.toFixed(3)} / {outputDuration.toFixed(3)} s</span><input className="transport-scrub" type="range" min="0" max={outputDuration || 1} step="0.001" value={Math.min(previewTime, outputDuration)} aria-label="Edited audio preview playhead" onChange={(event) => { const time = event.currentTarget.valueAsNumber; setPreviewTime(time); setPlayhead(trimMode === "keep" ? start + time : time < start ? time : time + selectedDuration); if (player.current) player.current.currentTime = time; }} /></div></div>
+        <div className="audio-waveform-stage"><canvas ref={timeline} className="audio-trim-waveform" role="img" aria-label="Full-source waveform timeline. Click to seek. Drag near either selection edge to trim, drag inside the selection to move it, or drag outside the selection to create a new range." onPointerDown={beginSelection} onPointerMove={moveSelection} onPointerUp={finishSelection} onPointerCancel={(event) => { if (selectionGesture.current?.pointerId === event.pointerId) selectionGesture.current = null; }} /><button type="button" className="waveform-playhead" style={{ left: `${playhead / audio.duration * 100}%` }} aria-label="Drag to seek source waveform playhead" onPointerDown={beginWaveformSeek} onPointerMove={moveWaveformSeek} onPointerUp={finishWaveformSeek} onPointerCancel={finishWaveformSeek}><span /></button></div>
+        <div className="trim-result-preview"><div className="preview-heading"><strong>Edited audio preview</strong><span>{previewUrl ? `${outputDuration.toFixed(3)} s output · full ${audio.duration.toFixed(3)} s source timeline` : "Preparing preview…"}</span></div><div className="custom-transport"><button type="button" className="transport-play" onClick={togglePlayback} aria-label={playing ? "Pause preview" : "Play preview"}>{playing ? "Ⅱ" : "▶"}</button><span className="transport-time">{playhead.toFixed(3)} / {audio.duration.toFixed(3)} s</span><input className="transport-scrub" type="range" min="0" max={audio.duration} step="0.001" value={Math.min(playhead, audio.duration)} aria-label="Full-source timeline playhead" onChange={(event) => seekSourceToTime(event.currentTarget.valueAsNumber)} /></div></div>
       </div>
     </section>}
   </main>;

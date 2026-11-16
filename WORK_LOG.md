@@ -1,5 +1,12 @@
 # Work log
 
+## 2026-11-16 — Seekable audio waveform and continuous video trim playhead
+
+- Made Audio Trim's source waveform seekable by clicking or dragging its playhead. The separate trim range remains full-source aligned, and its playhead does not resize to the edited output length; the output transport also reports and seeks on the full-source timeline, mapping through removed sections to the nearest edit boundary.
+- Made Video Trim's playhead seekable by dragging it directly and synchronized it with the media clock on every animation frame during playback, keeping the playhead visually continuous instead of waiting for coarse `timeupdate` events. The trim range remains independently draggable.
+- Audio waveform selection now treats a stationary click as a seek and a drag as a range edit. Added a wider pointer target around both waveform playheads while retaining the thin visual indicator.
+- Verification: `git diff --check` passed. Typecheck/build and browser playback review were not run in this session; the project-local dependency tree has a previously recorded missing Rolldown WASI binding, and browser interaction remains to be confirmed.
+
 ## 2026-11-15 — Handover issue audit and Audio Trim responsiveness
 
 - Reviewed `SESSION_HANDOFF.md` and recorded all nine open audit areas individually with current evidence and remaining browser/runtime checks.
