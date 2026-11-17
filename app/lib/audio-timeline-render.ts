@@ -15,7 +15,7 @@ export async function renderTimelineAudio(
   onProgress: (percent: number) => void,
   isCancelled: () => boolean,
 ) {
-  const audioClips = clips.filter((clip) => clip.track < 0);
+  const audioClips = clips.filter((clip) => !clip.muted && clip.volume > 0 && (clip.track < 0 || (clip.track >= 0 && assets.some((asset) => asset.id === clip.assetId && asset.kind === "video"))));
   if (!audioClips.length) return null;
   const audioAssets = assets.filter((asset) => audioClips.some((clip) => clip.assetId === asset.id));
   const sourceDuration = audioAssets.reduce((sum, asset) => sum + asset.duration, 0);
@@ -28,7 +28,23 @@ export async function renderTimelineAudio(
       if (isCancelled()) throw new Error("Export cancelled.");
       const asset = audioAssets[index]; const file = files[asset.id];
       if (!file) throw new Error(`The project source “${asset.name}” is missing. Re-import it before exporting.`);
-      decoded.set(asset.id, await context.decodeAudioData(await file.arrayBuffer()));
+      if (asset.kind === "video") {
+        const { ALL_FORMATS, BlobSource, BufferTarget, Conversion, Input, Output, WavOutputFormat } = await import("mediabunny");
+        const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+        try {
+          if (!(await input.getAudioTracks()).length) continue;
+          const target = new BufferTarget();
+          const output = new Output({ format: new WavOutputFormat(), target });
+          const conversion = await Conversion.init({ input, output, tracks: "all", video: { discard: true }, audio: { numberOfChannels: 2, sampleRate: OUTPUT_SAMPLE_RATE, sampleFormat: "s16" } });
+          if (!conversion.isValid || !conversion.utilizedTracks.length) throw new Error(`Could not decode audio from “${asset.name}”.`);
+          await conversion.execute();
+          if (isCancelled()) throw new Error("Export cancelled.");
+          if (!target.buffer || target.buffer.byteLength > 512 * 1024 * 1024) throw new Error(`Audio from “${asset.name}” exceeds the 512 MiB export limit.`);
+          decoded.set(asset.id, await context.decodeAudioData(target.buffer.slice(0)));
+        } finally { input.dispose(); }
+      } else {
+        decoded.set(asset.id, await context.decodeAudioData(await file.arrayBuffer()));
+      }
       onProgress(Math.round(((index + 1) / audioAssets.length) * 20));
     }
     let module: Awaited<ReturnType<typeof instantiateBungee>> | null = null;
@@ -39,6 +55,7 @@ export async function renderTimelineAudio(
       const clip = audioClips[clipIndex]; const buffer = decoded.get(clip.assetId);
       if (!buffer) continue;
       const rate = buffer.sampleRate;
+      if (clip.sourceStart >= buffer.duration) continue;
       const startFrame = Math.min(buffer.length - 1, Math.floor(clip.sourceStart * rate));
       const endFrame = Math.max(startFrame + 1, Math.min(buffer.length, Math.ceil(clip.sourceEnd * rate)));
       const sourceFrames = endFrame - startFrame;
@@ -54,7 +71,7 @@ export async function renderTimelineAudio(
         let transport: Transport | null = null;
         if (stretcher) {
           transport = new Transport(stretcher, sourceFrames);
-          transport.setSource("clip", { left, right }, { gain: clip.muted ? 0 : clip.keyframes?.length ? 1 : clip.volume, pan: 0 });
+          transport.setSource("clip", { left, right }, { gain: 1, pan: 0 });
           transport.speed = clip.speed; transport.play();
         }
         const outputFrames = Math.min(Math.ceil(sourceFrames / clip.speed), sampleCount - Math.round(clip.start * OUTPUT_SAMPLE_RATE));

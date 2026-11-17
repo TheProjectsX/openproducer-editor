@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "react-router build && node scripts/build-service-worker.mjs && node scripts/verify-static-output.mjs",
+    "predev": "npm i",
     "dev": "react-router dev",
     "preview": "vite preview",
     "typecheck": "react-router typegen && tsc",

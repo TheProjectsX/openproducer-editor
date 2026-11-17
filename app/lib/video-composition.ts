@@ -12,7 +12,8 @@ export function drawVideoComposition(
   media: VideoMediaElements,
   assets: VideoTimelineAsset[],
 ) {
-  canvas.width = timeline.width; canvas.height = timeline.height;
+  if (canvas.width !== timeline.width) canvas.width = timeline.width;
+  if (canvas.height !== timeline.height) canvas.height = timeline.height;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("This browser cannot create a 2D canvas renderer.");
   context.fillStyle = "#11131a"; context.fillRect(0, 0, canvas.width, canvas.height);
@@ -49,6 +50,7 @@ export function drawVideoComposition(
     context.filter = `brightness(${effects.brightness}%) contrast(${effects.contrast}%) saturate(${effects.saturation}%) grayscale(${effects.grayscale}%)`;
     context.translate(canvas.width / 2 + transform.x, canvas.height / 2 + transform.y);
     context.rotate(transform.rotation * Math.PI / 180);
+    context.scale(transform.mirrorX ? -1 : 1, transform.mirrorY ? -1 : 1);
     context.drawImage(source, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
     context.restore();
   }

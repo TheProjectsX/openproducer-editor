@@ -881,3 +881,70 @@
 - Clip drops now preserve where the user grabbed the clip instead of jumping its left edge to the pointer.
 - Added pure regression tests for scrolled coordinates, ruler alignment, grab-offset positioning, and invalid scales. Verification: core suite passed 22/22; direct `tsc --noEmit --pretty false` and `git diff --check` passed. The running browser initially rendered Video Studio's empty state, then a hot reload produced a React Router `useContext` runtime error that persisted after hard reload; populated timeline interactions could not be verified until the dev server is recovered.
 
+# 2026-11-17 — Rebuild Video Studio workspace around the desktop editor reference
+
+- Replaced the tall Video Studio introduction with a compact local-project bar and prominent export action. Direct entry can create a local video project.
+- Reworked the left pane into Media, Text, and Transitions tabs with actual available actions, a local import control, and media thumbnails. Added project details when no clip is selected, Basic/Speed/Adjust inspector tabs for selected clips, and source imagery on visual timeline clips.
+- Moved export settings and rendered-file preview into a dialog so the player and six-track timeline can use the full workspace height. Added direct split and delete controls to the timeline toolbar and tightened the dark editor layout.
+- Verification: direct `tsc --noEmit` and 22/22 Core tests passed. Full build and browser review remain blocked by the checkout's missing Windows Rolldown binding; this is not a visual or export gate pass.
+
+# 2026-11-17 — Fix blank Video Studio import and player seeking
+
+- Enabled Import media before a project exists. A successful import now creates a local video project, saves its assets and clips, and opens the saved project. The picker resets after selection so the same file can be imported again.
+- Disabled empty-timeline playback, including when the final clip is removed. Added current/total timecode, frame-step buttons, centered play/pause, and fullscreen below the preview.
+- Made the ruler a draggable and keyboard-operable seek control. Corrected seek and drop coordinates to use the scroll viewport's left edge, including its scroll offset and sticky track-label gutter.
+- Verification: direct TypeScript compilation and all 22 Core tests passed. Browser import, ruler drag, fullscreen, and offline project reload remain unverified because the Windows build binding is missing in this checkout.
+
+# 2026-11-17 — Correct bin placement, canvas fit, playhead drag, and timeline zoom
+
+- Import saves local assets into the media bin without making timeline clips. Each bin item can be clicked to add a clip or dragged to a compatible track; the first placed visual source sets the Original canvas aspect ratio.
+- Added Original, common ratio presets, and custom typed canvas dimensions beside the player. Recorded source dimensions from media inspection and made the displayed output canvas fit fully within the player. The renderer no longer resets its canvas backing size on every frame.
+- Added relative grab-drag movement to the playhead handle. Ctrl+wheel over the timeline changes its pixels-per-second scale while keeping the time under the pointer stable.
+- Verification: direct TypeScript compilation and 24/24 Core tests pass, including new ratio and zoom checks. Build/browser gates remain pending because this Windows checkout lacks the required Rolldown native binding.
+
+# 2026-11-17 — Embedded video sound and production retest
+
+- Restored embedded video audio in preview using each clip's volume, mute, speed, pitch mode, and fade settings. The export mixer now includes video source audio. Detach and replacement mute the original clip audio to avoid doubling it.
+- Repaired the local Windows native build packages and completed the production build and static route/service-worker verification. In a fresh local production preview, a fixture imported into the bin without auto-placement, stayed unplayable until placed, then played with its video element unmuted. A 320×180 MP4 render completed with an AAC audio track; FFmpeg measured −21.1 dB mean and −16.7 dB peak. Listening quality still needs direct review.
+- A portrait-ratio screenshot revealed that the canvas box overflowed the player. Constrained it to the player and added paused seek redraw triggers; the follow-up screenshot showed a visible portrait source frame and frame stepping advanced by 0.033333 s. Native fullscreen was denied by the in-app browser, so a full-window in-page fallback now opens when that API fails.
+
+# 2026-11-17 — Magnetic timeline placement
+
+- Fixed edge snapping for moved clips and media-bin drops. Hovering over a clip inserts before or after it, shifts later same-track clips to make room, and shows a placement ghost. Replaced unreliable native bin drag with pointer-based placement. These edits remain undoable and persist in the local project.
+- Browser check with a 4 s fixture confirmed edge snapping, insertion that shifted the next clip, undo, and two-clip restoration after reload. TypeScript, 26 Core tests, and the production build passed. Offline and cross-browser release checks remain open.
+
+# 2026-11-17 — Selected video controls and waveforms
+
+- Added selected-video sliders for scale, rotation, audio volume, and speed with values shown to at most three decimals. Added canvas alignment, X/Y mirror, silence, extract/replace audio, split, and duplicate controls. Mirror flags persist in the clip transform and are applied in the composite renderer.
+- Audio and video clips with audio streams now show locally decoded peak waveforms; embedded video audio does not need extraction first. Sampling scales to up to 16 buckets per source second (capped at 8,192), then reduces to about one bar per 2.5 timeline pixels. Each source's peaks are normalized to its own peak, video uses a compact strip, and trimmed clips display the corresponding source range. Removed the repeated-bar background and fabricated fallback so silent or unsupported streams do not pretend to have a waveform. Added thin custom scrollbar styling for the inspector.
+- Verification: `npm.cmd run typecheck` and `git diff --check` passed. Browser interaction, output parity, and offline behavior for these new controls still need validation.
+
+# 2026-11-17 — Inspector grouping and clip amplification
+
+- Put Track/Timeline start and Source in/Source out into paired rows below volume. Audio and video clips can now use 0–4× gain. Preview applies gain through local Web Audio nodes; export applies the same gain once before project peak protection.
+- Verification: typecheck and the static production build passed (28 routes, 106 cached assets). Browser loudness and export measurements remain unverified.
+
+# 2026-11-17 — Timeline split defaults and clip edge actions
+
+- Empty lane/ruler clicks clear selection. Split now falls back to the Video 1 clip under the playhead when nothing is selected. Added toolbar icon actions with tooltips to keep the hovered clip's left or right portion at the playhead.
+- Fixed checkbox sizing so Ripple/Snap labels sit close to their controls instead of inheriting the numeric input width.
+- Verification: typecheck and `git diff --check` passed. Browser interaction review remains outstanding.
+
+- Replaced the ambiguous Delete Left/Right arrows with mirrored clip/playhead icons that mark the removed side with an X.
+- Fixed Delete Left/Right target priority to use the hovered clip's stable ID before an older selection, preventing actions from trimming the previous clip. Delete Left now shifts the kept source range back to the clip's original start and enabled primary-track ripple moves following clips left to close the time gap. Delete Right keeps the clip start while shortening its end.
+- Kept both actions enabled at all times and added predictable target fallback plus clear handling when the playhead is outside a clip. Typecheck passes.
+- Fixed target priority after a reported split case: selection now beats stale hover state, and splitting assigns the new right segment as both selected and hovered. Clips are addressed by project IDs, never by names.
+
+
+# 2026-11-17 — Timeline toolbar grouping
+
+- Added thin vertical separator lines between side-delete tools, undo/redo, split/delete, ripple/snap, and timeline setting groups.
+
+# 2026-11-17 — Local media library
+
+- Added Library with Image, Video, and Sound effects subtabs separate from imported project assets. Library catalog sections stay empty until catalog content is available. The Image section uses a compact black tile with a top-right color-picker icon; clicking the tile saves a local SVG image asset and creates a five-second Video 1 clip.
+- Typecheck and static production build pass; the Library panel was visually reviewed.
+
+# 2026-11-17 — Interactive preview titles
+
+- Added direct title selection, move, resize, and rotation in the video preview. Gestures edit the persisted clip transform and produce one undo entry on release. The overlay aligns to the contained preview canvas and is excluded from the rendered export.

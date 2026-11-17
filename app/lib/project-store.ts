@@ -50,13 +50,14 @@ export type AudioProjectDocument = {
 };
 
 export type VideoTextSettings = { text: string; fontSize: number; color: string; backgroundColor: string; showBackground: boolean };
-export type VideoTimelineAsset = { id: string; name: string; type: string; size: number; duration: number; kind: "video" | "audio" | "image" | "text"; derivedFromAssetId?: string; textSettings?: VideoTextSettings };
-export type VideoClipTransform = { x: number; y: number; scale: number; rotation: number; opacity: number };
+export type VideoTimelineAsset = { id: string; name: string; type: string; size: number; duration: number; kind: "video" | "audio" | "image" | "text"; width?: number; height?: number; hasAudio?: boolean; derivedFromAssetId?: string; textSettings?: VideoTextSettings };
+export type VideoClipTransform = { x: number; y: number; scale: number; rotation: number; opacity: number; mirrorX?: boolean; mirrorY?: boolean };
 export type VideoClipTransitions = { fadeIn: number; fadeOut: number };
 export type VideoClipKeyframe = { time: number; transform: VideoClipTransform; volume: number };
 export type VideoClipEffects = { brightness: number; contrast: number; saturation: number; grayscale: number };
 export type VideoTimelineClip = { id: string; assetId: string; track: number; start: number; sourceStart: number; sourceEnd: number; speed: number; volume: number; muted: boolean; pitchMode?: "preserve" | "natural"; transform?: VideoClipTransform; effects?: VideoClipEffects; transitions?: VideoClipTransitions; keyframes?: VideoClipKeyframe[] };
-export type VideoTimelineProject = { version: 1; width: number; height: number; fps: number; duration: number; playhead: number; assets: VideoTimelineAsset[]; clips: VideoTimelineClip[] };
+export type VideoAspectRatioMode = "original" | "custom" | "16:9" | "4:3" | "2.35:1" | "2:1" | "1.85:1" | "9:16" | "3:4" | "1:1";
+export type VideoTimelineProject = { version: 1; width: number; height: number; aspectRatioMode?: VideoAspectRatioMode; fps: number; duration: number; playhead: number; assets: VideoTimelineAsset[]; clips: VideoTimelineClip[] };
 
 export type ImageProjectSettings = {
   width: number;

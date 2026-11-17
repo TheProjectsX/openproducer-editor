@@ -3,6 +3,8 @@ export type MediaTrackInspection = {
   codec: string;
   decodable: boolean;
   details: string;
+  width?: number;
+  height?: number;
 };
 
 export type MediaFileInspection = {
@@ -26,12 +28,10 @@ export async function inspectMediaFile(file: File): Promise<MediaFileInspection>
       input.getMimeType(),
     ]);
     const tracks = await Promise.all([
-      ...videoTracks.map(async (track): Promise<MediaTrackInspection> => ({
-        kind: "video",
-        codec: (await track.getCodec()) ?? "unknown",
-        decodable: await track.canDecode(),
-        details: `${await track.getCodedWidth()}×${await track.getCodedHeight()}`,
-      })),
+      ...videoTracks.map(async (track): Promise<MediaTrackInspection> => {
+        const [width, height, codec, decodable] = await Promise.all([track.getCodedWidth(), track.getCodedHeight(), track.getCodec(), track.canDecode()]);
+        return { kind: "video", codec: codec ?? "unknown", decodable, details: `${width}×${height}`, width, height };
+      }),
       ...audioTracks.map(async (track): Promise<MediaTrackInspection> => ({
         kind: "audio",
         codec: (await track.getCodec()) ?? "unknown",

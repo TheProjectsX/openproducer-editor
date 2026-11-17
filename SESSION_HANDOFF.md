@@ -1,5 +1,24 @@
 # Session handoff — Local Studio Core
 
+## Current handoff — 2026-11-17 (Asia/Dhaka)
+
+### Workspace and scope
+
+- Workspace: `C:\Users\Modasser Hasan\Contents\openproducer-editor`; branch `main`, HEAD `b005547` (`Capcut basic update`). The working tree has substantial **uncommitted** editor, CSS, audio/render, documentation, package, and test-file changes. Preserve them. Run `git status --short` before editing; do not reset or clean.
+- Read root `README.md`, `AGENTS.md`, and `project_research/` guidance before implementation. Root instructions require local media and project processing, saved edit instructions, shared preview/export behavior, static routes, and completion gates in `project_research/docs/08-test-and-release-plan.md`. Recent editor details are in `02-feature-matrix.md`, `06-editor-interactions.md`, and `10-decisions-and-sources.md`.
+
+### Recent work
+
+- Video Studio is a compact three-pane editor with a six-track timeline. Recent user-directed changes added media-bin-only import, contained aspect-ratio preview, draggable seek and Ctrl+wheel zoom, snapping/insertion, per-clip inspector controls, gain up to 4×, waveform previews for embedded video/audio, Delete Left/Right actions, toolbar dividers, and a separate Library panel. The Library has Image/Video/Sound effects tabs; local imports stay under Media. Its only built-in item is a roughly 150×110 black color tile with a top-right picker. Clicking the tile creates a local five-second SVG image clip. Cloud catalog sections are empty; no upload or cloud integration is wired.
+- Delete Left/Right currently choose the most recently hovered clip ID, then selection, Video 1 clip at the playhead, then first clip. Delete Left advances source-in while keeping the clip's original timeline start; enabled Video 1 ripple pulls following clips left. There were prior reports of a wrong neighboring clip being edited, so this needs direct browser interaction verification.
+- Latest request: make text interactive in the video preview. `app/routes/studio-video.tsx` now calculates a canvas-aligned title hit area for the active text clip. Clicking selects it; pointer drag moves it; the bottom-right handle changes uniform scale; the top handle rotates. A gesture updates the clip transform, then records one undo step on release. `app/app.css` styles the overlay and handles. The overlay is separate from the composition canvas, so the same transform is used by preview/export without drawing handles into output. The source text, font size, colors, and exact X/Y fields remain in the inspector.
+
+### Verification and open checks
+
+- Latest text change passed `npm.cmd run typecheck`, `npm.cmd run build` (28 prerendered routes, 106 service-worker assets), and `git diff --check`. **The text pointer gestures have not been browser-tested**, nor has title save/reopen or exported geometry been checked. Do that next on an isolated project: add a title, select it by clicking in the preview, move/resize/rotate, undo, refresh/reopen, export, and compare the rendered result. Check preview alignment at different canvas ratios and fullscreen sizes. The current resize handle changes uniform scale; independent horizontal/vertical stretching is not implemented yet.
+- Library layout and empty Video/Sound effects panels were visually reviewed in Chrome. The generated color asset's save/reopen/export/offline path is still unverified. Waveform and Delete Left/Right browser behavior, preview/export audio parity, and broader offline/cross-browser release gates remain open. Do not mark M6 or Core complete from typecheck/build alone.
+- `SESSION_HANDOFF.md` sections below are historical checkpoints and may describe older paths, commits, or behavior. This section is the newest state.
+
 ## Latest continuation — 2026-11-16 (Asia/Dhaka)
 
 ### Resize crop selector fix

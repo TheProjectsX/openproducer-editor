@@ -1,5 +1,13 @@
 # Decisions, open measurements, and sources
 
+## Video Studio layout reference (2026-11-17)
+
+- The user supplied ten screenshots of the desktop CapCut editor as visual and workflow references. They show a compact top project bar, left media/tool browser, dominant player, right clip settings, timeline occupying the lower workspace, and export settings in a modal. Local Studio uses that spatial hierarchy and interaction density without copying CapCut branding, unavailable AI features, or asset libraries.
+- The first implementation slice replaces the tall page introduction and always-visible export panel with a compact project bar and export dialog, adds functional Media/Text/Transitions browser tabs, Basic/Speed/Adjust inspector tabs, source imagery on visual timeline clips, project details when no clip is selected, direct timeline actions, and a local-project creation action on direct entry. The existing edit document and rendering functions remain the source of truth.
+- Evidence: direct TypeScript compilation and 22 Core tests pass. Browser layout and workflow checks are pending because this checkout's `node_modules` has Linux Rolldown binaries instead of the required Windows binding, so the production build/dev server cannot start here.
+- Follow-up from the user's blank-editor and transport screenshots: the import input had been disabled until a project was created separately, while the player could advance the empty timeline. Import now creates the local project after successful inspection, saves media references in the bin, then navigates to that project. The ruler uses the scroll viewport's geometry for seek/drop mapping, accepts pointer drag and keyboard seeking, and the player exposes timecode, frame-step, play/pause, and fullscreen. Source checks pass; the same dependency blocker prevents browser runtime validation.
+- The next user correction removed automatic clip creation on import. Explicit bin click or drop creates the clip. Original canvas aspect follows the first placed visual source, with presets and typed custom dimensions; actual source dimensions are recorded during inspection. Composition still uses a contain fit, and preview CSS contains the full output canvas. Canvas backing dimensions now change only when output settings change, avoiding repeated reset/reflow during playback. The playhead handle drags relative to its initial position, and Ctrl+wheel adjusts timeline pixels per second with pointer-time anchoring. The new pure ratio/zoom checks pass; browser fixture review remains pending.
+
 ## Settled product decisions
 
 | Decision | Choice and reason |
@@ -237,3 +245,50 @@ Added `sync-markers-24fps.mp4`, a synthetic four-second H.264/AAC fixture with a
 - Evidence: four focused Node tests cover nonzero scroll, gutter mapping, invalid scale, and drag grab offset; full core suite passes 21/21, direct TypeScript check passes, and `git diff --check` passes. A populated-project browser drag/seek check remains pending.
 - Follow-up interaction polish: native clip drag/drop records the horizontal grab offset and subtracts it from the drop time, so grabbing a clip in its middle does not snap its left edge under the pointer. A unit test covers this placement calculation.
 - Browser limitation observed during this change: `/studio/video` first rendered its empty state, then after HMR showed `Cannot read properties of null (reading 'useContext')` in the React Router wrapper; hard reload did not recover it. The repository's local `npm run build` is also blocked by the existing Windows Tailwind native binding/EPERM issue. Do not claim browser interaction verification until the dev server is recovered and the populated-project workflow is retested.
+
+## Video Studio reference corrections and embedded audio (2026-11-17)
+
+- Import now leaves files in the bin until a separate click or compatible track drop. The first visual clip in Original mode sets the canvas ratio from inspected dimensions; a typed Custom option and common ratio presets are available. The display canvas uses contain sizing. The playhead supports relative pointer dragging, and Ctrl+wheel changes timeline scale around the pointer.
+- Source inspection found preview video elements permanently muted and timeline export mixing only audio-lane clips. Video elements now apply clip volume, mute, speed, and fades during playback. Export decodes video source audio into the same timeline mix as audio-lane clips. Detach and replacement mute the selected video's original audio. Legacy assets without audio metadata remain eligible for extraction; silent videos yield no source samples.
+- Evidence: TypeScript compilation and 24 focused Core tests passed; the production build verified 28 prerendered routes and 106 service-worker assets after restoring the Windows native bindings. In a fresh local production preview, the 4 s H.264/AAC fixture imported into the bin without a clip, Play remained disabled, placement created a clip, and the source video played with `muted=false`. A 320×180, 4.011 s MP4 export completed. FFprobe found H.264 video and AAC audio tracks; FFmpeg measured non-silent exported audio at −21.1 dB mean and −16.7 dB peak. Listening quality has not been checked. A portrait-ratio browser screenshot exposed a canvas box taller than the player; the canvas is now fitted inside the player and a follow-up screenshot showed the source frame visible. Paused frame stepping advanced the source by 0.033333 s. The in-app browser denied native fullscreen, so the player uses an in-page expanded fallback; opening and closing that fallback passed browser review. Broader offline, save/reopen, pointer drag, and export fidelity gates remain open.
+
+## Magnetic timeline placement (2026-11-17)
+
+- Source inspection found the old snap reducer initialized at the unsnapped target, so no candidate edge could beat it. Clip drops also had no occupied-track insertion behavior. Replaced both paths with shared placement calculation: candidate start/end edges snap within the typed tolerance, occupied-clip hover chooses before or after, and same-track followers shift only enough to open the insertion. The existing snap toggle still controls magnetic edge matching.
+- Native browser dragging from the media bin did not reach the track in the local production preview. Bin tiles now use pointer capture and track hit-testing, with a live placement ghost; timeline clips retain their existing drag path. The pointer path keeps the project entirely local and uses the same undoable edit model as clip moves.
+- Evidence: the 4 s fixture snapped a moved clip to the first clip's 4.0 s end. A bin drag placed a clip at 0.6167 s; the next snapped to 4.6167 s, and a third insertion at 4.6167 s shifted the former second clip to 8.6167 s. Undo restored the two-clip timeline, and page reload restored both clips and their positions. Core tests pass 26/26; TypeScript and production build pass with 28 prerendered routes and 106 service-worker assets. Offline and cross-browser interaction checks remain open; this is not a Core release gate pass.
+
+## Selected-video inspector and timeline waveforms (2026-11-17)
+
+- Kept clip properties in the existing per-clip project model. Added selected-video scale, rotation, volume, alignment to the canvas bounds, horizontal/vertical mirror flags, silence, extraction, replacement audio, split, and duplicate controls. Slider lines are 2 px with compact thumbs and three-decimal readouts; precise fields remain where position and timing require typed values. Mirror transforms are applied in the shared canvas renderer used by preview/export.
+- Audio assets and video assets with audio streams are decoded locally through Mediabunny into up to 16 peak buckets per source second (capped at 8,192). Peaks are normalized per source so quiet recordings remain legible, and clips show only the buckets in their trimmed source range, reduced to a density of about one bar per 2.5 timeline pixels. Video clips use a compact bottom strip; unsupported or silent streams show no fabricated fallback bars.
+- Evidence: TypeScript and static production build pass (28 prerendered routes, 106 service-worker assets). The local editor view showed peaks on video clips with embedded audio. Visual review found that fixed 180-bucket sampling made long source tracks appear sparse, and removed both that limit and the repeated-gradient bars that obscured the signal. Project reopen, preview/export parity, and offline waveform checks remain outstanding; this is not an M6 release gate pass.
+
+## Inspector field layout and gain above unity (2026-11-17)
+
+- Group Track/Timeline start and Source in/Source out into two compact rows below Audio volume. This keeps clip placement and trim metadata after the directly adjustable sound control in the inspector.
+- Extend per-clip volume to 0–4× for audio and video. The preview routes local media elements through Web Audio gain nodes; export applies the same linear clip gain and retains the project's existing peak protection. The pitch-preserved stretcher now receives unity gain so the mixer applies clip gain only once.
+- Evidence: TypeScript and static production build pass; the build verifies 28 prerendered routes and 106 cached assets. No browser listening or exported gain measurement has been run for this update.
+
+## Timeline split defaults and trim actions (2026-11-17)
+
+- Empty lane/ruler clicks clear selection. Split uses the selected clip when one exists; otherwise it chooses the Video 1 clip containing the playhead. Added toolbar Delete Left/Right actions for the last clip hovered, enabled only when the playhead is inside that clip. Each action retains the side of the playhead named by the action; Video 1 ripple follows the current ripple setting.
+- Fixed checkbox sizing specifically because the timeline-wide 65 px numeric input rule also matched checkbox controls, leaving a visible gap before their labels.
+- Evidence: `npm.cmd run typecheck` and `git diff --check` pass. Browser interaction review remains pending.
+
+- Visual follow-up: replaced the unclear arrow marks on Delete Left/Right with mirrored clip-and-playhead symbols. Each shows the segment that remains and an X over the removed side; accessible labels and hover tooltips remain intact.
+
+- Enablement follow-up: remove the playhead-inside-clip disabled gate. The actions now always render enabled and resolve target in selected → hovered → Video 1 under playhead → first timeline clip order. If the cut lies beyond the clip, the action removes the clip only when it is entirely on the requested side; otherwise it reports that there is no segment to remove. Typecheck passes.
+
+- Target correction: splitting selects and records the new right segment as the current hover target. Explicit selection takes precedence over stale hover state, so Delete Left/Right edits the selected split segment instead of a neighboring clip. The editor identifies clips by stable project IDs, not filenames.
+- Follow-up correction: reports showed selected-first targeting could still trim the previous clip when a different clip was hovered. Delete Left/Right now resolve the most recently hovered clip ID first, then selection, playhead clip, and first clip; the status text names the affected asset. Delete Left shifts the kept source range back to the clip's original start, and enabled primary-track ripple moves later clips left by the removed duration. Delete Right keeps the clip's start and shortens its source end.
+
+## Local editor library (2026-11-17)
+
+- Added separate Image, Video, and Sound effects subtabs. User-imported assets stay in Media and do not populate Library. Catalog sections remain empty until their catalog content is available. The Image section shows a compact solid-black tile with a top-right color picker; clicking the tile creates a saved five-second SVG still clip on Video 1.
+- Evidence: typecheck and static production build pass; browser review showed the new Library panel and color picker. Project reopen, output rendering, and offline interaction checks remain required before claiming milestone completion.
+
+## Preview text transforms (2026-11-17)
+
+- Active text clips expose a preview hit area with a move box, resize corner, and rotate handle. Pointer motion updates the same clip transform evaluated by the canvas renderer for preview and export; release records one undo state. The hit area uses the preview's contained canvas scale and title font metrics.
+- Typecheck passes. Browser pointer review, project reopen, exported title geometry, and offline checks remain open.
