@@ -1,5 +1,16 @@
 # Work log
 
+## 2026-11-17 — Dynamic Video Studio lanes
+
+- Replaced the fixed six-lane display with an empty main drop area and lanes derived from placed clips. Dragging visual or audio media temporarily exposes a new compatible lane; text titles create an overlay lane above the main lane. Existing numeric track assignments remain unchanged.
+- Centered the main lane vertically with balanced flexible space above and below it, compensating for unequal overlay and audio lane counts.
+- Moved centering space outside the lane stack so adjacent lanes have no gap. Audio lanes remain hidden until occupied. General audio drops create or append Audio 1; targeted audio drops use their timeline position and open another lane when overlapping. Visual media requires a lane drop (keyboard activation uses the playhead).
+- Bound Ctrl+wheel zoom directly to the timeline viewport with a non-passive listener. The existing shared scale changes clip widths and maintains the pointer's timeline time by scrolling the viewport. Direct TypeScript compilation and diff checks pass; browser gesture review remains open.
+- Built the current production app and opened it on port 5173. A five-second local color clip measured 300 px wide at 60 px/s and 600 px at 120 px/s. The browser tool could not send Ctrl and wheel as one gesture, so that specific input path is still unverified.
+- Corrected pointer-centered zoom on short timelines: added enough scrollable width, retained the hovered timeline time after React lays out the new clip widths, and covered the required scroll position with a pure regression check. Direct TypeScript compilation and 28 Core tests pass; modifier-wheel browser input is still unverified.
+- Fixed text title timeline dragging: allowed text on positive overlay tracks, stopped temporary lane insertion from shifting existing clips during a drag, added an independent higher-overlay drop target, and cleared drag state on drop. In a fresh production browser preview, a title moved from 0 to 3 s on Overlay 1, then to Overlay 2; refresh restored Track 2/start 3 s. TypeScript, 29 Core tests, and production build pass.
+- Added focused lane-layout checks. Browser drag/drop, save/reopen, export ordering, and offline verification remain open.
+
 ## 2026-11-16 — Drag collage photos between cells and add background swatches
 
 - A drag that stays within a photo's source cell continues to pan the photo. Dragging across a cell boundary now highlights the target, swaps with an occupied cell, or moves into an empty cell. Added a Cell position selector as a keyboard alternative.

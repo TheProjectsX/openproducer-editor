@@ -1,5 +1,17 @@
 # Decisions, open measurements, and sources
 
+## Dynamic timeline lanes (2026-11-17)
+
+Kept the existing signed numeric track model so saved projects and preview/export ordering remain compatible: track 0 is the main visual lane, positive tracks are overlays, and negative tracks are audio. The lane list is derived from clip assignments, with a temporary destination lane during drags. Existing Core tests and TypeScript checks cover the pure layout and compilation; browser placement and offline/export gates remain open.
+
+Ctrl+wheel timeline zoom now uses a non-passive native wheel listener on the scroll viewport so browser zoom does not consume the gesture. Clip widths, positions, ruler ticks, waveforms, and the playhead continue to derive from the shared pixels-per-second value; the time under the pointer is retained by adjusting horizontal scroll. TypeScript passes; browser interaction remains to verify.
+
+Production preview check on port 5173 (2026-11-17): a five-second local color-background clip measured 300 px wide at 60 px/s and 600 px at 120 px/s in the in-app browser. This verifies clip width follows the shared zoom value. The browser automation did not produce a combined Ctrl+wheel gesture, so modifier-wheel input and pointer anchoring remain unverified.
+
+Follow-up: the short timeline's 904 px content width was narrower than the 1262 px viewport, preventing the scroll offset needed to hold a hovered clip point stationary. Content width now includes the viewport width beyond the clip duration, and a layout effect applies the pointer-time scroll offset after zoom. At 60→120 px/s, a hovered point at 2.5 s and x=254 px requires 150 px of horizontal scroll; the new content width allows it. Pure timing/width test passes; direct modifier-wheel browser review remains open.
+
+Text clip drag audit: `placementForDrop` rejected text unconditionally. Removing that rejection exposed a second browser behavior: adding a temporary overlay lane at drag start shifted the source lane and left a phantom lane after drop. Existing lanes now stay fixed during clip drags, a separate absolute drop target creates a higher overlay, and drop clears drag state. On a fresh local production preview, horizontal drag kept Track 1 and set start to 3 s; upward drop set Track 2; reload restored Track 2/start 3 s. Browser output/export was not reviewed.
+
 ## Video Studio layout reference (2026-11-17)
 
 - The user supplied ten screenshots of the desktop CapCut editor as visual and workflow references. They show a compact top project bar, left media/tool browser, dominant player, right clip settings, timeline occupying the lower workspace, and export settings in a modal. Local Studio uses that spatial hierarchy and interaction density without copying CapCut branding, unavailable AI features, or asset libraries.

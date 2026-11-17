@@ -1,6 +1,22 @@
 const TIMELINE_TRACK_LABEL_WIDTH = 104;
 const CANVAS_LONG_SIDE = 1920;
 
+export function canPlaceAssetOnTrack(kind: "audio" | "video" | "image" | "text", track: number) {
+  return Number.isInteger(track) && (kind === "audio" ? track < 0 : kind === "text" ? track > 0 : track >= 0);
+}
+
+export function visibleTimelineTracks(clips: readonly { track: number }[], dragKind: "visual" | "audio" | null = null) {
+  const highestOverlay = Math.max(0, ...clips.map((clip) => clip.track));
+  const lowestAudio = Math.max(0, ...clips.map((clip) => -clip.track));
+  const overlayCount = highestOverlay + (dragKind === "visual" ? 1 : 0);
+  const audioCount = lowestAudio;
+  return [
+    ...Array.from({ length: overlayCount }, (_, index) => overlayCount - index),
+    0,
+    ...Array.from({ length: audioCount }, (_, index) => -(index + 1)),
+  ];
+}
+
 export function canvasDimensionsForAspect(ratio: number) {
   if (!Number.isFinite(ratio) || ratio <= 0) return null;
   const even = (value: number) => Math.max(16, Math.round(value / 2) * 2);
@@ -12,6 +28,14 @@ export function canvasDimensionsForAspect(ratio: number) {
 export function zoomPixelsPerSecond(current: number, wheelDelta: number) {
   const scale = wheelDelta < 0 ? 1.12 : 1 / 1.12;
   return Math.max(12, Math.min(160, Math.round(current * scale)));
+}
+
+export function timelineContentWidth(duration: number, pixelsPerSecond: number, viewportWidth: number) {
+  return TIMELINE_TRACK_LABEL_WIDTH + Math.max(800, Math.max(0, duration) * pixelsPerSecond + Math.max(0, viewportWidth));
+}
+
+export function timelineZoomScrollLeft(timeAtPointer: number, pointerX: number, pixelsPerSecond: number) {
+  return Math.max(0, TIMELINE_TRACK_LABEL_WIDTH + timeAtPointer * pixelsPerSecond - pointerX);
 }
 
 export function timelineTimeAtPointer(

@@ -1,5 +1,28 @@
 # Session handoff — Local Studio Core
 
+## Current handoff — 2026-11-18 (Asia/Dhaka)
+
+### Checkout and guardrails
+
+- Workspace: `E:\Coding_Practice\Live Projects\openproducer-editor`. Branch `main` is at `66be848` (`Add interactive video preview text manipulation and editor workspace enhancements`), matching `origin/main`. The worktree has **uncommitted changes** in this handoff, `WORK_LOG.md`, `app/app.css`, `app/lib/video-timeline.ts`, `app/routes/studio-video.tsx`, `project_research/docs/02-feature-matrix.md`, `06-editor-interactions.md`, `10-decisions-and-sources.md`, and `tests/video-timeline.test.mjs`. Preserve these edits; do not reset or clean. Run `git status --short` before further work.
+- Read root `README.md`, `AGENTS.md`, and the `project_research/` guides before implementation. Keep all media, projects, processing, preview, and export local. The roadmap and test/release gate remain binding; **M6/Core is not complete**.
+- Sections below this one are historical and contain stale paths, commits, and fixed-track descriptions. This section is the current state.
+
+### Work in this continuation
+
+- Media bin assets now use the Library image tile's three-column size and 1.35 aspect ratio. Thumbnails fit without crop; their background is lighter than the editor surface. Video/audio durations appear at the top right as `mm:ss` with a dark outline. Card hover and cursor changes were removed. A small cyan-outlined thumbnail follows the pointer during a bin drag.
+- Video Studio's timeline now derives visible lanes from clip assignments. An empty project shows a centered, unlabeled main visual drop area. Video/images default to track `0`; overlays use positive tracks above it; audio uses negative tracks directly below it. Audio lanes appear only when occupied. A general audio drop starts at zero or appends to Audio 1; a targeted overlapping audio drop creates another audio lane. Video and image placement requires a visual-lane drop, with keyboard activation at the playhead. Existing saved numeric tracks remain compatible.
+- Ctrl+wheel zoom uses a non-passive listener. Clip widths, ruler marks, waveforms, and the playhead use the shared pixels-per-second scale. The timeline reserves horizontal scroll space on short projects, and a layout effect adjusts scroll so the hovered time stays under the pointer.
+- Fixed text title timeline movement. The old drop validator rejected text on every track. Text now moves within positive overlay lanes. Existing lanes remain fixed during a clip drag; a separate target above the stack creates the next overlay lane. Drop clears the temporary drag state.
+
+### Verification and remaining checks
+
+- Latest direct `npx.cmd tsc --noEmit --pretty false` passed; `npm.cmd run test:core` passed **29/29**; production `npm.cmd run build` passed with elevated file access (28 prerendered routes and 107 service-worker assets); `git diff --check` passed. Ordinary build/typegen can fail on Windows native module `EPERM`, while elevated build succeeded. Temporary local preview processes were stopped.
+- In a fresh local production browser preview, a five-second color clip measured **300 px at 60 px/s** and **600 px at 120 px/s**. A focused pure test confirms the scroll offset needed to keep a hovered 2.5 s point anchored on a short timeline. The browser automation could not send Ctrl and wheel as one gesture, so **the actual modifier-wheel gesture and pointer anchoring remain unverified in a browser**.
+- Text title timeline drag **was browser-tested**: horizontal drag changed its start from 0 to 3 s while keeping Overlay 1; an upward drag moved it to Overlay 2; refresh restored Track 2/start 3 s. Preview title handles for move/resize/rotation, title export geometry, undo, and offline operation remain unverified. The text clip's timeline move does not establish preview/export parity.
+- Dynamic lane placement for audio, visual media, and saved projects needs broader browser checks. The Project Details panel still reports `3 video · 3 audio` despite dynamic lanes; update that display when continuing timeline work. Test actual Ctrl+wheel with a physical browser gesture, including short and long projects and the time under the cursor. Review text and audio drop placement, undo, project reopen, export order, and offline behavior before marking the milestone complete.
+- The latest browser test used only a generated local color background and text title. No user media was added to the repository. Prior Core gaps remain: extraction and split-archive retests, cancellation/storage recovery, cross-browser format matrix, accessibility, offline operation, and representative external-output review.
+
 ## Current handoff — 2026-11-17 (Asia/Dhaka)
 
 ### Workspace and scope

@@ -1,6 +1,32 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canvasDimensionsForAspect, resolveTimelinePlacement, timelineDropStart, timelineRulerOffset, timelineTimeAtPointer, zoomPixelsPerSecond } from "../app/lib/video-timeline.ts";
+import { canPlaceAssetOnTrack, canvasDimensionsForAspect, resolveTimelinePlacement, timelineContentWidth, timelineDropStart, timelineRulerOffset, timelineTimeAtPointer, timelineZoomScrollLeft, visibleTimelineTracks, zoomPixelsPerSecond } from "../app/lib/video-timeline.ts";
+
+test("text clips can move on existing and new overlay lanes", () => {
+  assert.equal(canPlaceAssetOnTrack("text", 1), true);
+  assert.equal(canPlaceAssetOnTrack("text", 2), true);
+  assert.equal(canPlaceAssetOnTrack("text", 0), false);
+  assert.equal(canPlaceAssetOnTrack("text", -1), false);
+  assert.equal(canPlaceAssetOnTrack("audio", -1), true);
+  assert.equal(canPlaceAssetOnTrack("video", 0), true);
+});
+
+test("zoom keeps the hovered clip time at the pointer on a short timeline", () => {
+  const pointerX = 254;
+  const time = (pointerX - timelineRulerOffset()) / 60;
+  const scrollLeft = timelineZoomScrollLeft(time, pointerX, 120);
+  assert.equal(scrollLeft, 150);
+  assert.equal(timelineTimeAtPointer(pointerX, 0, scrollLeft, 120, timelineRulerOffset()), time);
+  assert.ok(timelineContentWidth(5, 120, 1262) - 1262 >= scrollLeft);
+});
+
+test("timeline lanes appear around the main lane as clips and drags require them", () => {
+  assert.deepEqual(visibleTimelineTracks([]), [0]);
+  assert.deepEqual(visibleTimelineTracks([], "audio"), [0]);
+  assert.deepEqual(visibleTimelineTracks([{ track: -1 }]), [0, -1]);
+  assert.deepEqual(visibleTimelineTracks([{ track: 0 }, { track: 2 }, { track: -2 }]), [2, 1, 0, -1, -2]);
+  assert.deepEqual(visibleTimelineTracks([{ track: 0 }, { track: 1 }], "visual"), [2, 1, 0]);
+});
 
 test("timeline pointer positions account for horizontal scrolling", () => {
   assert.equal(timelineTimeAtPointer(360, 120, 0, 60), 4);

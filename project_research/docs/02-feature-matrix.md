@@ -1,5 +1,11 @@
 # Feature matrix and release boundaries
 
+## Dynamic Video Studio lanes (2026-11-17)
+
+The timeline now begins with one unlabeled main drop area centered vertically in the available timeline space. Visible overlay lanes above it and audio lanes directly below it are derived from placed clips; audio lanes stay hidden until occupied. A general audio drop onto the timeline starts at zero or appends to Audio 1; a drop onto an existing audio lane uses the selected time and creates another audio lane when it overlaps. Video and image placement requires a visual lane drop, with keyboard placement at the playhead. New text titles get an overlay lane. Existing saved numeric track assignments remain readable. TypeScript and lane unit checks pass; pointer placement, project reopen, export order, and offline operation still need browser verification.
+
+Text timeline drag follow-up: text clips now pass the same-lane and overlay-lane drop rules. Dragging an existing clip keeps occupied lanes fixed; a separate target above the stack creates a higher overlay. A production browser check moved a title from 0 to 3 seconds on Overlay 1, then to Overlay 2, and refresh restored Track 2 at 3 seconds. Export/offline parity remains open.
+
 ## Video Studio workspace rebuild (2026-11-17)
 
 Selected text clips now expose direct preview handles for move, resize, and rotation. Gestures update the persisted clip transform and share the composition renderer with export. Typecheck passes; browser gesture and saved/exported output review remain open.
