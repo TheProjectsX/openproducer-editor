@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router";
 import type { Route } from "./+types/studio-video";
@@ -7,8 +7,9 @@ import { createProject, getProject, readVideoAsset, saveVideoTimeline, type Vide
 import { drawVideoComposition, getClipLength } from "../lib/video-composition";
 import { evaluateClipKeyframes, evaluateClipTransition, upsertClipKeyframe } from "../lib/video-keyframes";
 import { renderTimelineAudio } from "../lib/audio-timeline-render";
-import { canPlaceAssetOnTrack, canvasDimensionsForAspect, resolveTimelinePlacement, timelineContentWidth, timelineDropStart, timelineRulerOffset, timelineTimeAtPointer, timelineZoomScrollLeft, visibleTimelineTracks, zoomPixelsPerSecond } from "../lib/video-timeline";
+import { canPlaceAssetOnTrack, canvasDimensionsForAspect, planMediaBatchPlacement, resolveTimelinePlacement, timelineContentWidth, timelineDropStart, timelineRulerOffset, timelineTimeAtPointer, timelineZoomScrollLeft, visibleTimelineTracks, zoomPixelsPerSecond } from "../lib/video-timeline";
 import { inspectMediaFile } from "../lib/media-inspection";
+import { sortMediaAssets, updateMediaSelection, type MediaFilter, type MediaSort, type SortDirection } from "../lib/video-media-bin";
 import wasmUrl from "bungee-web/bungee.wasm?url";
 
 const EMPTY: VideoTimelineProject = { version: 1, width: 1920, height: 1080, aspectRatioMode: "original", fps: 30, duration: 0, playhead: 0, assets: [], clips: [] };
@@ -42,6 +43,43 @@ function formatAssetDuration(seconds: number) {
   const minutes = Math.floor(totalSeconds / 60) % 60;
   const remainingSeconds = totalSeconds % 60;
   return (hours ? [hours, minutes, remainingSeconds] : [minutes, remainingSeconds]).map((value) => String(value).padStart(2, "0")).join(":");
+}
+
+function MediaBinControls({ filter, onFilter, sort, onSort, direction, onDirection }: {
+  filter: MediaFilter;
+  onFilter: (value: MediaFilter) => void;
+  sort: MediaSort;
+  onSort: (value: MediaSort) => void;
+  direction: SortDirection;
+  onDirection: (value: SortDirection) => void;
+}) {
+  const closeMenu = (event: MouseEvent<HTMLButtonElement>) => event.currentTarget.closest("details")?.removeAttribute("open");
+  const sortOptions: { value: MediaSort; label: string }[] = [
+    { value: "imported", label: "Time imported" }, { value: "fileDate", label: "File date" },
+    { value: "name", label: "Name" }, { value: "type", label: "Type" }, { value: "duration", label: "Duration" },
+  ];
+  const filterOptions: { value: MediaFilter; label: string }[] = [
+    { value: "all", label: "All" }, { value: "video", label: "Video" },
+    { value: "audio", label: "Audio" }, { value: "image", label: "Image" },
+  ];
+  const textOrder = sort === "name" || sort === "type";
+  const durationOrder = sort === "duration";
+  return <div className="studio-media-menu-buttons">
+    <details className="studio-media-menu">
+      <summary aria-label="Sort media" title="Sort media"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h9M3 8h7M3 12h5M15 4v12m-3-3 3 3 3-3" /></svg><span className="studio-menu-chevron" aria-hidden="true">⌄</span></summary>
+      <div className="studio-media-menu-panel" role="group" aria-label="Sort media by">
+        {sortOptions.map((option) => <button type="button" key={option.value} aria-label={`Sort by ${option.label}`} aria-pressed={sort === option.value} onClick={(event) => { onSort(option.value); closeMenu(event); }}><span className="studio-menu-check">{sort === option.value ? "✓" : ""}</span>{option.label}</button>)}
+        <div className="studio-menu-divider" />
+        {(["desc", "asc"] as const).map((value) => <button type="button" key={value} aria-label={textOrder ? (value === "asc" ? "A to Z" : "Z to A") : durationOrder ? (value === "asc" ? "Shortest first" : "Longest first") : (value === "asc" ? "Oldest first" : "Newest first")} aria-pressed={direction === value} onClick={(event) => { onDirection(value); closeMenu(event); }}><span className="studio-menu-check">{direction === value ? "✓" : ""}</span>{textOrder ? (value === "asc" ? "A to Z" : "Z to A") : durationOrder ? (value === "asc" ? "Shortest first" : "Longest first") : (value === "asc" ? "Oldest first" : "Newest first")}</button>)}
+      </div>
+    </details>
+    <details className="studio-media-menu">
+      <summary aria-label="Filter media" title="Filter media" className={filter !== "all" ? "active" : ""}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 4h15l-6 6.5V16l-3-1.5v-4L2.5 4Z" /></svg><span className="studio-menu-chevron" aria-hidden="true">⌄</span></summary>
+      <div className="studio-media-menu-panel studio-filter-menu-panel" role="group" aria-label="Filter media by type">
+        {filterOptions.map((option) => <button type="button" key={option.value} aria-label={`Show ${option.label.toLowerCase()} media`} aria-pressed={filter === option.value} onClick={(event) => { onFilter(option.value); closeMenu(event); }}><span className="studio-menu-check">{filter === option.value ? "✓" : ""}</span>{option.label}</button>)}
+      </div>
+    </details>
+  </div>;
 }
 
 function EditorRange({ label, value, min, max, step = 0.001, unit = "", onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; onChange: (value: number) => void }) {
@@ -78,6 +116,13 @@ export default function VideoStudio() {
   const [selected, setSelected] = useState("");
   const [hoveredClipId, setHoveredClipId] = useState("");
   const [activeBinTab, setActiveBinTab] = useState<"media" | "library" | "text" | "transitions">("media");
+  const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
+  const [mediaSort, setMediaSort] = useState<MediaSort>("imported");
+  const [mediaSortDirection, setMediaSortDirection] = useState<SortDirection>("desc");
+  const [selectedBinIds, setSelectedBinIds] = useState<string[]>([]);
+  const [binMarquee, setBinMarquee] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const binSelectionAnchorRef = useRef<string | null>(null);
+  const binMarqueeRef = useRef<{ pointerId: number; startX: number; startY: number; selectedAtStart: string[]; additive: boolean; dragging: boolean } | null>(null);
   const [libraryTab, setLibraryTab] = useState<"image" | "video" | "sound">("image");
   const [libraryBackgroundColor, setLibraryBackgroundColor] = useState("#000000");
   const [inspectorTab, setInspectorTab] = useState<"basic" | "speed" | "adjust">("basic");
@@ -90,13 +135,15 @@ export default function VideoStudio() {
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState("60");
   const [timelineViewportWidth, setTimelineViewportWidth] = useState(0);
+  const [rulerHoverGuide, setRulerHoverGuide] = useState<{ left: number; top: number; height: number } | null>(null);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [snapThreshold, setSnapThreshold] = useState("0.2");
   const [dropPreview, setDropPreview] = useState<{ track: number; start: number; duration: number } | null>(null);
-  const [binDragPreview, setBinDragPreview] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [binDragPreview, setBinDragPreview] = useState<{ id: string; count: number; x: number; y: number } | null>(null);
   const [activeTrackDragKind, setActiveTrackDragKind] = useState<"visual" | "audio" | null>(null);
   const draggingRef = useRef<{ kind: "asset" | "clip"; id: string; grabOffset: number } | null>(null);
-  const binPointerRef = useRef<{ pointerId: number; id: string; initialX: number; initialY: number; dragging: boolean } | null>(null);
+  const binPointerRef = useRef<{ pointerId: number; id: string; ids: string[]; initialX: number; initialY: number; dragging: boolean } | null>(null);
+  const binBodyRef = useRef<HTMLDivElement>(null);
   const suppressBinClickRef = useRef(false);
   const [ripplePrimaryTrack, setRipplePrimaryTrack] = useState(true);
   const [transitionDuration, setTransitionDuration] = useState("0.5");
@@ -145,6 +192,7 @@ export default function VideoStudio() {
   const timelineEditTarget = hoveredClip ?? selectedClip ?? mainClipAtPlayhead ?? timeline.clips[0];
   const selectedAsset = selectedClip && timeline.assets.find((asset) => asset.id === selectedClip.assetId);
   const availableAudioAssets = timeline.assets.filter((asset) => asset.kind === "audio");
+  const visibleMediaAssets = useMemo(() => sortMediaAssets(timeline.assets, mediaFilter, mediaSort, mediaSortDirection), [timeline.assets, mediaFilter, mediaSort, mediaSortDirection]);
   const selectedReplacementAudioAssetId = availableAudioAssets.some((asset) => asset.id === replacementAudioAssetId) ? replacementAudioAssetId : availableAudioAssets[0]?.id ?? "";
   const selectedValues = selectedClip ? evaluateClipKeyframes(selectedClip, Math.max(0, timeline.playhead - selectedClip.start)) : null;
   const selectedTransform = selectedValues?.transform ?? IDENTITY_TRANSFORM;
@@ -207,7 +255,7 @@ export default function VideoStudio() {
         const loaded = await Promise.all(saved.assets.map(async (asset) => [asset.id, await readVideoAsset(asset.id)] as const));
         if (cancelled) return;
         const restored = Object.fromEntries(loaded.filter((item): item is readonly [string, File] => Boolean(item[1])));
-        setFiles(restored); setTimeline(saved); setSelected(saved.clips[0]?.id ?? "");
+        setFiles(restored); setTimeline(saved); setSelected(saved.clips[0]?.id ?? ""); setSelectedBinIds([]); binSelectionAnchorRef.current = null;
         setFrameRateDraft(String(saved.fps));
         setWidthDraft(String(saved.width)); setHeightDraft(String(saved.height));
         setReady(true);
@@ -359,7 +407,7 @@ export default function VideoStudio() {
       }
       if (!kind) { setError(`${file.name} is not a supported video, audio, or image file.`); continue; }
       if (!duration) { setError(`Could not read a usable duration for ${file.name}.`); continue; }
-      const asset = { id, name: file.name, type: file.type, size: file.size, duration, kind, width: mediaWidth, height: mediaHeight, hasAudio } satisfies VideoTimelineAsset;
+      const asset = { id, name: file.name, type: file.type, size: file.size, duration, kind, importedAt: Date.now() + assets.length, fileModifiedAt: file.lastModified || undefined, width: mediaWidth, height: mediaHeight, hasAudio } satisfies VideoTimelineAsset;
       if ([...baseTimeline.assets, ...assets].reduce((total, item) => total + item.size, file.size) > 512 * 1024 * 1024) { setError("The total local media limit for this prototype is 512 MiB per project."); continue; }
       assets.push(asset); nextFiles[id] = file;
     }
@@ -378,7 +426,7 @@ export default function VideoStudio() {
     const color = /^#[0-9a-f]{6}$/i.test(libraryBackgroundColor) ? libraryBackgroundColor : "#808080";
     const file = new File([`<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080"><rect width="1920" height="1080" fill="${color}"/></svg>`], `Color background ${color}.svg`, { type: "image/svg+xml" });
     const current = projectId ? timelineRef.current : EMPTY;
-    const asset: VideoTimelineAsset = { id: crypto.randomUUID(), name: file.name, type: file.type, size: file.size, duration: 3600, kind: "image", width: 1920, height: 1080 };
+    const asset: VideoTimelineAsset = { id: crypto.randomUUID(), name: file.name, type: file.type, size: file.size, duration: 3600, kind: "image", importedAt: Date.now(), width: 1920, height: 1080 };
     const track = 0;
     const start = Math.max(current.playhead, ...current.clips.filter((clip) => clip.track === track).map((clip) => clip.start + clipLength(clip)), 0);
     const clip: VideoTimelineClip = { id: crypto.randomUUID(), assetId: asset.id, track, start, sourceStart: 0, sourceEnd: 5, speed: 1, volume: 1, muted: false };
@@ -431,6 +479,37 @@ export default function VideoStudio() {
     if (dimensions) { setWidthDraft(String(dimensions.width)); setHeightDraft(String(dimensions.height)); }
     setSelected(clip.id); setError("");
   }
+  function selectBinAsset(id: string, shift: boolean, toggle: boolean) {
+    const visibleIds = visibleMediaAssets.filter((asset) => asset.kind !== "text").map((asset) => asset.id);
+    if (!visibleIds.includes(id)) return;
+    setSelectedBinIds((current) => updateMediaSelection(visibleIds, current, binSelectionAnchorRef.current, id, shift, toggle));
+    if (!shift) binSelectionAnchorRef.current = id;
+  }
+  function placeMediaBatch(ids: readonly string[], targetTrack: number, pointerTime: number) {
+    const assets = visibleMediaAssets.filter((asset) => ids.includes(asset.id));
+    if (!assets.length) return;
+    if (assets.length === 1) { addAssetToTimeline(assets[0].id, targetTrack, pointerTime); return; }
+    const current = timelineRef.current;
+    const existing = current.clips.map((clip) => ({ id: clip.id, track: clip.track, start: clip.start, end: clip.start + clipLength(clip) }));
+    const placement = planMediaBatchPlacement(assets, targetTrack, pointerTime, existing, Number(snapThreshold), snapEnabled);
+    if (!placement) { setError("Drop the first item in the sorted selection on a compatible lane: visuals on a visual lane, audio on an audio lane. Text titles cannot be placed from the media bin."); return; }
+    const firstVisual = !current.clips.some((clip) => clip.track >= 0 && current.assets.some((asset) => asset.id === clip.assetId && (asset.kind === "video" || asset.kind === "image")));
+    const visualAsset = firstVisual && assets.find((asset) => asset.kind === "video" || asset.kind === "image");
+    const dimensions = visualAsset && (current.aspectRatioMode ?? "custom") === "original" && visualAsset.width && visualAsset.height
+      ? canvasDimensionsForAspect(visualAsset.width / visualAsset.height) : null;
+    const addedClips: VideoTimelineClip[] = placement.placements.map((item) => ({
+      id: crypto.randomUUID(), assetId: item.assetId, track: item.track, start: item.start,
+      sourceStart: 0, sourceEnd: item.duration, speed: 1, volume: 1, muted: false,
+      ...(item.track < 0 ? { pitchMode: "preserve" as const } : {}),
+    }));
+    applyTimelineEdit((previous) => {
+      const clips = [...previous.clips.map((clip) => placement.shiftedStarts[clip.id] === undefined ? clip : { ...clip, start: placement.shiftedStarts[clip.id] }), ...addedClips];
+      return { ...previous, ...dimensions, clips, duration: Math.max(0, ...clips.map((clip) => clip.start + clipLength(clip))) };
+    });
+    if (dimensions) { setWidthDraft(String(dimensions.width)); setHeightDraft(String(dimensions.height)); }
+    setSelected(addedClips[0].id); setError("");
+    setStatus(`Added ${assets.length} selected media items in the current bin order.`);
+  }
   function moveClipToTrack(id: string, track: number, pointerTime: number, grabOffset: number) {
     const placement = placementForDrop(track, pointerTime, { kind: "clip", id, grabOffset });
     if (!placement) { setError("Drop text on an overlay lane, audio on an audio lane, and video or images on a visual lane."); return; }
@@ -450,11 +529,13 @@ export default function VideoStudio() {
     const drag = binPointerRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     if (!drag.dragging && Math.hypot(event.clientX - drag.initialX, event.clientY - drag.initialY) < 6) return;
+    if (!drag.dragging) { setSelectedBinIds(drag.ids); binSelectionAnchorRef.current = drag.id; }
     drag.dragging = true;
-    setBinDragPreview({ id: drag.id, x: event.clientX, y: event.clientY });
+    setBinDragPreview({ id: drag.id, count: drag.ids.length, x: event.clientX, y: event.clientY });
     const target = binTrackAtPointer(event.clientX, event.clientY);
-    const asset = timelineRef.current.assets.find((item) => item.id === drag.id);
-    const placement = target && asset?.kind !== "audio" && placementForDrop(target.track, timelinePointerTime(event, target.lane), { kind: "asset", id: drag.id, grabOffset: 0 });
+    const assets = visibleMediaAssets.filter((asset) => drag.ids.includes(asset.id));
+    const existing = timelineRef.current.clips.map((clip) => ({ id: clip.id, track: clip.track, start: clip.start, end: clip.start + clipLength(clip) }));
+    const placement = target && planMediaBatchPlacement(assets, target.track, timelinePointerTime(event, target.lane), existing, Number(snapThreshold), snapEnabled);
     setDropPreview(placement && target ? { track: target.track, start: placement.start, duration: placement.duration } : null);
   }
   function finishBinPointer(event: React.PointerEvent<HTMLButtonElement>) {
@@ -471,13 +552,55 @@ export default function VideoStudio() {
       const asset = timelineRef.current.assets.find((item) => item.id === drag.id);
       const overTimeline = document.elementFromPoint(event.clientX, event.clientY)?.closest(".timeline-scroll");
       if (asset?.kind === "audio" && overTimeline) {
-        if (target && target.track < 0) addAssetToTimeline(drag.id, target.track, timelinePointerTime(event, target.lane));
-        else addAssetToTimeline(drag.id);
-      } else if (target) addAssetToTimeline(drag.id, target.track, timelinePointerTime(event, target.lane));
+        if (target && target.track < 0) placeMediaBatch(drag.ids, target.track, timelinePointerTime(event, target.lane));
+        else if (!target) {
+          const audioEnd = Math.max(0, ...timelineRef.current.clips.filter((clip) => clip.track === -1).map((clip) => clip.start + clipLength(clip)));
+          placeMediaBatch(drag.ids, -1, audioEnd);
+        } else placeMediaBatch(drag.ids, target.track, timelinePointerTime(event, target.lane));
+      } else if (target) placeMediaBatch(drag.ids, target.track, timelinePointerTime(event, target.lane));
+      else if (overTimeline) setError("Drop video or images on a visual lane.");
     }
     setDropPreview(null);
   }
   function cancelBinPointer() { binPointerRef.current = null; setBinDragPreview(null); setDropPreview(null); }
+  function beginBinMarquee(event: React.PointerEvent<HTMLDivElement>) {
+    if (activeBinTab !== "media" || event.button !== 0 || (event.target as Element).closest("button, label, input, select, summary")) return;
+    binMarqueeRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, selectedAtStart: selectedBinIds, additive: event.ctrlKey || event.metaKey, dragging: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  function moveBinMarquee(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = binMarqueeRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!drag.dragging && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 5) return;
+    drag.dragging = true;
+    const left = Math.min(drag.startX, event.clientX);
+    const top = Math.min(drag.startY, event.clientY);
+    const right = Math.max(drag.startX, event.clientX);
+    const bottom = Math.max(drag.startY, event.clientY);
+    setBinMarquee({ left, top, width: right - left, height: bottom - top });
+    const hitIds = Array.from(binBodyRef.current?.querySelectorAll<HTMLElement>(".studio-bin-grid .bin-item[data-asset-id]") ?? [])
+      .filter((tile) => {
+        const bounds = tile.getBoundingClientRect();
+        return bounds.left < right && bounds.right > left && bounds.top < bottom && bounds.bottom > top;
+      })
+      .map((tile) => tile.dataset.assetId ?? "")
+      .filter((id) => visibleMediaAssets.some((asset) => asset.id === id && asset.kind !== "text"));
+    setSelectedBinIds(drag.additive ? [...new Set([...drag.selectedAtStart, ...hitIds])] : hitIds);
+  }
+  function finishBinMarquee(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = binMarqueeRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    binMarqueeRef.current = null;
+    setBinMarquee(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (!drag.dragging) { setSelectedBinIds([]); binSelectionAnchorRef.current = null; }
+    else binSelectionAnchorRef.current = null;
+  }
+  function cancelBinMarquee(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = binMarqueeRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    binMarqueeRef.current = null; setBinMarquee(null); setSelectedBinIds(drag.selectedAtStart);
+  }
 
   function selectAspectRatio(mode: VideoAspectRatioMode) {
     const firstClip = [...timeline.clips].filter((clip) => clip.track >= 0 && timeline.assets.some((asset) => asset.id === clip.assetId && (asset.kind === "video" || asset.kind === "image"))).sort((a, b) => a.start - b.start)[0];
@@ -632,7 +755,7 @@ export default function VideoStudio() {
       if (timelineRef.current.assets.reduce((total, asset) => total + asset.size, audioFile.size) > 512 * 1024 * 1024) throw new Error("Detaching this audio would exceed the 512 MiB total project media limit.");
       const audioId = crypto.randomUUID();
       const audioDuration = Math.max(0.01, (target.buffer.byteLength - 44) / (48_000 * 2 * 2));
-      const audioAsset: VideoTimelineAsset = { id: audioId, name: audioFile.name, type: audioFile.type, size: audioFile.size, duration: audioDuration, kind: "audio", derivedFromAssetId: selectedAsset.id };
+      const audioAsset: VideoTimelineAsset = { id: audioId, name: audioFile.name, type: audioFile.type, size: audioFile.size, duration: audioDuration, kind: "audio", importedAt: Date.now(), derivedFromAssetId: selectedAsset.id };
       const sourceEnd = Math.min(selectedClip.sourceEnd, audioDuration);
       if (sourceEnd <= selectedClip.sourceStart) throw new Error("The extracted audio track does not cover this video clip's selected source range.");
       const audioClip: VideoTimelineClip = { id: crypto.randomUUID(), assetId: audioId, track: -1, start: selectedClip.start, sourceStart: selectedClip.sourceStart, sourceEnd, speed: selectedClip.speed, volume: selectedClip.volume, muted: false, pitchMode: "preserve" };
@@ -697,7 +820,7 @@ export default function VideoStudio() {
     setError(""); setStatus(kind === "dissolve" ? "Dissolve added between adjacent visual clips." : "Audio crossfade added between adjacent clips.");
   }
   function addTitle() {
-    const asset: VideoTimelineAsset = { id: crypto.randomUUID(), name: "Text title", type: "text/plain", size: 0, duration: 3600, kind: "text", textSettings: { text: "Your title", fontSize: 72, color: "#ffffff", backgroundColor: "#172033", showBackground: false } };
+    const asset: VideoTimelineAsset = { id: crypto.randomUUID(), name: "Text title", type: "text/plain", size: 0, duration: 3600, kind: "text", importedAt: Date.now(), textSettings: { text: "Your title", fontSize: 72, color: "#ffffff", backgroundColor: "#172033", showBackground: false } };
     const track = Math.max(0, ...timeline.clips.map((item) => item.track)) + 1;
     const clip: VideoTimelineClip = { id: crypto.randomUUID(), assetId: asset.id, track, start: timeline.playhead, sourceStart: 0, sourceEnd: 5, speed: 1, volume: 1, muted: false };
     applyTimelineEdit((current) => ({ ...current, assets: [...current.assets, asset], clips: [...current.clips, clip], duration: Math.max(current.duration, clip.start + clipLength(clip)) }));
@@ -815,6 +938,18 @@ export default function VideoStudio() {
     const time = timelinePointerTime({ clientX }, ruler, timelineRulerOffset());
     setTimeline((current) => ({ ...current, playhead: Math.min(current.duration, time) }));
   }
+  function showRulerHoverGuide(event: React.PointerEvent<HTMLDivElement>) {
+    const viewport = timelineScrollRef.current;
+    if (!viewport || !timeline.clips.length || event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const bounds = viewport.getBoundingClientRect();
+    const left = event.clientX - bounds.left + viewport.scrollLeft;
+    if (left < timelineRulerOffset() || left > timelineRulerOffset() + timeline.duration * pxPerSecond) {
+      setRulerHoverGuide(null);
+      return;
+    }
+    const top = event.clientY - bounds.top + viewport.scrollTop;
+    setRulerHoverGuide({ left, top, height: Math.max(0, viewport.scrollTop + viewport.clientHeight - top) });
+  }
   function stepFrame(direction: -1 | 1) {
     if (!timeline.clips.length) return;
     setPlaying(false);
@@ -880,8 +1015,18 @@ export default function VideoStudio() {
     setSelected(copy.id);
   }
   useEffect(() => {
+    function isTypingTarget(target: EventTarget | null) {
+      return target instanceof HTMLTextAreaElement || (target instanceof HTMLInputElement && ["text", "search", "email", "url", "tel", "password"].includes(target.type)) || (target instanceof HTMLElement && target.isContentEditable);
+    }
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target;
+      if (event.code === "Space" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (isTypingTarget(target)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!event.repeat) togglePlayback();
+        return;
+      }
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable)) return;
       const actionControl = target instanceof HTMLElement && target.closest("button, a, [role=button]");
       if (actionControl && !event.ctrlKey && !event.metaKey && event.key !== "Delete" && event.key !== "Backspace") return;
@@ -890,8 +1035,7 @@ export default function VideoStudio() {
         else if (event.key.toLowerCase() === "y") { event.preventDefault(); redo(); }
         return;
       }
-      if (event.code === "Space") { event.preventDefault(); togglePlayback(); }
-      else if (event.key === "Delete" || event.key === "Backspace") { if (selected) { event.preventDefault(); removeClip(selected); } }
+      if (event.key === "Delete" || event.key === "Backspace") { if (selected) { event.preventDefault(); removeClip(selected); } }
       else if (event.key.toLowerCase() === "s") { event.preventDefault(); splitSelected(); }
       else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
         event.preventDefault();
@@ -900,7 +1044,18 @@ export default function VideoStudio() {
         setTimeline((current) => ({ ...current, playhead: Math.max(0, Math.min(current.duration, current.playhead + step * direction)) }));
       } else if (event.key === "Home") { event.preventDefault(); setTimeline((current) => ({ ...current, playhead: 0 })); }
     }
-    window.addEventListener("keydown", onKeyDown); return () => window.removeEventListener("keydown", onKeyDown);
+    function onKeyUp(event: KeyboardEvent) {
+      const target = event.target;
+      if (event.code !== "Space" || event.ctrlKey || event.metaKey || event.altKey || isTypingTarget(target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
+    };
   });
 
   function togglePlayback() {
@@ -1044,7 +1199,7 @@ export default function VideoStudio() {
     {extractingAudio && <p className="source-info" role="status">Detaching source audio: {extractProgress}% <button className="editor-action danger" onClick={() => void cancelAudioExtraction()}>Cancel</button></p>}
     <section className="video-editor-layout" inert={exporting || extractingAudio}>
       <aside className="video-bin"><div className="studio-bin-tabs" role="tablist" aria-label="Editor tools">{(["media", "library", "text", "transitions"] as const).map((tab) => <button key={tab} role="tab" aria-selected={activeBinTab === tab} className={activeBinTab === tab ? "active" : ""} onClick={() => setActiveBinTab(tab)}>{tab === "media" ? "▣" : tab === "library" ? "▤" : tab === "text" ? "T" : "◇"}<span>{tab[0].toUpperCase() + tab.slice(1)}</span></button>)}</div>
-        <div className="studio-bin-body">{activeBinTab === "media" ? <><div className="studio-bin-heading"><strong>Your media</strong><span>{timeline.assets.length} items</span></div><label className="studio-import-button">＋ Import media<input type="file" multiple accept="video/*,audio/*,image/*" disabled={Boolean(projectId && !ready) || exporting} onChange={(event) => { const chosen = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void importFiles(chosen); }} /></label><div className="studio-bin-grid">{timeline.assets.map((asset) => <button key={asset.id} className="bin-item" onPointerDown={(event) => { if (event.button !== 0) return; binPointerRef.current = { pointerId: event.pointerId, id: asset.id, initialX: event.clientX, initialY: event.clientY, dragging: false }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={moveBinPointer} onPointerUp={finishBinPointer} onPointerCancel={cancelBinPointer} onClick={(event) => { if (suppressBinClickRef.current) { event.preventDefault(); return; } if (asset.kind === "audio") addAssetToTimeline(asset.id); else if (event.detail === 0) addAssetToTimeline(asset.id, 0, timeline.playhead); else setStatus(`Drag ${asset.name} to a visual lane to place it.`); }} title={asset.kind === "audio" ? `Add ${asset.name} to the timeline` : `Drag ${asset.name} to a visual lane`}><span className={`studio-asset-thumb ${asset.kind}`}>{asset.kind === "image" && assetUrls[asset.id] ? <img src={assetUrls[asset.id]} alt="" /> : asset.kind === "video" && assetUrls[asset.id] ? <video src={assetUrls[asset.id]} muted preload="metadata" onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.min(0.1, asset.duration / 2); }} aria-hidden="true" /> : asset.kind === "audio" ? "♫" : "T"}{asset.kind !== "image" && <span className="studio-asset-duration">{formatAssetDuration(asset.duration)}</span>}</span><strong title={asset.name}>{asset.name}</strong></button>)}</div>{!timeline.assets.length && <div className="studio-bin-empty"><span>▣</span><strong>Start with your media</strong><p>Import video, audio, or images. Your files stay on this device.</p></div>}</> : activeBinTab === "library" ? <><div className="studio-bin-heading"><strong>Library</strong><span>On this device</span></div><div className="studio-library-tabs" role="tablist" aria-label="Library categories">{(["image", "video", "sound"] as const).map((tab) => <button type="button" key={tab} role="tab" aria-selected={libraryTab === tab} className={libraryTab === tab ? "active" : ""} onClick={() => setLibraryTab(tab)}>{tab === "sound" ? "Sound effects" : `${tab[0].toUpperCase()}${tab.slice(1)}s`}</button>)}</div>{libraryTab === "image" ? <div className="studio-library-grid"><div className="studio-library-color-tile"><button type="button" className="studio-library-color-preview" aria-label="Add color background to timeline" title="Add color background to timeline" style={{ backgroundColor: libraryBackgroundColor }} disabled={Boolean(projectId && !ready) || exporting} onClick={() => void addLibraryColorBackground()} /><label className="studio-library-color-picker" title="Choose background color"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5a7.5 7.5 0 1 0 0 15h1a2 2 0 0 0 1.5-3.3c-.7-.8-.2-2.2.9-2.2H15a2.5 2.5 0 0 0 2.5-2.5C17.5 5.6 14.1 2.5 10 2.5Z"/><circle cx="6.5" cy="9" r=".7"/><circle cx="9.5" cy="6.5" r=".7"/><circle cx="13" cy="7" r=".7"/></svg><input aria-label="Choose background color" type="color" value={libraryBackgroundColor} onChange={(event) => setLibraryBackgroundColor(event.currentTarget.value)} /></label></div></div> : libraryTab === "video" ? <p className="studio-bin-hint">Library videos are not available yet.</p> : <p className="studio-bin-hint">Sound effects are not available yet.</p>}</> : activeBinTab === "text" ? <><div className="studio-bin-heading"><strong>Text</strong></div><button className="studio-template-card" disabled={!projectId || !ready || exporting} onClick={addTitle}><span>Text</span><strong>Default title</strong><small>Add at the playhead</small></button></> : <><div className="studio-bin-heading"><strong>Transitions</strong></div><p className="studio-bin-hint">Select a clip on the timeline, then apply a transition to the next clip on the same track.</p><button className="studio-template-card" disabled={!selectedClip || selectedClip.track < 0} onClick={() => createTransitionToNext("dissolve")}><span>◇</span><strong>Dissolve</strong><small>Blend adjacent visuals</small></button><button className="studio-template-card" disabled={!selectedClip || selectedClip.track >= 0} onClick={() => createTransitionToNext("crossfade")}><span>♫</span><strong>Crossfade</strong><small>Blend adjacent audio</small></button></>}</div></aside>
+        <div className="studio-bin-body" ref={binBodyRef} onPointerDown={beginBinMarquee} onPointerMove={moveBinMarquee} onPointerUp={finishBinMarquee} onPointerCancel={cancelBinMarquee}>{activeBinTab === "media" ? <><div className="studio-bin-heading"><strong>Your media</strong><div className="studio-bin-heading-actions"><button type="button" disabled={!visibleMediaAssets.some((asset) => asset.kind !== "text")} onClick={() => { setSelectedBinIds(visibleMediaAssets.filter((asset) => asset.kind !== "text").map((asset) => asset.id)); binSelectionAnchorRef.current = visibleMediaAssets.find((asset) => asset.kind !== "text")?.id ?? null; }}>Select all</button><button type="button" disabled={!selectedBinIds.length} onClick={() => { setSelectedBinIds([]); binSelectionAnchorRef.current = null; }}>Deselect all</button><span>{timeline.assets.length} items</span></div></div><div className="studio-media-toolbar"><label className="studio-import-button">＋ Import media<input type="file" multiple accept="video/*,audio/*,image/*" disabled={Boolean(projectId && !ready) || exporting} onChange={(event) => { const chosen = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void importFiles(chosen); }} /></label><MediaBinControls filter={mediaFilter} onFilter={(filter) => { setMediaFilter(filter); setSelectedBinIds([]); binSelectionAnchorRef.current = null; }} sort={mediaSort} onSort={(sort) => { setMediaSort(sort); setMediaSortDirection(sort === "name" || sort === "type" ? "asc" : "desc"); }} direction={mediaSortDirection} onDirection={setMediaSortDirection} /></div><div className="studio-bin-grid">{visibleMediaAssets.map((asset) => <button key={asset.id} data-asset-id={asset.id} className={`bin-item ${selectedBinIds.includes(asset.id) ? "bin-selected" : ""}`} aria-pressed={selectedBinIds.includes(asset.id)} onPointerDown={(event) => { if (event.button !== 0 || asset.kind === "text") return; const ids = selectedBinIds.includes(asset.id) && !event.ctrlKey && !event.metaKey && !event.shiftKey ? visibleMediaAssets.filter((item) => selectedBinIds.includes(item.id) && item.kind !== "text").map((item) => item.id) : [asset.id]; binPointerRef.current = { pointerId: event.pointerId, id: asset.id, ids, initialX: event.clientX, initialY: event.clientY, dragging: false }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={moveBinPointer} onPointerUp={finishBinPointer} onPointerCancel={cancelBinPointer} onClick={(event) => { if (suppressBinClickRef.current) { event.preventDefault(); return; } if (event.detail === 0) return; selectBinAsset(asset.id, event.shiftKey, event.ctrlKey || event.metaKey); }} onKeyDown={(event) => { if (asset.kind === "text") return; if (event.key === "Enter" && (event.ctrlKey || event.metaKey || event.shiftKey)) { event.preventDefault(); selectBinAsset(asset.id, event.shiftKey, event.ctrlKey || event.metaKey); } else if (event.key === "Enter") { event.preventDefault(); const ids = selectedBinIds.includes(asset.id) ? selectedBinIds : [asset.id]; placeMediaBatch(ids, asset.kind === "audio" ? -1 : 0, timeline.playhead); } }} title={`Select ${asset.name}. Ctrl-click to toggle, Shift-click to select a range; drag selected media to the timeline.`}><span className={`studio-asset-thumb ${asset.kind}`}>{asset.kind === "image" && assetUrls[asset.id] ? <img src={assetUrls[asset.id]} alt="" /> : asset.kind === "video" && assetUrls[asset.id] ? <video src={assetUrls[asset.id]} muted preload="metadata" onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.min(0.1, asset.duration / 2); }} aria-hidden="true" /> : asset.kind === "audio" ? "♫" : "T"}{asset.kind !== "image" && <span className="studio-asset-duration">{formatAssetDuration(asset.duration)}</span>}</span><strong title={asset.name}>{asset.name}</strong></button>)}</div>{timeline.assets.length > 0 && !visibleMediaAssets.length && <p className="studio-bin-hint studio-bin-no-results">No {mediaFilter} media in this project.</p>}{!timeline.assets.length && <div className="studio-bin-empty"><span>▣</span><strong>Start with your media</strong><p>Import video, audio, or images. Your files stay on this device.</p></div>}</> : activeBinTab === "library" ? <><div className="studio-bin-heading"><strong>Library</strong><span>On this device</span></div><div className="studio-library-tabs" role="tablist" aria-label="Library categories">{(["image", "video", "sound"] as const).map((tab) => <button type="button" key={tab} role="tab" aria-selected={libraryTab === tab} className={libraryTab === tab ? "active" : ""} onClick={() => setLibraryTab(tab)}>{tab === "sound" ? "Sound effects" : `${tab[0].toUpperCase()}${tab.slice(1)}s`}</button>)}</div>{libraryTab === "image" ? <div className="studio-library-grid"><div className="studio-library-color-tile"><button type="button" className="studio-library-color-preview" aria-label="Add color background to timeline" title="Add color background to timeline" style={{ backgroundColor: libraryBackgroundColor }} disabled={Boolean(projectId && !ready) || exporting} onClick={() => void addLibraryColorBackground()} /><label className="studio-library-color-picker" title="Choose background color"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5a7.5 7.5 0 1 0 0 15h1a2 2 0 0 0 1.5-3.3c-.7-.8-.2-2.2.9-2.2H15a2.5 2.5 0 0 0 2.5-2.5C17.5 5.6 14.1 2.5 10 2.5Z"/><circle cx="6.5" cy="9" r=".7"/><circle cx="9.5" cy="6.5" r=".7"/><circle cx="13" cy="7" r=".7"/></svg><input aria-label="Choose background color" type="color" value={libraryBackgroundColor} onChange={(event) => setLibraryBackgroundColor(event.currentTarget.value)} /></label></div></div> : libraryTab === "video" ? <p className="studio-bin-hint">Library videos are not available yet.</p> : <p className="studio-bin-hint">Sound effects are not available yet.</p>}</> : activeBinTab === "text" ? <><div className="studio-bin-heading"><strong>Text</strong></div><button className="studio-template-card" disabled={!projectId || !ready || exporting} onClick={addTitle}><span>Text</span><strong>Default title</strong><small>Add at the playhead</small></button></> : <><div className="studio-bin-heading"><strong>Transitions</strong></div><p className="studio-bin-hint">Select a clip on the timeline, then apply a transition to the next clip on the same track.</p><button className="studio-template-card" disabled={!selectedClip || selectedClip.track < 0} onClick={() => createTransitionToNext("dissolve")}><span>◇</span><strong>Dissolve</strong><small>Blend adjacent visuals</small></button><button className="studio-template-card" disabled={!selectedClip || selectedClip.track >= 0} onClick={() => createTransitionToNext("crossfade")}><span>♫</span><strong>Crossfade</strong><small>Blend adjacent audio</small></button></>}</div></aside>
       <section className={`editor-preview${playerExpanded ? " expanded" : ""}`} ref={previewRef}><div className="preview-heading"><strong>Composite preview</strong><span>{previewAsset?.name ?? "Nothing at playhead"} · {timeline.playhead.toFixed(2)} s · {timeline.width}×{timeline.height}</span></div><div className="editor-stage" ref={stageRef}><canvas ref={canvasRef} aria-label="Composited video timeline preview" />{titleOverlay && <div className={`studio-title-overlay ${selected === editableTitleClip?.id ? "selected" : ""}`} role="group" aria-label="Selected title: drag to move, use corner to resize, top handle to rotate" style={{ left: titleOverlay.left, top: titleOverlay.top, width: titleOverlay.width, height: titleOverlay.height, transform: `translate(-50%, -50%) rotate(${editableTitleTransform.rotation}deg)` }} onPointerDown={beginTextGesture} onPointerMove={moveTextGesture} onPointerUp={finishTextGesture} onPointerCancel={finishTextGesture}><span className="studio-title-rotate" data-title-handle="rotate" title="Rotate text" /><span className="studio-title-resize" data-title-handle="scale" title="Resize text" /></div>}<div className="media-sources" aria-hidden="true">{timeline.assets.filter((asset) => asset.kind === "image").map((asset) => <img key={asset.id} ref={(el) => { if (el) imageRefs.current[asset.id] = el; else delete imageRefs.current[asset.id]; }} src={assetUrls[asset.id]} alt="" onLoad={() => setMediaRevision((n) => n + 1)} />)}{timeline.clips.filter((clip) => timeline.assets.find((asset) => asset.id === clip.assetId)?.kind === "video").map((clip) => <video key={clip.id} ref={(el) => { if (el) videoRefs.current[clip.id] = el; else delete videoRefs.current[clip.id]; }} src={assetUrls[clip.assetId]} playsInline preload="auto" onLoadedData={() => setMediaRevision((n) => n + 1)} onSeeked={() => setMediaRevision((n) => n + 1)} />)}{timeline.clips.filter((clip) => clip.track < 0).map((clip) => <audio key={clip.id} ref={(el) => { if (el) audioRefs.current[clip.id] = el; else delete audioRefs.current[clip.id]; }} src={assetUrls[clip.assetId]} preload="auto" />)}</div></div><div className="editor-transport">
         <span className="studio-timecode" aria-label="Current time and timeline duration">{formatTimecode(timeline.playhead, timeline.fps)} <span>/</span> {formatTimecode(timeline.duration, timeline.fps)}</span>
         <div className="studio-playback-controls">
@@ -1158,8 +1313,9 @@ export default function VideoStudio() {
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`local-studio-edit.${resultType === "video/mp4" ? "mp4" : "webm"}`}>Download {resultType === "video/mp4" ? "MP4" : "WebM"}</a>}
       </div>
       <div className="resize-preview"><div className="preview-heading"><strong>Export preview</strong><span>{resultUrl ? "Rendered file" : "Export keeps your editable project"}</span></div>{resultUrl ? <CustomMediaPreview kind="video" src={resultUrl} label="Rendered video preview" /> : <div className="empty-preview">Render a project to get a playable file.</div>}</div>
-    </section></div>}    <section className="video-timeline" inert={exporting}><div className="timeline-toolbar"><strong>Timeline · {timeline.duration.toFixed(2)} seconds</strong><span className="timeline-toolbar-separator" aria-hidden="true" /><div className="timeline-edit-tools"><button type="button" title="Delete Left" aria-label="Delete Left" onClick={() => deleteHoveredSide("left")}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v14M12 5h6v10h-6zM2 7l6 6M8 7l-6 6" /></svg></button><button type="button" title="Delete Right" aria-label="Delete Right" onClick={() => deleteHoveredSide("right")}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v14M2 5h6v10H2zM12 7l6 6m0-6-6 6" /></svg></button></div><span className="timeline-toolbar-separator" aria-hidden="true" /><div className="timeline-actions" data-history-version={historyVersion}><button disabled={!historyRef.current.past.length} onClick={undo}>Undo</button><button disabled={!historyRef.current.future.length} onClick={redo}>Redo</button><span className="timeline-toolbar-separator" aria-hidden="true" /><button disabled={!selectedClip && !mainClipAtPlayhead} onClick={splitSelected}>Split</button><button disabled={!selectedClip} onClick={() => selectedClip && removeClip(selectedClip.id)}>Delete</button><span className="timeline-toolbar-separator" aria-hidden="true" /><label><input type="checkbox" checked={ripplePrimaryTrack} onChange={(event) => setRipplePrimaryTrack(event.currentTarget.checked)} />Ripple</label><label><input type="checkbox" checked={snapEnabled} onChange={(event) => setSnapEnabled(event.currentTarget.checked)} />Snap</label><span className="timeline-toolbar-separator" aria-hidden="true" /><label>Snap tolerance<input type="number" min="0" max="5" step="any" value={snapThreshold} disabled={!snapEnabled} onChange={(event) => setSnapThreshold(event.currentTarget.value)} />s</label><span className="timeline-toolbar-separator" aria-hidden="true" /><label>Zoom<input type="number" min="12" max="160" value={zoom} onChange={(event) => setZoom(event.currentTarget.value)} />px/s</label></div></div><div className="timeline-scroll" ref={timelineScrollRef} title="Hold Ctrl and scroll to zoom the timeline"><div className="timeline-ruler" role="slider" tabIndex={timeline.clips.length ? 0 : -1} aria-label="Timeline seek" onClick={() => setSelected("")} aria-valuemin={0} aria-valuemax={timeline.duration} aria-valuenow={timeline.playhead} aria-valuetext={formatTimecode(timeline.playhead, timeline.fps)} style={{ width: timelineWidth }} onPointerDown={(event) => { if (!timeline.clips.length) return; setPlaying(false); event.currentTarget.setPointerCapture(event.pointerId); seekTimeline(event.clientX, event.currentTarget); }} onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) seekTimeline(event.clientX, event.currentTarget); }} onPointerUp={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }} onPointerCancel={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }} onKeyDown={(event) => { if (!timeline.clips.length) return; if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) { event.preventDefault(); event.stopPropagation(); setPlaying(false); setTimeline((current) => ({ ...current, playhead: event.key === "Home" ? 0 : event.key === "End" ? current.duration : Math.max(0, Math.min(current.duration, current.playhead + (event.key === "ArrowLeft" ? -1 : 1) * (event.shiftKey ? 1 : 1 / Math.max(1, current.fps)))) })); } }}>{Array.from({ length: Math.ceil(timeline.duration) + 1 }, (_, second) => <span key={second} style={{ left: timelineRulerOffset() + second * pxPerSecond }}>{second}s</span>)}</div>{activeTrackDragKind === "visual" && <div className="track-lane timeline-new-overlay-target" data-track={nextOverlayTrack} onDragOver={(event) => previewTrackDrop(event, nextOverlayTrack)} onDrop={(event) => finishTrackDrop(event, nextOverlayTrack)}>Move to new Overlay {nextOverlayTrack}</div>}<div className="timeline-center-spacer" style={{ paddingTop: Math.max(0, audioLaneCount - overlayLaneCount) * 52 }} aria-hidden="true" />{visibleTracks.map((track) => <Fragment key={track}><div className={`timeline-track ${!timeline.clips.length && !dragKind && track === 0 ? "empty-main" : ""}`} key={track}><strong>{track === 0 ? (timeline.clips.some((clip) => clip.track === 0) ? "Video 1" : "") : track > 0 ? `Overlay ${track}` : `Audio ${-track}`}</strong><div className="track-lane" data-track={track} style={{ width: timelineWidth - timelineRulerOffset() }} onDragOver={(event) => previewTrackDrop(event, track)} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropPreview(null); }} onDrop={(event) => finishTrackDrop(event, track)} onClick={(event) => { const playhead = timelinePointerTime(event, event.currentTarget); setTimeline((current) => ({ ...current, playhead: Math.min(current.duration, playhead) })); setSelected(""); }}>{!timeline.clips.length && track === 0 && <span className="timeline-empty-prompt">Drag media here to start creating</span>}{dropPreview?.track === track && <div className="timeline-drop-preview" aria-hidden="true" style={{ left: dropPreview.start * pxPerSecond, width: Math.max(22, dropPreview.duration * pxPerSecond) }}><span>{dropPreview.start.toFixed(2)}s</span></div>}{timeline.clips.filter((clip) => clip.track === track).map((clip) => { const asset = timeline.assets.find((item) => item.id === clip.assetId); const waveformAsset = asset?.kind === "audio" ? asset : asset?.kind === "video" ? timeline.assets.find((item) => item.kind === "audio" && item.derivedFromAssetId === asset.id) ?? (asset.hasAudio !== false ? asset : undefined) : undefined; const waveform = waveformAsset ? waveforms[waveformAsset.id] : undefined; const waveformStart = waveformAsset ? Math.floor(clip.sourceStart / waveformAsset.duration * (waveform?.length ?? 0)) : 0; const waveformEnd = waveformAsset ? Math.ceil(clip.sourceEnd / waveformAsset.duration * (waveform?.length ?? 0)) : 0; const clipWaveformSlice = waveform?.slice(waveformStart, Math.max(waveformStart + 1, waveformEnd)); const waveformBarCount = Math.max(1, Math.floor(clipLength(clip) * pxPerSecond / 2.5)); const clipWaveform = clipWaveformSlice?.length ? Array.from({ length: Math.min(waveformBarCount, clipWaveformSlice.length) }, (_, index) => { const barCount = Math.min(waveformBarCount, clipWaveformSlice.length); const start = Math.floor(index * clipWaveformSlice.length / barCount); const end = Math.max(start + 1, Math.floor((index + 1) * clipWaveformSlice.length / barCount)); return Math.max(...clipWaveformSlice.slice(start, end)); }) : undefined; return <button draggable key={clip.id} className={`timeline-clip ${selected === clip.id ? "selected" : ""} ${asset?.kind ?? ""}`} style={{ left: clip.start * pxPerSecond, width: Math.max(22, clipLength(clip) * pxPerSecond) }} onPointerMove={(event) => moveTrim(event, clip.id)} onPointerUp={finishTrim} onPointerCancel={finishTrim} onDragStart={(event) => { const bounds = event.currentTarget.getBoundingClientRect(); const grabOffset = event.clientX - bounds.left; draggingRef.current = { kind: "clip", id: clip.id, grabOffset }; setActiveTrackDragKind(asset?.kind === "audio" ? "audio" : "visual"); event.dataTransfer.setData("text/clip", clip.id); event.dataTransfer.setData("text/clip-grab-offset", String(grabOffset)); event.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => { draggingRef.current = null; setActiveTrackDragKind(null); setDropPreview(null); }} onPointerEnter={() => setHoveredClipId(clip.id)} onFocus={() => setHoveredClipId(clip.id)} onClick={(event) => { event.stopPropagation(); setSelected(clip.id); setHoveredClipId(clip.id); }}>{asset?.kind === "image" && assetUrls[asset.id] && <img className="studio-clip-visual" src={assetUrls[asset.id]} alt="" aria-hidden="true" />}{asset?.kind === "video" && assetUrls[asset.id] && <video className="studio-clip-visual" src={assetUrls[clip.assetId]} muted playsInline preload="metadata" onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.min(0.1, asset.duration / 2); }} aria-hidden="true" />}{clipWaveform && <span className={asset?.kind === "video" ? "studio-clip-wave video-audio-wave" : "studio-clip-wave"} aria-hidden="true">{clipWaveform.map((peak, index) => <i key={index} style={{ height: String(Math.max(12, peak * 100)) + "%" }} />)}</span>}<span className="timeline-trim-handle left" aria-hidden="true" onPointerDown={(event) => beginTrim(event, clip, "left")} /><span className="timeline-trim-handle right" aria-hidden="true" onPointerDown={(event) => beginTrim(event, clip, "right")} /><strong>{asset?.name}</strong><small>{clipLength(clip).toFixed(2)}s · {clip.speed.toFixed(3)}×</small>{clip.keyframes?.map((frame, index) => <span key={`${clip.id}-key-${index}`} className="timeline-keyframe" aria-hidden="true" style={{ left: `${Math.max(0, Math.min(100, frame.time / Math.max(clipLength(clip), 0.001) * 100))}%` }} />)}</button>; })}</div></div></Fragment>)}<div className="timeline-center-spacer" style={{ paddingBottom: Math.max(0, overlayLaneCount - audioLaneCount) * 52 }} aria-hidden="true" /><button type="button" tabIndex={-1} aria-label="Drag playhead to seek" disabled={!timeline.clips.length} className="timeline-playhead" style={{ left: timelineRulerOffset() + timeline.playhead * pxPerSecond }} onPointerDown={(event) => { if (!timeline.clips.length) return; event.preventDefault(); event.stopPropagation(); setPlaying(false); event.currentTarget.setPointerCapture(event.pointerId); playheadDragRef.current = { pointerId: event.pointerId, initialX: event.clientX, initialTime: timeline.playhead }; }} onPointerMove={movePlayhead} onPointerUp={finishPlayheadDrag} onPointerCancel={finishPlayheadDrag} /> </div></section>
+    </section></div>}    <section className="video-timeline" inert={exporting}><div className="timeline-toolbar"><strong>Timeline · {timeline.duration.toFixed(2)} seconds</strong><span className="timeline-toolbar-separator" aria-hidden="true" /><div className="timeline-edit-tools"><button type="button" title="Delete Left" aria-label="Delete Left" onClick={() => deleteHoveredSide("left")}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v14M12 5h6v10h-6zM2 7l6 6M8 7l-6 6" /></svg></button><button type="button" title="Delete Right" aria-label="Delete Right" onClick={() => deleteHoveredSide("right")}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v14M2 5h6v10H2zM12 7l6 6m0-6-6 6" /></svg></button></div><span className="timeline-toolbar-separator" aria-hidden="true" /><div className="timeline-actions" data-history-version={historyVersion}><button disabled={!historyRef.current.past.length} onClick={undo}>Undo</button><button disabled={!historyRef.current.future.length} onClick={redo}>Redo</button><span className="timeline-toolbar-separator" aria-hidden="true" /><button disabled={!selectedClip && !mainClipAtPlayhead} onClick={splitSelected}>Split</button><button disabled={!selectedClip} onClick={() => selectedClip && removeClip(selectedClip.id)}>Delete</button><span className="timeline-toolbar-separator" aria-hidden="true" /><label><input type="checkbox" checked={ripplePrimaryTrack} onChange={(event) => setRipplePrimaryTrack(event.currentTarget.checked)} />Ripple</label><label><input type="checkbox" checked={snapEnabled} onChange={(event) => setSnapEnabled(event.currentTarget.checked)} />Snap</label><span className="timeline-toolbar-separator" aria-hidden="true" /><label>Snap tolerance<input type="number" min="0" max="5" step="any" value={snapThreshold} disabled={!snapEnabled} onChange={(event) => setSnapThreshold(event.currentTarget.value)} />s</label><span className="timeline-toolbar-separator" aria-hidden="true" /><label>Zoom<input type="number" min="12" max="160" value={zoom} onChange={(event) => setZoom(event.currentTarget.value)} />px/s</label></div></div><div className="timeline-scroll" ref={timelineScrollRef} title="Hold Ctrl and scroll to zoom the timeline" onClick={(event) => { if (!(event.target instanceof Element) || !event.target.closest(".timeline-clip")) setSelected(""); }}><div className="timeline-ruler" role="slider" tabIndex={timeline.clips.length ? 0 : -1} onPointerEnter={showRulerHoverGuide} onPointerLeave={() => setRulerHoverGuide(null)} aria-label="Timeline seek" onClick={(event) => { setSelected(""); if (event.detail > 0 && timeline.clips.length) { setPlaying(false); seekTimeline(event.clientX, event.currentTarget); } }} aria-valuemin={0} aria-valuemax={timeline.duration} aria-valuenow={timeline.playhead} aria-valuetext={formatTimecode(timeline.playhead, timeline.fps)} style={{ width: timelineWidth }} onPointerDown={(event) => { if (!timeline.clips.length) return; setRulerHoverGuide(null); setPlaying(false); event.currentTarget.setPointerCapture(event.pointerId); seekTimeline(event.clientX, event.currentTarget); }} onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) seekTimeline(event.clientX, event.currentTarget); else showRulerHoverGuide(event); }} onPointerUp={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }} onPointerCancel={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }} onKeyDown={(event) => { if (!timeline.clips.length) return; if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) { event.preventDefault(); event.stopPropagation(); setPlaying(false); setTimeline((current) => ({ ...current, playhead: event.key === "Home" ? 0 : event.key === "End" ? current.duration : Math.max(0, Math.min(current.duration, current.playhead + (event.key === "ArrowLeft" ? -1 : 1) * (event.shiftKey ? 1 : 1 / Math.max(1, current.fps)))) })); } }}>{Array.from({ length: Math.ceil(timeline.duration) + 1 }, (_, second) => <span key={second} style={{ left: timelineRulerOffset() + second * pxPerSecond }}>{second}s</span>)}</div>{rulerHoverGuide && <div className="timeline-hover-guide" aria-hidden="true" style={rulerHoverGuide} />}{activeTrackDragKind === "visual" && <div className="track-lane timeline-new-overlay-target" data-track={nextOverlayTrack} onDragOver={(event) => previewTrackDrop(event, nextOverlayTrack)} onDrop={(event) => finishTrackDrop(event, nextOverlayTrack)}>Move to new Overlay {nextOverlayTrack}</div>}<div className="timeline-center-spacer" style={{ paddingTop: Math.max(0, audioLaneCount - overlayLaneCount) * 52 }} aria-hidden="true" />{visibleTracks.map((track) => <Fragment key={track}><div className={`timeline-track ${!timeline.clips.length && !dragKind && track === 0 ? "empty-main" : ""}`} key={track}><strong>{track === 0 ? (timeline.clips.some((clip) => clip.track === 0) ? "Video 1" : "") : track > 0 ? `Overlay ${track}` : `Audio ${-track}`}</strong><div className="track-lane" data-track={track} style={{ width: timelineWidth - timelineRulerOffset() }} onDragOver={(event) => previewTrackDrop(event, track)} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropPreview(null); }} onDrop={(event) => finishTrackDrop(event, track)} onClick={(event) => { const playhead = timelinePointerTime(event, event.currentTarget); setTimeline((current) => ({ ...current, playhead: Math.min(current.duration, playhead) })); setSelected(""); }}>{!timeline.clips.length && track === 0 && <span className="timeline-empty-prompt">Drag media here to start creating</span>}{dropPreview?.track === track && <div className="timeline-drop-preview" aria-hidden="true" style={{ left: dropPreview.start * pxPerSecond, width: Math.max(22, dropPreview.duration * pxPerSecond) }}><span>{dropPreview.start.toFixed(2)}s</span></div>}{timeline.clips.filter((clip) => clip.track === track).map((clip) => { const asset = timeline.assets.find((item) => item.id === clip.assetId); const waveformAsset = asset?.kind === "audio" ? asset : asset?.kind === "video" ? timeline.assets.find((item) => item.kind === "audio" && item.derivedFromAssetId === asset.id) ?? (asset.hasAudio !== false ? asset : undefined) : undefined; const waveform = waveformAsset ? waveforms[waveformAsset.id] : undefined; const waveformStart = waveformAsset ? Math.floor(clip.sourceStart / waveformAsset.duration * (waveform?.length ?? 0)) : 0; const waveformEnd = waveformAsset ? Math.ceil(clip.sourceEnd / waveformAsset.duration * (waveform?.length ?? 0)) : 0; const clipWaveformSlice = waveform?.slice(waveformStart, Math.max(waveformStart + 1, waveformEnd)); const waveformBarCount = Math.max(1, Math.floor(clipLength(clip) * pxPerSecond / 2.5)); const clipWaveform = clipWaveformSlice?.length ? Array.from({ length: Math.min(waveformBarCount, clipWaveformSlice.length) }, (_, index) => { const barCount = Math.min(waveformBarCount, clipWaveformSlice.length); const start = Math.floor(index * clipWaveformSlice.length / barCount); const end = Math.max(start + 1, Math.floor((index + 1) * clipWaveformSlice.length / barCount)); return Math.max(...clipWaveformSlice.slice(start, end)); }) : undefined; return <button draggable key={clip.id} className={`timeline-clip ${selected === clip.id ? "selected" : ""} ${asset?.kind ?? ""}`} style={{ left: clip.start * pxPerSecond, width: Math.max(22, clipLength(clip) * pxPerSecond) }} onPointerMove={(event) => moveTrim(event, clip.id)} onPointerUp={finishTrim} onPointerCancel={finishTrim} onDragStart={(event) => { const bounds = event.currentTarget.getBoundingClientRect(); const grabOffset = event.clientX - bounds.left; draggingRef.current = { kind: "clip", id: clip.id, grabOffset }; setActiveTrackDragKind(asset?.kind === "audio" ? "audio" : "visual"); event.dataTransfer.setData("text/clip", clip.id); event.dataTransfer.setData("text/clip-grab-offset", String(grabOffset)); event.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => { draggingRef.current = null; setActiveTrackDragKind(null); setDropPreview(null); }} onPointerEnter={() => setHoveredClipId(clip.id)} onFocus={() => setHoveredClipId(clip.id)} onClick={(event) => { event.stopPropagation(); setSelected(clip.id); setHoveredClipId(clip.id); }}>{asset?.kind === "image" && assetUrls[asset.id] && <img className="studio-clip-visual" src={assetUrls[asset.id]} alt="" aria-hidden="true" />}{asset?.kind === "video" && assetUrls[asset.id] && <video className="studio-clip-visual" src={assetUrls[clip.assetId]} muted playsInline preload="metadata" onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.min(0.1, asset.duration / 2); }} aria-hidden="true" />}{clipWaveform && <span className={asset?.kind === "video" ? "studio-clip-wave video-audio-wave" : "studio-clip-wave"} aria-hidden="true">{clipWaveform.map((peak, index) => <i key={index} style={{ height: String(Math.max(12, peak * 100)) + "%" }} />)}</span>}<span className="timeline-trim-handle left" aria-hidden="true" onPointerDown={(event) => beginTrim(event, clip, "left")} /><span className="timeline-trim-handle right" aria-hidden="true" onPointerDown={(event) => beginTrim(event, clip, "right")} /><strong>{asset?.name}</strong><small>{clipLength(clip).toFixed(2)}s · {clip.speed.toFixed(3)}×</small>{clip.keyframes?.map((frame, index) => <span key={`${clip.id}-key-${index}`} className="timeline-keyframe" aria-hidden="true" style={{ left: `${Math.max(0, Math.min(100, frame.time / Math.max(clipLength(clip), 0.001) * 100))}%` }} />)}</button>; })}</div></div></Fragment>)}<div className="timeline-center-spacer" style={{ paddingBottom: Math.max(0, overlayLaneCount - audioLaneCount) * 52 }} aria-hidden="true" /><button type="button" tabIndex={-1} aria-label="Drag playhead to seek" disabled={!timeline.clips.length} className="timeline-playhead" style={{ left: timelineRulerOffset() + timeline.playhead * pxPerSecond }} onPointerDown={(event) => { if (!timeline.clips.length) return; event.preventDefault(); event.stopPropagation(); setPlaying(false); event.currentTarget.setPointerCapture(event.pointerId); playheadDragRef.current = { pointerId: event.pointerId, initialX: event.clientX, initialTime: timeline.playhead }; }} onPointerMove={movePlayhead} onPointerUp={finishPlayheadDrag} onPointerCancel={finishPlayheadDrag} /> </div></section>
     <p className="resize-note editor-disclaimer">Timeline preview composites active visual clips from bottom to top, including per-clip transforms, text titles, and custom linear fade transitions. Audio lanes play in sync with the project clock. Timeline render/export is available in supported browsers; verify output playback for your media and device.</p>
-    {binDragPreview && draggedBinAsset && typeof document !== "undefined" && createPortal(<div className="studio-bin-drag-ghost" style={{ left: binDragPreview.x + 12, top: binDragPreview.y + 12 }} aria-hidden="true">{draggedBinAsset.kind === "image" && assetUrls[draggedBinAsset.id] ? <img src={assetUrls[draggedBinAsset.id]} alt="" /> : draggedBinAsset.kind === "video" && assetUrls[draggedBinAsset.id] ? <video src={assetUrls[draggedBinAsset.id]} muted preload="metadata" onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.min(0.1, draggedBinAsset.duration / 2); }} /> : <span>{draggedBinAsset.kind === "audio" ? "♫" : "T"}</span>}</div>, document.body)}
+    {binMarquee && typeof document !== "undefined" && createPortal(<div className="studio-bin-marquee" style={binMarquee} aria-hidden="true" />, document.body)}
+    {binDragPreview && draggedBinAsset && typeof document !== "undefined" && createPortal(<div className="studio-bin-drag-ghost" style={{ left: binDragPreview.x + 12, top: binDragPreview.y + 12 }} aria-hidden="true">{draggedBinAsset.kind === "image" && assetUrls[draggedBinAsset.id] ? <img src={assetUrls[draggedBinAsset.id]} alt="" /> : draggedBinAsset.kind === "video" && assetUrls[draggedBinAsset.id] ? <video src={assetUrls[draggedBinAsset.id]} muted preload="metadata" onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.min(0.1, draggedBinAsset.duration / 2); }} /> : <span>{draggedBinAsset.kind === "audio" ? "♫" : "T"}</span>}{binDragPreview.count > 1 && <span className="studio-bin-drag-count">{binDragPreview.count}</span>}</div>, document.body)}
   </main>;
 }

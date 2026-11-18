@@ -50,7 +50,7 @@ export type AudioProjectDocument = {
 };
 
 export type VideoTextSettings = { text: string; fontSize: number; color: string; backgroundColor: string; showBackground: boolean };
-export type VideoTimelineAsset = { id: string; name: string; type: string; size: number; duration: number; kind: "video" | "audio" | "image" | "text"; width?: number; height?: number; hasAudio?: boolean; derivedFromAssetId?: string; textSettings?: VideoTextSettings };
+export type VideoTimelineAsset = { id: string; name: string; type: string; size: number; duration: number; kind: "video" | "audio" | "image" | "text"; importedAt?: number; fileModifiedAt?: number; width?: number; height?: number; hasAudio?: boolean; derivedFromAssetId?: string; textSettings?: VideoTextSettings };
 export type VideoClipTransform = { x: number; y: number; scale: number; rotation: number; opacity: number; mirrorX?: boolean; mirrorY?: boolean };
 export type VideoClipTransitions = { fadeIn: number; fadeOut: number };
 export type VideoClipKeyframe = { time: number; transform: VideoClipTransform; volume: number };

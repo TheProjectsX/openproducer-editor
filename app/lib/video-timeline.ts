@@ -62,6 +62,46 @@ export function timelineDropStart(pointerTime: number, grabOffsetPx: number, pix
 
 export type TimelinePlacementClip = { id: string; start: number; end: number };
 
+export type BatchAsset = { id: string; kind: "audio" | "video" | "image" | "text"; duration: number };
+
+/** Keep visible order within each lane while audio and visuals begin together. */
+export function planMediaBatchPlacement(
+  assets: readonly BatchAsset[], targetTrack: number, desiredStart: number,
+  existing: readonly (TimelinePlacementClip & { track: number })[], tolerance: number, magnetic: boolean,
+) {
+  if (!assets.length || assets.some((asset) => asset.kind === "text" || !Number.isFinite(asset.duration) || asset.duration <= 0)) return null;
+  if (!canPlaceAssetOnTrack(assets[0].kind, targetTrack)) return null;
+  const visualTrack = targetTrack >= 0 ? targetTrack : 0;
+  const audioTrack = targetTrack < 0 ? targetTrack : -1;
+  const visualDuration = assets.filter((asset) => asset.kind !== "audio").reduce((total, asset) => total + (asset.kind === "image" ? 5 : asset.duration), 0);
+  const audioDuration = assets.filter((asset) => asset.kind === "audio").reduce((total, asset) => total + asset.duration, 0);
+  const duration = Math.max(visualDuration, audioDuration);
+  const targetDuration = targetTrack < 0 ? audioDuration : visualDuration;
+  const primary = resolveTimelinePlacement(desiredStart, targetDuration, existing.filter((clip) => clip.track === targetTrack), tolerance, magnetic);
+  const shiftedStarts = { ...primary.shiftedStarts };
+  const usedTracks = new Set(assets.map((asset) => asset.kind === "audio" ? audioTrack : visualTrack));
+  for (const track of usedTracks) {
+    if (track === targetTrack) continue;
+    let cursor = primary.start + (track < 0 ? audioDuration : visualDuration);
+    for (const clip of existing.filter((item) => item.track === track).sort((a, b) => a.start - b.start)) {
+      if (clip.end <= primary.start) continue;
+      if (clip.start < cursor) { shiftedStarts[clip.id] = cursor; cursor += clip.end - clip.start; }
+      else cursor = clip.end;
+    }
+  }
+  let nextVisualStart = primary.start;
+  let nextAudioStart = primary.start;
+  const placements = assets.map((asset) => {
+    const clipDuration = asset.kind === "image" ? 5 : asset.duration;
+    const isAudio = asset.kind === "audio";
+    const placement = { assetId: asset.id, track: isAudio ? audioTrack : visualTrack, start: isAudio ? nextAudioStart : nextVisualStart, duration: clipDuration };
+    if (isAudio) nextAudioStart += clipDuration;
+    else nextVisualStart += clipDuration;
+    return placement;
+  });
+  return { start: primary.start, duration, placements, shiftedStarts };
+}
+
 /** Magnetically place a clip in a lane, opening only the space needed at the insertion point. */
 export function resolveTimelinePlacement(
   desiredStart: number,

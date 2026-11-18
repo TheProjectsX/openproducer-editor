@@ -1,6 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canPlaceAssetOnTrack, canvasDimensionsForAspect, resolveTimelinePlacement, timelineContentWidth, timelineDropStart, timelineRulerOffset, timelineTimeAtPointer, timelineZoomScrollLeft, visibleTimelineTracks, zoomPixelsPerSecond } from "../app/lib/video-timeline.ts";
+import { canPlaceAssetOnTrack, canvasDimensionsForAspect, planMediaBatchPlacement, resolveTimelinePlacement, timelineContentWidth, timelineDropStart, timelineRulerOffset, timelineTimeAtPointer, timelineZoomScrollLeft, visibleTimelineTracks, zoomPixelsPerSecond } from "../app/lib/video-timeline.ts";
+
+test("batch placement preserves order within lanes while starting audio alongside visuals", () => {
+  const assets = [
+    { id: "video", kind: "video", duration: 4 },
+    { id: "audio", kind: "audio", duration: 3 },
+    { id: "image", kind: "image", duration: 3600 },
+  ];
+  const result = planMediaBatchPlacement(assets, 0, 2, [
+    { id: "visual-old", track: 0, start: 0, end: 2 },
+    { id: "audio-old", track: -1, start: 3, end: 5 },
+  ], 0.2, true);
+  assert.deepEqual(result?.placements, [
+    { assetId: "video", track: 0, start: 2, duration: 4 },
+    { assetId: "audio", track: -1, start: 2, duration: 3 },
+    { assetId: "image", track: 0, start: 6, duration: 5 },
+  ]);
+  assert.equal(result?.shiftedStarts["audio-old"], 5);
+  assert.equal(result?.duration, 9);
+  assert.equal(planMediaBatchPlacement(assets, -1, 2, [], 0.2, true), null);
+});
 
 test("text clips can move on existing and new overlay lanes", () => {
   assert.equal(canPlaceAssetOnTrack("text", 1), true);
