@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canPlaceAssetOnTrack, canvasDimensionsForAspect, planMediaBatchPlacement, resolveTimelinePlacement, timelineContentWidth, timelineDropStart, timelineRulerOffset, timelineTimeAtPointer, timelineZoomScrollLeft, visibleTimelineTracks, zoomPixelsPerSecond } from "../app/lib/video-timeline.ts";
+import { canPlaceAssetOnTrack, canvasDimensionsForAspect, planMediaBatchPlacement, resolveMarqueeSelection, resolveTimelinePlacement, timelineContentWidth, timelineDropStart, timelineRulerOffset, timelineTimeAtPointer, timelineZoomScrollLeft, visibleTimelineTracks, zoomPixelsPerSecond } from "../app/lib/video-timeline.ts";
 
 test("batch placement preserves order within lanes while starting audio alongside visuals", () => {
   const assets = [
@@ -97,4 +97,10 @@ test("dropping at an occupied edge opens room along the same track", () => {
   assert.deepEqual(resolveTimelinePlacement(1, 2, clips, 0.2, true), { start: 0, shiftedStarts: { first: 2, second: 6, third: 10 } });
   assert.deepEqual(resolveTimelinePlacement(5, 3, clips, 0.2, false), { start: 4, shiftedStarts: { second: 7, third: 11 } });
   assert.deepEqual(resolveTimelinePlacement(12.5, 3, clips, 0.2, false), { start: 12.5, shiftedStarts: {} });
+});
+
+test("marquee selection replaces or adds to starting clip selection", () => {
+  assert.deepEqual(resolveMarqueeSelection(["a", "b"], ["b", "c"], false), ["b", "c"]);
+  assert.deepEqual(resolveMarqueeSelection(["a", "b"], ["b", "c"], true), ["a", "b", "c"]);
+  assert.deepEqual(resolveMarqueeSelection(["a"], [], false), []);
 });

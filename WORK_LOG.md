@@ -1,5 +1,14 @@
 # Work log
 
+## 2026-11-18 — Timeline marquee multi-select and CapCut-style Video Studio inspector
+
+- Added mouse marquee multi-selection on the Video Studio timeline (`beginTimelineMarquee`..`cancelTimelineMarquee` in `app/routes/studio-video.tsx`, `resolveMarqueeSelection` in `app/lib/video-timeline.ts`, `user-select: none` on `.timeline-scroll` in `app/app.css`, and unit test in `tests/video-timeline.test.mjs`).
+- Fixed `editClip` and `patchSelectedEffects` in `app/routes/studio-video.tsx` to apply edits atomically across all unlocked clips in `selectedClips` while guarding track-incompatible moves.
+- Recorded and completed all 6 phases of the CapCut PC right-side inspector parity plan in `project_research/docs/13-inspector-capcut-parity.md`:
+  - **Details (no selection):** Inline project rename, editable `Aspect ratio`, `Width`/`Height`, `Frame rate`, and shared preview/export `backgroundColor` (`app/lib/project-store.ts`, `app/lib/video-composition.ts`).
+  - **Per-asset inspector tabs & controls:** `Audio` (`Basic`, `Speed` + fade sliders), `Video` (`Basic`, `Audio`, `Speed`, `Adjust` + `Transform` `Position X/Y`, `Opacity`, `Reset`, `Freeze frame`), `Image` (`Basic`, `Duration`, `Adjust` + `Scale` slider, `Mirror` SVG icons), `Text` (`Text`, `Basic`, `Duration` + `Font size` slider, `Underline`, `TT`/`tt`/`Tt` case, `Character` spacing, `Shadow Offset X/Y`, `Background Padding`, SVG alignment icons), `Target duration`/`Duration` seekbars, and `Selection` multi-clip inspector filtering. Removed redundant `Split`/`Duplicate`/`Delete` buttons from the inspector.
+- Verification: `npx.cmd tsc --noEmit --pretty false`, `npm.cmd run test:core` (38/38), and `git diff --check` passed.
+
 ## 2026-11-18 — Header navigation polish and CapCut PC Video Studio parity (Batches 1–5)
 
 - Moved `.tool-breadcrumbs` out of `.tool-page-header` to the top-left of tool pages above `.resize-intro`, added hover/outside-click/Escape auto-close for header tool-group dropdowns and Video Studio `<details>` menus.

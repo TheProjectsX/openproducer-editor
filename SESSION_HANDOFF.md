@@ -1,5 +1,34 @@
 # Session handoff — Local Studio Core
 
+## Current handoff — 2026-11-18 (Night, Asia/Dhaka)
+
+### Checkout and guardrails
+
+- Workspace: `e:\Coding_Practice\Live Projects\openproducer-editor`. Branch `main` is at `ab11a8d` (`Session handoff update`), matching `origin/main`. Uncommitted changes are present in `app/app.css`, `app/lib/project-store.ts`, `app/lib/video-composition.ts`, `app/lib/video-timeline.ts`, `app/routes/studio-video.tsx`, `tests/video-timeline.test.mjs`, and untracked `project_research/docs/13-inspector-capcut-parity.md`. Preserve all work; do not reset or clean. Run `git status --short` before further work.
+- Read root `README.md`, `AGENTS.md`, and `project_research/` guides before implementation. Keep all media, projects, processing, preview, and export on-device. The roadmap and test/release gate remain binding; **M6/Core is not complete** until browser, export, and offline verification pass.
+- Sections below this one are historical checkpoints.
+
+### Work completed in this session
+
+- **Timeline Mouse Marquee & Multi-Select Editing (`app/routes/studio-video.tsx`, `app/lib/video-timeline.ts`, `tests/video-timeline.test.mjs`, `app/app.css`):**
+  - Added mouse marquee selection (`beginTimelineMarquee`, `moveTimelineMarquee`, `finishTimelineMarquee`, `cancelTimelineMarquee`) on `.timeline-scroll`, supporting **Ctrl/Cmd+drag** additive selection, `data-clip-id` hit-testing, click-suppression after drag, `user-select: none` on `.timeline-scroll`, and `resolveMarqueeSelection` unit test.
+  - Fixed multi-selection editing in `editClip` and `patchSelectedEffects` so edits (volume, mute, speed, pitch mode, blend mode, fades, transforms, color adjustments) apply atomically across all unlocked clips in `selectedClips` while guarding track-incompatible moves (`canPlaceAssetOnTrack`).
+- **Right-Side Inspector CapCut PC Parity (`project_research/docs/13-inspector-capcut-parity.md`, `app/routes/studio-video.tsx`, `app/lib/project-store.ts`, `app/lib/video-composition.ts`, `app/app.css`):**
+  - **No Selected (`Details`):** Added inline project name (`renameProject`), `Canvas & Output` controls (`Aspect ratio`, `Width`/`Height`, `Frame rate`, and shared preview/export `backgroundColor` with `Reset`).
+  - **Audio Clip (`track < 0`):** Scoped tabs to `Basic` and `Speed` (hiding `Adjust`), grouped `Volume & Fade` with `Reset`, `Fade in`/`Fade out` sliders (`EditorRange`), and `Silence audio`.
+  - **Video Clip:** Added `Basic`, `Audio`, `Speed`, `Adjust` tabs; moved `Position X/Y` & `Opacity` slider into `Basic` → `Transform` with `Reset` and `Freeze frame at playhead`; added `Audio pitch mode` to `Speed`; removed duplicate `Split`/`Duplicate`/`Delete` buttons from the inspector.
+  - **Image / Shape Clip:** Scoped tabs to `Basic`, `Duration`, `Adjust`; added `Scale` slider, `Reset`, and SVG `Mirror` flip icons; replaced `Speed` with `Duration` (`EditorRange` + custom input + `Fade in`/`Fade out` sliders); removed irrelevant `Mute clip` checkbox.
+  - **Text Clip:** Scoped tabs to `Text`, `Basic`, `Duration`; added `Font size` `EditorRange` slider, `Pattern` (`B` / `U` / `I`), `Case` (`TT` / `tt` / `Tt`), `Character` (`letterSpacing`), `Line`, `Shadow Offset X/Y`, `Background Padding`, and SVG alignment icons (replacing `L`/`C`/`R`), backed by `VideoTextSettings` and `drawVideoComposition`.
+  - **Speed & Multi-Select Polish:** Added `EditorRange` seekbars for `Target duration` and `Duration`, SVG `Mirror` icons across Video/Image/Selection, and multi-select inspector filtering (showing `Selection` / `{N} clips selected` and hiding single-clip-only controls).
+
+### Verification and next priorities
+
+- **Verified in this session:** `npx.cmd tsc --noEmit --pretty false` passed; `npm.cmd run test:core` passed **38/38**; `git diff --check` passed.
+- **Not yet run after these edits:** `npm.cmd run build` (static production build + service worker) and real-browser interactive / export / offline verification of the new timeline marquee, multi-select editing, and updated inspector controls.
+- **Next priorities:**
+  1. **Production build & browser verification:** Run `npm.cmd run build` and test `/studio/video` in Chrome/Edge (timeline marquee + multi-select volume/speed/transform edits, `Details` background color export parity, `Text` underline/case/letter-spacing export parity, `Video`/`Image`/`Audio` inspector tabs, save/reopen, and offline mode).
+  2. **Remaining Core release gates:** Retest `/tools/video/extract-audio` on AAC MP4 / Opus WebM fixtures, verify Audio Split ZIP archive integrity, and complete offline/external-player checks across Audio, Video, and Image tools.
+
 ## Current handoff — 2026-11-18 (Afternoon, Asia/Dhaka)
 
 ### Checkout and guardrails

@@ -133,3 +133,7 @@ export function resolveTimelinePlacement(
   }
   return { start, shiftedStarts };
 }
+
+export function resolveMarqueeSelection(selectedAtStart: string[], hitIds: string[], additive: boolean): string[] {
+  return additive ? [...new Set([...selectedAtStart, ...hitIds])] : hitIds;
+}

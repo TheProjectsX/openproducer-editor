@@ -17,7 +17,7 @@ export function drawVideoComposition(
   if (canvas.height !== timeline.height) canvas.height = timeline.height;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("This browser cannot create a 2D canvas renderer.");
-  context.fillStyle = "#11131a"; context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = timeline.backgroundColor || "#11131a"; context.fillRect(0, 0, canvas.width, canvas.height);
   const clips = timeline.clips.filter((clip) => clip.track >= 0 && !timeline.trackStates?.[clip.track]?.hidden && time >= clip.start && time < clip.start + getClipLength(clip)).sort((a, b) => a.track - b.track || a.start - b.start);
   for (const clip of clips) {
     const asset = assets.find((item) => item.id === clip.assetId);
@@ -47,7 +47,15 @@ export function drawVideoComposition(
       const transform = evaluateClipKeyframes(clip, clipTime).transform;
       const settings = asset.textSettings;
       const fontSize = Math.max(8, Math.min(512, settings.fontSize * transform.scale * transitionScale));
-      const lines = settings.text.split("\n");
+      const textCase = settings.textCase ?? (settings.uppercase ? "uppercase" : "none");
+      const transformedText = textCase === "uppercase"
+        ? settings.text.toUpperCase()
+        : textCase === "lowercase"
+          ? settings.text.toLowerCase()
+          : textCase === "capitalize"
+            ? settings.text.toLowerCase().replace(/\b\p{L}/gu, (char) => char.toUpperCase())
+            : settings.text;
+      const lines = transformedText.split("\n");
       const alpha = Math.max(0, Math.min(1, transform.opacity * transitionAlpha));
       context.save();
       applyTransitionClip();
@@ -59,15 +67,19 @@ export function drawVideoComposition(
       const fontWeight = settings.bold === false ? "400" : "700";
       const fontFamily = settings.fontFamily || "system-ui, sans-serif";
       context.font = `${fontStyle}${fontWeight} ${fontSize}px ${fontFamily}`;
+      if ("letterSpacing" in context) {
+        (context as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${(settings.letterSpacing ?? 0) * transform.scale}px`;
+      }
       const align = settings.align ?? "center";
       context.textAlign = align; context.textBaseline = "middle";
       const lineHeight = fontSize * (settings.lineHeight ?? 1.2);
       const widest = Math.max(0, ...lines.map((line) => context.measureText(line).width));
       if (settings.showBackground) {
-        const bgX = -widest / 2 - fontSize * 0.35;
-        const bgY = -lines.length * lineHeight / 2 - fontSize * 0.2;
-        const bgW = widest + fontSize * 0.7;
-        const bgH = lines.length * lineHeight + fontSize * 0.4;
+        const extraPad = Math.max(0, (settings.backgroundPadding ?? 0) * transform.scale);
+        const bgX = -widest / 2 - fontSize * 0.35 - extraPad;
+        const bgY = -lines.length * lineHeight / 2 - fontSize * 0.2 - extraPad;
+        const bgW = widest + fontSize * 0.7 + extraPad * 2;
+        const bgH = lines.length * lineHeight + fontSize * 0.4 + extraPad * 2;
         const radius = Math.max(0, Math.min(Math.min(bgW, bgH) / 2, (settings.backgroundRadius ?? 0) * transform.scale));
         context.save();
         context.globalAlpha = alpha * Math.max(0, Math.min(1, settings.backgroundOpacity ?? 1));
@@ -82,7 +94,8 @@ export function drawVideoComposition(
       if (settings.shadow) {
         context.shadowColor = settings.shadowColor ?? "#000000";
         context.shadowBlur = Math.max(0, (settings.shadowBlur ?? 8) * transform.scale);
-        context.shadowOffsetY = 2 * transform.scale;
+        context.shadowOffsetX = (settings.shadowOffsetX ?? 0) * transform.scale;
+        context.shadowOffsetY = (settings.shadowOffsetY ?? 2) * transform.scale;
       }
       const textX = align === "left" ? -widest / 2 : align === "right" ? widest / 2 : 0;
       if ((settings.strokeWidth ?? 0) > 0) {
@@ -92,7 +105,23 @@ export function drawVideoComposition(
         lines.forEach((line, index) => context.strokeText(line, textX, (index - (lines.length - 1) / 2) * lineHeight));
       }
       context.fillStyle = settings.color;
-      lines.forEach((line, index) => context.fillText(line, textX, (index - (lines.length - 1) / 2) * lineHeight));
+      lines.forEach((line, index) => {
+        const y = (index - (lines.length - 1) / 2) * lineHeight;
+        context.fillText(line, textX, y);
+        if (settings.underline && line.length > 0) {
+          const lineWidth = context.measureText(line).width;
+          const startX = align === "left" ? textX : align === "right" ? textX - lineWidth : textX - lineWidth / 2;
+          const underlineY = y + fontSize * 0.48;
+          context.save();
+          context.strokeStyle = settings.color;
+          context.lineWidth = Math.max(1, fontSize * 0.07);
+          context.beginPath();
+          context.moveTo(startX, underlineY);
+          context.lineTo(startX + lineWidth, underlineY);
+          context.stroke();
+          context.restore();
+        }
+      });
       context.restore(); continue;
     }
     const source: CanvasImageSource | undefined = asset?.kind === "video" ? media.videos[clip.id] : media.images[clip.assetId];
