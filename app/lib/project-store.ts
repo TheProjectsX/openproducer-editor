@@ -49,17 +49,38 @@ export type AudioProjectDocument = {
   fadeOut: number;
 };
 
-export type VideoTextSettings = { text: string; fontSize: number; color: string; backgroundColor: string; showBackground: boolean };
+export type VideoTextSettings = {
+  text: string;
+  fontSize: number;
+  color: string;
+  backgroundColor: string;
+  showBackground: boolean;
+  fontFamily?: string;
+  bold?: boolean;
+  italic?: boolean;
+  align?: "left" | "center" | "right";
+  lineHeight?: number;
+  strokeColor?: string;
+  strokeWidth?: number;
+  shadow?: boolean;
+  shadowColor?: string;
+  shadowBlur?: number;
+  backgroundRadius?: number;
+  backgroundOpacity?: number;
+};
 export type VideoTimelineAsset = { id: string; name: string; type: string; size: number; duration: number; kind: "video" | "audio" | "image" | "text"; importedAt?: number; fileModifiedAt?: number; width?: number; height?: number; hasAudio?: boolean; derivedFromAssetId?: string; textSettings?: VideoTextSettings };
 export type VideoClipTransform = { x: number; y: number; scale: number; rotation: number; opacity: number; mirrorX?: boolean; mirrorY?: boolean };
 export type VideoImageCrop = { left: number; top: number; right: number; bottom: number };
 export type VideoImageSize = { width: number; height: number };
-export type VideoClipTransitions = { fadeIn: number; fadeOut: number };
+export type VideoTransitionType = "fade" | "wipe-left" | "wipe-right" | "wipe-up" | "wipe-down" | "slide-left" | "slide-right" | "zoom-in";
+export type VideoClipTransitions = { fadeIn: number; fadeOut: number; inType?: VideoTransitionType; outType?: VideoTransitionType };
 export type VideoClipKeyframe = { time: number; transform: VideoClipTransform; volume: number };
-export type VideoClipEffects = { brightness: number; contrast: number; saturation: number; grayscale: number };
-export type VideoTimelineClip = { id: string; assetId: string; track: number; start: number; sourceStart: number; sourceEnd: number; speed: number; volume: number; muted: boolean; pitchMode?: "preserve" | "natural"; transform?: VideoClipTransform; effects?: VideoClipEffects; transitions?: VideoClipTransitions; keyframes?: VideoClipKeyframe[]; imageCrop?: VideoImageCrop; imageSize?: VideoImageSize; imageMatchAspect?: boolean };
+export type VideoClipEffects = { brightness: number; contrast: number; saturation: number; grayscale: number; hue?: number; sepia?: number; blur?: number };
+export type VideoBlendMode = "source-over" | "screen" | "multiply" | "overlay" | "lighten" | "darken";
+export type VideoTimelineClip = { id: string; assetId: string; track: number; start: number; sourceStart: number; sourceEnd: number; speed: number; volume: number; muted: boolean; pitchMode?: "preserve" | "natural"; blendMode?: VideoBlendMode; transform?: VideoClipTransform; effects?: VideoClipEffects; transitions?: VideoClipTransitions; keyframes?: VideoClipKeyframe[]; imageCrop?: VideoImageCrop; imageSize?: VideoImageSize; imageMatchAspect?: boolean };
+export type VideoTrackState = { hidden?: boolean; muted?: boolean; locked?: boolean };
 export type VideoAspectRatioMode = "original" | "custom" | "16:9" | "4:3" | "2.35:1" | "2:1" | "1.85:1" | "9:16" | "3:4" | "1:1";
-export type VideoTimelineProject = { version: 1; width: number; height: number; aspectRatioMode?: VideoAspectRatioMode; fps: number; duration: number; playhead: number; assets: VideoTimelineAsset[]; clips: VideoTimelineClip[] };
+export type VideoTimelineProject = { version: 1; width: number; height: number; aspectRatioMode?: VideoAspectRatioMode; fps: number; duration: number; playhead: number; assets: VideoTimelineAsset[]; clips: VideoTimelineClip[]; trackStates?: Record<number, VideoTrackState> };
 
 export type ImageProjectSettings = {
   width: number;
@@ -320,6 +341,23 @@ export async function duplicateProject(id: string): Promise<LocalProject> {
     await deleteProject(copy.id).catch(() => undefined);
     throw cause;
   }
+}
+
+export async function renameProject(id: string, title: string): Promise<void> {
+  const nextTitle = title.trim();
+  if (!nextTitle) return;
+  const database = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(PROJECTS_STORE, "readwrite");
+    const projects = transaction.objectStore(PROJECTS_STORE);
+    const request = projects.get(id) as IDBRequest<LocalProject | undefined>;
+    request.onsuccess = () => {
+      if (!request.result) { transaction.abort(); return; }
+      projects.put({ ...request.result, title: nextTitle, updatedAt: Date.now() });
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("Could not rename the local project."));
+  });
 }
 
 export async function deleteProject(id: string): Promise<void> {

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 
 const groups = {
@@ -17,18 +18,57 @@ function titleFromPath(path: string) {
 
 export function ToolPageHeader({ status }: { status?: string }) {
   const { pathname } = useLocation();
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const menuRef = useRef<HTMLElement>(null);
+  const lastPointerTypeRef = useRef<string>("mouse");
   const categoryKey = pathname.startsWith("/tools/audio") || pathname === "/studio/audio" ? "audio" : pathname.startsWith("/tools/video") || pathname === "/studio/video" ? "video" : "image";
   const category = pathname === "/studio/video" ? { label: "Creative Studio", href: "/" } : groups[categoryKey];
   const toolTitle = titleFromPath(pathname);
-  return <header className="resize-header tool-page-header">
-    <a href="/" className="brand"><span className="brand-mark" aria-hidden="true">L</span>Local Studio</a>
+
+  useEffect(() => {
+    setOpenGroup(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!openGroup) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setOpenGroup(null);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenGroup(null);
+    };
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openGroup]);
+
+  return <>
+    <header className="resize-header tool-page-header">
+      <a href="/" className="brand"><span className="brand-mark" aria-hidden="true">L</span>Local Studio</a>
+      <nav ref={menuRef} className="tool-group-menu" aria-label="Tool groups">{Object.entries(groups).map(([key, group]) => <details
+        key={key}
+        open={openGroup === key}
+        onPointerEnter={(event) => { if (event.pointerType === "mouse") setOpenGroup(key); }}
+        onPointerLeave={(event) => { if (event.pointerType === "mouse") setOpenGroup((current) => (current === key ? null : current)); }}
+        onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpenGroup((current) => (current === key ? null : current)); }}
+      >
+        <summary
+          onPointerDown={(event) => { lastPointerTypeRef.current = event.pointerType; }}
+          onClick={(event) => {
+            event.preventDefault();
+            const isMouseClick = event.detail > 0 && lastPointerTypeRef.current === "mouse";
+            setOpenGroup((current) => (isMouseClick ? key : current === key ? null : key));
+          }}
+        >{group.label}<span aria-hidden="true">⌄</span></summary>
+        <div className="tool-dropdown"><a className="tool-dropdown-all" href={group.href}>All {group.label.toLowerCase()} ↗</a>{group.tools.map(([label, href]) => <a href={href} key={href}>{label}</a>)}</div>
+      </details>)}</nav>
+      {status && <span className="tool-page-status" role="status">{status}</span>}
+    </header>
     <nav className="tool-breadcrumbs" aria-label="Breadcrumb">
       <a href="/">Home</a><span aria-hidden="true">/</span><a href={category.href}>{category.label}</a><span aria-hidden="true">/</span><span aria-current="page">{toolTitle}</span>
     </nav>
-    <nav className="tool-group-menu" aria-label="Tool groups">{Object.entries(groups).map(([key, group]) => <details key={key}>
-      <summary>{group.label}<span aria-hidden="true">⌄</span></summary>
-      <div className="tool-dropdown"><a className="tool-dropdown-all" href={group.href}>All {group.label.toLowerCase()} ↗</a>{group.tools.map(([label, href]) => <a href={href} key={href}>{label}</a>)}</div>
-    </details>)}</nav>
-    {status && <span className="tool-page-status" role="status">{status}</span>}
-  </header>;
+  </>;
 }
