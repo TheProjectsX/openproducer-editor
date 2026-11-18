@@ -4,6 +4,10 @@ export type MediaFilter = "all" | "image" | "video" | "audio";
 export type MediaSort = "imported" | "fileDate" | "name" | "type" | "duration";
 export type SortDirection = "asc" | "desc";
 
+export function isMediaAsset(asset: VideoTimelineAsset) {
+  return asset.kind === "video" || asset.kind === "audio" || asset.kind === "image";
+}
+
 export function updateMediaSelection(visibleIds: readonly string[], selectedIds: readonly string[], anchorId: string | null, clickedId: string, shift: boolean, toggle: boolean) {
   if (!visibleIds.includes(clickedId)) return [...selectedIds];
   if (shift && anchorId && visibleIds.includes(anchorId)) {
@@ -18,7 +22,7 @@ export function updateMediaSelection(visibleIds: readonly string[], selectedIds:
 export function sortMediaAssets(assets: readonly VideoTimelineAsset[], filter: MediaFilter, sort: MediaSort, direction: SortDirection) {
   const sign = direction === "asc" ? 1 : -1;
   return assets.map((asset, index) => ({ asset, index }))
-    .filter(({ asset }) => filter === "all" || asset.kind === filter)
+    .filter(({ asset }) => isMediaAsset(asset) && (filter === "all" || asset.kind === filter))
     .sort((left, right) => {
       const a = left.asset;
       const b = right.asset;
@@ -29,7 +33,7 @@ export function sortMediaAssets(assets: readonly VideoTimelineAsset[], filter: M
       const value = (asset: VideoTimelineAsset, index: number) => {
         if (sort === "imported") return asset.importedAt ?? index;
         if (sort === "fileDate") return asset.fileModifiedAt;
-        return asset.kind === "image" || asset.kind === "text" ? undefined : asset.duration;
+        return asset.kind === "image" ? undefined : asset.duration;
       };
       const first = value(a, left.index);
       const second = value(b, right.index);

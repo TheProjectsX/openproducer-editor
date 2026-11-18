@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { sortMediaAssets, updateMediaSelection } from "../app/lib/video-media-bin.ts";
+import { isMediaAsset, sortMediaAssets, updateMediaSelection } from "../app/lib/video-media-bin.ts";
 
 const assets = [
   { id: "old", name: "Zebra.mp4", kind: "video", duration: 12, importedAt: 100, fileModifiedAt: 1000 },
@@ -13,6 +13,15 @@ const ids = (items) => items.map((asset) => asset.id);
 test("media filters retain only the requested kind", () => {
   assert.deepEqual(ids(sortMediaAssets(assets, "video", "name", "asc")), ["legacy", "old"]);
   assert.deepEqual(ids(sortMediaAssets(assets, "audio", "name", "asc")), ["audio"]);
+});
+
+test("text titles stay in the project but never appear in Media", () => {
+  const title = { id: "title", name: "Default title", kind: "text", duration: 5, importedAt: 400 };
+  const projectAssets = [...assets, title];
+  assert.deepEqual(ids(sortMediaAssets(projectAssets, "all", "imported", "asc")), ["legacy", "old", "image", "audio"]);
+  assert.deepEqual(ids(sortMediaAssets(projectAssets, "image", "name", "asc")), ["image"]);
+  assert.equal(projectAssets.filter(isMediaAsset).length, assets.length);
+  assert.equal(projectAssets.at(-1), title);
 });
 
 test("media sorting supports both directions and leaves the project order intact", () => {
