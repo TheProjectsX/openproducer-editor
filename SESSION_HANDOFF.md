@@ -1,5 +1,35 @@
 # Session handoff — Local Studio Core
 
+## Current handoff — 2026-11-18 (Afternoon, Asia/Dhaka)
+
+### Checkout and guardrails
+
+- Workspace: `C:\Users\Modasser Hasan\Contents\openproducer-editor`. Branch `main` is at `e8e5a1d` (`feat: add interactive video preview text manipulation and editor workspace enhancements`). Preserve existing work; do not reset or clean. Run `git status --short` before further work.
+- Read root `README.md`, `AGENTS.md`, and the `project_research/` guides before implementation. Keep all media, projects, processing, preview, and export on-device. The roadmap and test/release gate remain binding; **M6/Core is not complete** until browser, export, and offline verification pass.
+- Sections below this one are historical checkpoints.
+
+### Work completed in this session
+
+- **Header & Tool Navigation (`app/components/tool-page-header.tsx`, `app/app.css`):**
+  - Moved `.tool-breadcrumbs` out of `<header>` to the top-left of the page directly above `.resize-intro`, while keeping `.tool-group-menu` right-aligned in the header.
+  - Controlled `.tool-group-menu` dropdowns with `openGroup` state, mouse `onPointerEnter`/`onPointerLeave` auto-close, a `.tool-dropdown::before` hover bridge, and capture-phase outside-click + `Escape` dismissal across both header menus and Video Studio `<details>` dropdowns (`Filter`, `Sort`, `Preview Zoom`, `Aspect Ratio`).
+- **CapCut PC Gap Analysis & Video Studio Batches 1–5 (`project_research/docs/12-capcut-pc-gap-analysis.md`, `app/routes/studio-video.tsx`, `app/lib/video-composition.ts`, `app/lib/project-store.ts`, `app/app.css`):**
+  - **Batch 1 — Preview & Canvas Manipulation:** Click-to-select any active `text`, `image`, or `video` clip directly in `.editor-stage`; added image preview rotation handle and default-on `Maintain aspect ratio when resizing` (toggleable); added `.studio-video-overlay` move/resize/rotate handles; added 6 px preview magnetic snap guides (center X/Y + canvas edges, `Alt` bypasses); click-empty-stage deselection; zoomable/pannable preview stage (`Fit / 50% / 100% / 150% / 200%`, custom `25%–400%`, `Ctrl/Meta+wheel`, drag-to-pan).
+  - **Batch 2 — Timeline & Track Editing:** Per-lane `Hide` (`track >= 0`), `Mute`, and `Lock` gutter controls (`trackStates` respected in preview, playback, and export); timeline `−` / slider / `+` / `Fit` zoom controls; `Ctrl/Cmd+click` and `Shift+click` multi-clip timeline selection; right-click `.studio-clip-context-menu` (`Split`, `Copy`, `Paste`, `Duplicate`, `Freeze frame`, `Detach audio`, `Delete`); dynamic Project Details track counts; fixed `detachVideoAudio` to pick the first non-overlapping `Audio N` lane and added `.timeline-new-audio-target` (`Move to new Audio N`) when dragging audio.
+  - **Playhead & Seeker UX:** Added magnetic playhead snapping to timeline bounds, clip starts/ends across all tracks, and keyframes (`Alt` bypasses). Fixed seekbar movement (ruler/playhead drag/click) so it no longer deselects the active clip, and restricted `.track-lane` click to deselection only (seeking remains on the ruler and playhead handle).
+  - **Batch 3 — Inspector & Clip Properties:** Inline `◇`/`◆` keyframe toggle buttons in `Basic`; expanded `VideoTextSettings` and `drawVideoComposition` (font family, bold/italic, align, line height, stroke, drop shadow, background radius/opacity); expanded `Adjust` tab (`Hue`, `Sepia`, `Blur`, `Reset adjustments`); `Blend mode` (`Normal`, `Screen`, `Multiply`, `Overlay`, `Lighten`, `Darken`); `Speed` preset chips (`0.25×`–`4×`), live duration readout, and reverse `Target duration` input.
+  - **Batch 4 — Left Panel (`Text`, `Shapes`, `Transitions`):** Added 6 local text presets, a `Shapes` tab with 6 local SVG vector overlays + color picker, and `Fade to black`, `Wipe` (L/R/U/D), `Slide` (L/R), and `Zoom in` transitions rendered in `drawVideoComposition`. Updated Text, Shapes, and Transitions items to 3-column rectangular `.studio-asset-thumb` tiles with live visual previews.
+  - **Batch 5 — Shortcuts & Polish:** Added `Q`/`W` (delete left/right), `J`/`K`/`L` (shuttle), `-`/`+` (timeline zoom), `?` shortcut reference modal, and inline project title rename (`renameProject`).
+
+### Verification and next priorities
+
+- **Verified in this session:** `npx.cmd tsc --noEmit --pretty false` passed; `npm.cmd run test:core` passed **37/37**; `git diff --check` passed.
+- **Not yet run after these edits:** `npm.cmd run build` (static production build + service worker) and real-browser interactive / export / offline verification of the new Video Studio features.
+- **Next priorities:**
+  1. **Design & UI polish pass** (user noted revisiting designs after finishing Video Studio).
+  2. **Production build & browser verification:** Run `npm.cmd run build` and test `/studio/video` in Chrome/Edge (preview overlay selection/handles/snap/zoom, track hide/mute/lock, detach/new audio lane, text/shape/transition export parity, save/reopen, and offline mode).
+  3. **Remaining Core release gates:** Retest `/tools/video/extract-audio` on AAC MP4 / Opus WebM fixtures, verify Audio Split ZIP archive integrity, and complete offline/external-player checks across Audio, Video, and Image tools.
+
 ## Current handoff — 2026-11-18 (Asia/Dhaka)
 
 ### Checkout and guardrails

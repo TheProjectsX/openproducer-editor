@@ -1,5 +1,14 @@
 # Work log
 
+## 2026-11-18 — Header navigation polish and CapCut PC Video Studio parity (Batches 1–5)
+
+- Moved `.tool-breadcrumbs` out of `.tool-page-header` to the top-left of tool pages above `.resize-intro`, added hover/outside-click/Escape auto-close for header tool-group dropdowns and Video Studio `<details>` menus.
+- Logged the CapCut PC feature gap analysis in `project_research/docs/12-capcut-pc-gap-analysis.md` and implemented Batches 1–5 in `/studio/video`:
+  - **Preview & Canvas:** Click-to-select any active visual clip in `.editor-stage`, image preview rotation handle, default-on `Maintain aspect ratio when resizing`, video overlay move/resize/rotate handles, 6 px center/edge magnetic snap guides, click-empty-stage deselection, and zoomable/pannable preview stage (`Fit / 50%–200% / 25%–400%`, `Ctrl+wheel`, drag-to-pan).
+  - **Timeline & Tracks:** Per-lane `Hide`, `Mute`, and `Lock` gutter controls (`trackStates` across preview/playback/export); `−`/slider/`+`/`Fit` timeline zoom; `Ctrl`/`Shift` multi-clip selection; right-click context menu (`Split`, `Copy`, `Paste`, `Duplicate`, `Freeze frame`, `Detach audio`, `Delete`); dynamic Project Details track counts; non-overlapping `Audio N` placement on detach and `Move to new Audio N` drop target on audio drag; magnetic playhead snapping; preserved clip selection during seekbar movement and restricted `.track-lane` clicks to deselection.
+  - **Inspector, Left Panel, & Shortcuts:** Inline `◇`/`◆` keyframe toggles; text styling parity (font, bold/italic, align, line height, stroke, shadow, background radius/opacity); `Hue`/`Sepia`/`Blur` + reset; blend modes; speed presets + reverse `Target duration` input; 6 text presets, `Shapes` tab (6 SVG shapes + color picker), and Wipe/Slide/Zoom/Fade-to-black transitions rendered as 3-column rectangular preview tiles; `Q`/`W`/`J`/`K`/`L`/`-`/`+`/`?` shortcuts, shortcut modal, and inline `renameProject`.
+- Verification: `npx.cmd tsc --noEmit --pretty false`, `npm.cmd run test:core` (37/37), and `git diff --check` passed.
+
 ## 2026-11-17 — Dynamic Video Studio lanes
 
 - Replaced the fixed six-lane display with an empty main drop area and lanes derived from placed clips. Dragging visual or audio media temporarily exposes a new compatible lane; text titles create an overlay lane above the main lane. Existing numeric track assignments remain unchanged.
