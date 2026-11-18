@@ -33,6 +33,16 @@ test("keyframes interpolate transforms and volume linearly", () => {
   assert.deepEqual(evaluateClipKeyframes(item, 1), { transform: transform(10), volume: 0.5 });
 });
 
+test("keyframe evaluation retains discrete image mirror settings", () => {
+  const item = clip({ keyframes: [
+    { time: 0, transform: { ...transform(0), mirrorX: false, mirrorY: true }, volume: 1 },
+    { time: 2, transform: { ...transform(20), mirrorX: true, mirrorY: false }, volume: 1 },
+  ] });
+  assert.equal(evaluateClipKeyframes(item, 0.5).transform.mirrorX, false);
+  assert.equal(evaluateClipKeyframes(item, 1.5).transform.mirrorX, true);
+  assert.equal(evaluateClipKeyframes(item, 1.5).transform.mirrorY, false);
+});
+
 test("adding a keyframe at an existing time updates rather than duplicates it", () => {
   const frames = upsertClipKeyframe(clip({ keyframes: [{ time: 1, transform: transform(1), volume: 1 }] }), { time: 1.0005, transform: transform(7), volume: 0.5 });
   assert.equal(frames.length, 1);

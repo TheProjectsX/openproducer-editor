@@ -1,6 +1,7 @@
 import type { VideoTimelineAsset, VideoTimelineClip, VideoTimelineProject } from "./project-store";
 import { evaluateClipKeyframes, evaluateClipTransition } from "./video-keyframes";
 import { getClipLength } from "./video-timing";
+import { imageClipGeometry } from "./video-image-layout";
 export { getClipLength } from "./video-timing";
 
 export type VideoMediaElements = { videos: Record<string, HTMLVideoElement>; images: Record<string, HTMLImageElement> };
@@ -43,7 +44,9 @@ export function drawVideoComposition(
     if (!source || width === 0 || height === 0 || (source instanceof HTMLVideoElement && source.readyState < 2)) continue;
     const fitScale = Math.min(canvas.width / width, canvas.height / height);
     const transform = evaluateClipKeyframes(clip, clipTime).transform;
-    const drawWidth = width * fitScale * transform.scale; const drawHeight = height * fitScale * transform.scale;
+    const imageGeometry = asset?.kind === "image" ? imageClipGeometry(width, height, canvas.width, canvas.height, clip.imageCrop, clip.imageSize, transform.scale) : null;
+    const drawWidth = imageGeometry?.width ?? width * fitScale * transform.scale;
+    const drawHeight = imageGeometry?.height ?? height * fitScale * transform.scale;
     const effects = clip.effects ?? { brightness: 100, contrast: 100, saturation: 100, grayscale: 0 };
     context.save();
     context.globalAlpha = Math.max(0, Math.min(1, transform.opacity * transitionAlpha));
@@ -51,7 +54,8 @@ export function drawVideoComposition(
     context.translate(canvas.width / 2 + transform.x, canvas.height / 2 + transform.y);
     context.rotate(transform.rotation * Math.PI / 180);
     context.scale(transform.mirrorX ? -1 : 1, transform.mirrorY ? -1 : 1);
-    context.drawImage(source, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+    if (imageGeometry) context.drawImage(source, imageGeometry.source.x, imageGeometry.source.y, imageGeometry.source.width, imageGeometry.source.height, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+    else context.drawImage(source, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
     context.restore();
   }
 }

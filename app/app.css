@@ -802,6 +802,8 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .studio-title-overlay::before, .studio-title-overlay::after { position: absolute; width: 7px; height: 7px; border: 1px solid #1d252a; background: #fff; content: ""; }
 .studio-title-overlay::before { top: -4px; left: -4px; }.studio-title-overlay::after { bottom: -4px; left: -4px; }
 .studio-title-resize { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border: 1px solid #1d252a; background: #fff; cursor: nwse-resize; }
+.studio-image-overlay { position: absolute; z-index: 6; box-sizing: border-box; border: 1px solid #e5f7ff; outline: 1px solid #102027a8; cursor: move; touch-action: none; }
+.studio-image-resize { position: absolute; right: -7px; bottom: -7px; width: 13px; height: 13px; border: 1px solid #15313d; border-radius: 2px; background: #effcff; cursor: nwse-resize; }
 .studio-title-rotate { position: absolute; left: calc(50% - 6px); top: -26px; width: 12px; height: 12px; border: 1px solid #1d252a; border-radius: 50%; background: #fff; cursor: grab; }
 .studio-title-rotate::after { position: absolute; top: 11px; left: 5px; width: 1px; height: 13px; background: #f2f5f7; content: ""; }
 .video-studio-page .editor-preview:fullscreen .editor-stage canvas { max-height: 100%; }

@@ -3,13 +3,14 @@ import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router";
 import type { Route } from "./+types/studio-video";
 import { CustomMediaPreview } from "../components/custom-media-preview";
-import { createProject, getProject, readVideoAsset, saveVideoTimeline, type VideoAspectRatioMode, type VideoClipTransform, type VideoTimelineAsset, type VideoTimelineClip, type VideoTimelineProject } from "../lib/project-store";
+import { createProject, getProject, readVideoAsset, saveVideoTimeline, type VideoAspectRatioMode, type VideoClipTransform, type VideoImageCrop, type VideoTimelineAsset, type VideoTimelineClip, type VideoTimelineProject } from "../lib/project-store";
 import { drawVideoComposition, getClipLength } from "../lib/video-composition";
 import { evaluateClipKeyframes, evaluateClipTransition, upsertClipKeyframe } from "../lib/video-keyframes";
 import { renderTimelineAudio } from "../lib/audio-timeline-render";
 import { canPlaceAssetOnTrack, canvasDimensionsForAspect, planMediaBatchPlacement, resolveTimelinePlacement, timelineContentWidth, timelineDropStart, timelineRulerOffset, timelineTimeAtPointer, timelineZoomScrollLeft, visibleTimelineTracks, zoomPixelsPerSecond } from "../lib/video-timeline";
 import { inspectMediaFile } from "../lib/media-inspection";
 import { isMediaAsset, sortMediaAssets, updateMediaSelection, type MediaFilter, type MediaSort, type SortDirection } from "../lib/video-media-bin";
+import { EMPTY_IMAGE_CROP, imageClipGeometry } from "../lib/video-image-layout";
 import wasmUrl from "bungee-web/bungee.wasm?url";
 
 const EMPTY: VideoTimelineProject = { version: 1, width: 1920, height: 1080, aspectRatioMode: "original", fps: 30, duration: 0, playhead: 0, assets: [], clips: [] };
@@ -84,6 +85,18 @@ function MediaBinControls({ filter, onFilter, sort, onSort, direction, onDirecti
 
 function EditorRange({ label, value, min, max, step = 0.001, unit = "", onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; onChange: (value: number) => void }) {
   return <label className="editor-range-control"><span>{label}<output>{value.toFixed(3)}{unit}</output></span><input aria-label={label} type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.currentTarget.value))} /></label>;
+}
+
+function ImageNumberInput({ label, value, min, max, step = "any", unit, onCommit }: { label: string; value: number; min: number; max: number; step?: string; unit: string; onCommit: (value: number) => void }) {
+  const formatted = Number(value.toFixed(3));
+  const [draft, setDraft] = useState(String(formatted));
+  useEffect(() => setDraft(String(formatted)), [formatted]);
+  function commit() {
+    const number = Number(draft);
+    if (draft.trim() && Number.isFinite(number)) onCommit(Math.max(min, Math.min(max, number)));
+    else setDraft(String(formatted));
+  }
+  return <label className="speed-field">{label} <span>{unit}</span><input type="number" min={min} max={max} step={step} value={draft} onChange={(event) => setDraft(event.currentTarget.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} /></label>;
 }
 
 function updateClipTimeline(current: VideoTimelineProject, id: string, patch: Partial<VideoTimelineClip>, playhead: number, ripplePrimaryTrack: boolean) {
@@ -167,6 +180,7 @@ export default function VideoStudio() {
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const textGestureRef = useRef<{ id: string; pointerId: number; mode: "move" | "scale" | "rotate"; x: number; y: number; transform: VideoClipTransform; original: VideoTimelineProject; fit: number; centerX: number; centerY: number } | null>(null);
+  const imageGestureRef = useRef<{ id: string; pointerId: number; mode: "move" | "resize"; x: number; y: number; width: number; height: number; transform: VideoClipTransform; original: VideoTimelineProject; fit: number; matchAspect: boolean; sourceAspect: number } | null>(null);
   const previewRef = useRef<HTMLElement>(null);
   const [playerExpanded, setPlayerExpanded] = useState(false);
   const videoRefs = useRef<Record<string, HTMLVideoElement>>({});
@@ -220,6 +234,14 @@ export default function VideoStudio() {
     const height = lines.length * font * 1.2 + font * 0.4;
     const fit = Math.min(stageSize.width / timeline.width, stageSize.height / timeline.height);
     return { width: Math.max(36, width * fit), height: Math.max(24, height * fit), left: stageSize.width / 2 + editableTitleTransform.x * fit, top: stageSize.height / 2 + editableTitleTransform.y * fit, fit };
+  })() : null;
+  const imageCrop = selectedClip?.imageCrop ?? EMPTY_IMAGE_CROP;
+  const selectedImageGeometry = selectedAsset?.kind === "image" && selectedClip
+    ? imageClipGeometry(selectedAsset.width ?? imageRefs.current[selectedAsset.id]?.naturalWidth ?? timeline.width, selectedAsset.height ?? imageRefs.current[selectedAsset.id]?.naturalHeight ?? timeline.height, timeline.width, timeline.height, selectedClip.imageCrop, selectedClip.imageSize, selectedTransform.scale)
+    : null;
+  const imageOverlay = selectedImageGeometry && selectedClip && timeline.playhead >= selectedClip.start && timeline.playhead < selectedClip.start + clipLength(selectedClip) && stageSize.width && stageSize.height ? (() => {
+    const fit = Math.min(stageSize.width / timeline.width, stageSize.height / timeline.height);
+    return { width: selectedImageGeometry.width * fit, height: selectedImageGeometry.height * fit, left: stageSize.width / 2 + selectedTransform.x * fit, top: stageSize.height / 2 + selectedTransform.y * fit, fit };
   })() : null;
 
   function setPreviewGain(element: HTMLMediaElement, clipId: string, gain: number) {
@@ -670,13 +692,90 @@ export default function VideoStudio() {
       setHistoryVersion((value) => value + 1);
     }
   }
-  function alignSelectedVideo(horizontal: "left" | "center" | "right", vertical: "top" | "middle" | "bottom") {
+  function setSelectedImageSize(axis: "width" | "height", value: number) {
+    if (!selectedClip || !selectedImageGeometry) return;
+    const width = axis === "width" ? value : selectedImageGeometry.width;
+    const height = axis === "height" ? value : selectedImageGeometry.height;
+    const aspect = selectedImageGeometry.source.width / selectedImageGeometry.source.height;
+    const matched = selectedClip.imageMatchAspect ? axis === "width" ? { width, height: width / aspect } : { width: height * aspect, height } : { width, height };
+    const scale = Math.max(0.001, selectedTransform.scale);
+    editClip(selectedClip.id, { imageSize: { width: matched.width / scale, height: matched.height / scale } });
+  }
+  function setSelectedImageCrop(edge: keyof VideoImageCrop, percent: number) {
+    if (!selectedClip || selectedAsset?.kind !== "image" || !selectedImageGeometry) return;
+    const opposite = edge === "left" ? "right" : edge === "right" ? "left" : edge === "top" ? "bottom" : "top";
+    const sourceSize = edge === "left" || edge === "right" ? selectedAsset.width ?? 1 : selectedAsset.height ?? 1;
+    const maximum = Math.max(0, 1 - imageCrop[opposite] - 1 / Math.max(1, sourceSize));
+    const nextCrop = { ...imageCrop, [edge]: Math.max(0, Math.min(maximum, percent / 100)) };
+    const nextSource = imageClipGeometry(selectedAsset.width ?? 1, selectedAsset.height ?? 1, timeline.width, timeline.height, nextCrop).source;
+    const scale = Math.max(0.001, selectedTransform.scale);
+    editClip(selectedClip.id, { imageCrop: nextCrop, ...(selectedClip.imageMatchAspect ? { imageSize: { width: selectedImageGeometry.width / scale, height: selectedImageGeometry.width / (nextSource.width / nextSource.height) / scale } } : {}) });
+  }
+  function resetSelectedImageCrop() {
+    if (!selectedClip || selectedAsset?.kind !== "image" || !selectedImageGeometry) return;
+    const aspect = (selectedAsset.width ?? 1) / (selectedAsset.height ?? 1);
+    const scale = Math.max(0.001, selectedTransform.scale);
+    editClip(selectedClip.id, { imageCrop: undefined, ...(selectedClip.imageMatchAspect ? { imageSize: { width: selectedImageGeometry.width / scale, height: selectedImageGeometry.width / aspect / scale } } : {}) });
+  }
+  function beginImageGesture(event: React.PointerEvent<HTMLDivElement>) {
+    if (!selectedClip || !selectedImageGeometry || !imageOverlay) return;
+    event.preventDefault(); event.stopPropagation(); setPlaying(false);
+    imageGestureRef.current = {
+      id: selectedClip.id, pointerId: event.pointerId, mode: (event.target as HTMLElement).closest("[data-image-handle=resize]") ? "resize" : "move",
+      x: event.clientX, y: event.clientY, width: selectedImageGeometry.width, height: selectedImageGeometry.height,
+      transform: { ...selectedTransform }, original: timelineRef.current, fit: imageOverlay.fit,
+      matchAspect: Boolean(selectedClip.imageMatchAspect), sourceAspect: selectedImageGeometry.source.width / selectedImageGeometry.source.height,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  function moveImageGesture(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = imageGestureRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const dx = (event.clientX - drag.x) / drag.fit;
+    const dy = (event.clientY - drag.y) / drag.fit;
+    const transform = { ...drag.transform };
+    let imageSize: VideoTimelineClip["imageSize"];
+    if (drag.mode === "move") { transform.x += dx; transform.y += dy; }
+    else {
+      const radians = transform.rotation * Math.PI / 180;
+      const cos = Math.cos(radians); const sin = Math.sin(radians);
+      const localX = dx * cos + dy * sin;
+      const localY = -dx * sin + dy * cos;
+      let width = Math.max(1, drag.width + localX);
+      let height = Math.max(1, drag.height + localY);
+      if (drag.matchAspect) {
+        if (Math.abs(localX) >= Math.abs(localY)) height = width / drag.sourceAspect;
+        else width = height * drag.sourceAspect;
+      }
+      const halfWidthChange = (width - drag.width) / 2;
+      const halfHeightChange = (height - drag.height) / 2;
+      transform.x += halfWidthChange * cos - halfHeightChange * sin;
+      transform.y += halfWidthChange * sin + halfHeightChange * cos;
+      const scale = Math.max(0.001, transform.scale);
+      imageSize = { width: width / scale, height: height / scale };
+    }
+    const updated = updateClipTimeline(drag.original, drag.id, { transform, ...(imageSize ? { imageSize } : {}) }, drag.original.playhead, ripplePrimaryTrack);
+    timelineRef.current = updated; setTimeline(updated);
+  }
+  function finishImageGesture(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = imageGestureRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    imageGestureRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (timelineRef.current !== drag.original) {
+      historyRef.current.past.push(drag.original);
+      if (historyRef.current.past.length > 50) historyRef.current.past.shift();
+      historyRef.current.future = [];
+      setHistoryVersion((value) => value + 1);
+    }
+  }
+  function alignSelectedVisual(horizontal: "left" | "center" | "right", vertical: "top" | "middle" | "bottom") {
     if (!selectedClip || !selectedAsset) return;
     const sourceWidth = selectedAsset.width ?? timeline.width;
     const sourceHeight = selectedAsset.height ?? timeline.height;
     const fit = Math.min(timeline.width / sourceWidth, timeline.height / sourceHeight) * selectedTransform.scale;
-    const spareX = Math.max(0, (timeline.width - sourceWidth * fit) / 2);
-    const spareY = Math.max(0, (timeline.height - sourceHeight * fit) / 2);
+    const spareX = (timeline.width - (selectedImageGeometry?.width ?? sourceWidth * fit)) / 2;
+    const spareY = (timeline.height - (selectedImageGeometry?.height ?? sourceHeight * fit)) / 2;
     editClip(selectedClip.id, { transform: { ...selectedTransform,
       x: horizontal === "left" ? -spareX : horizontal === "right" ? spareX : 0,
       y: vertical === "top" ? -spareY : vertical === "bottom" ? spareY : 0,
@@ -1201,7 +1300,7 @@ export default function VideoStudio() {
     <section className="video-editor-layout" inert={exporting || extractingAudio}>
       <aside className="video-bin"><div className="studio-bin-tabs" role="tablist" aria-label="Editor tools">{(["media", "library", "text", "transitions"] as const).map((tab) => <button key={tab} role="tab" aria-selected={activeBinTab === tab} className={activeBinTab === tab ? "active" : ""} onClick={() => setActiveBinTab(tab)}>{tab === "media" ? "▣" : tab === "library" ? "▤" : tab === "text" ? "T" : "◇"}<span>{tab[0].toUpperCase() + tab.slice(1)}</span></button>)}</div>
         <div className="studio-bin-body" ref={binBodyRef} onPointerDown={beginBinMarquee} onPointerMove={moveBinMarquee} onPointerUp={finishBinMarquee} onPointerCancel={cancelBinMarquee}>{activeBinTab === "media" ? <><div className="studio-bin-heading"><strong>Your media</strong><div className="studio-bin-heading-actions"><button type="button" disabled={!visibleMediaAssets.length} onClick={() => { setSelectedBinIds(visibleMediaAssets.map((asset) => asset.id)); binSelectionAnchorRef.current = visibleMediaAssets[0]?.id ?? null; }}>Select all</button><button type="button" disabled={!selectedBinIds.length} onClick={() => { setSelectedBinIds([]); binSelectionAnchorRef.current = null; }}>Deselect all</button><span>{mediaAssetCount} items</span></div></div><div className="studio-media-toolbar"><label className="studio-import-button">＋ Import media<input type="file" multiple accept="video/*,audio/*,image/*" disabled={Boolean(projectId && !ready) || exporting} onChange={(event) => { const chosen = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void importFiles(chosen); }} /></label><MediaBinControls filter={mediaFilter} onFilter={(filter) => { setMediaFilter(filter); setSelectedBinIds([]); binSelectionAnchorRef.current = null; }} sort={mediaSort} onSort={(sort) => { setMediaSort(sort); setMediaSortDirection(sort === "name" || sort === "type" ? "asc" : "desc"); }} direction={mediaSortDirection} onDirection={setMediaSortDirection} /></div><div className="studio-bin-grid">{visibleMediaAssets.map((asset) => <button key={asset.id} data-asset-id={asset.id} className={`bin-item ${selectedBinIds.includes(asset.id) ? "bin-selected" : ""}`} aria-pressed={selectedBinIds.includes(asset.id)} onPointerDown={(event) => { if (event.button !== 0 || asset.kind === "text") return; const ids = selectedBinIds.includes(asset.id) && !event.ctrlKey && !event.metaKey && !event.shiftKey ? visibleMediaAssets.filter((item) => selectedBinIds.includes(item.id)).map((item) => item.id) : [asset.id]; binPointerRef.current = { pointerId: event.pointerId, id: asset.id, ids, initialX: event.clientX, initialY: event.clientY, dragging: false }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={moveBinPointer} onPointerUp={finishBinPointer} onPointerCancel={cancelBinPointer} onClick={(event) => { if (suppressBinClickRef.current) { event.preventDefault(); return; } if (event.detail === 0) return; selectBinAsset(asset.id, event.shiftKey, event.ctrlKey || event.metaKey); }} onKeyDown={(event) => { if (asset.kind === "text") return; if (event.key === "Enter" && (event.ctrlKey || event.metaKey || event.shiftKey)) { event.preventDefault(); selectBinAsset(asset.id, event.shiftKey, event.ctrlKey || event.metaKey); } else if (event.key === "Enter") { event.preventDefault(); const ids = selectedBinIds.includes(asset.id) ? selectedBinIds : [asset.id]; placeMediaBatch(ids, asset.kind === "audio" ? -1 : 0, timeline.playhead); } }} title={`Select ${asset.name}. Ctrl-click to toggle, Shift-click to select a range; drag selected media to the timeline.`}><span className={`studio-asset-thumb ${asset.kind}`}>{asset.kind === "image" && assetUrls[asset.id] ? <img src={assetUrls[asset.id]} alt="" /> : asset.kind === "video" && assetUrls[asset.id] ? <video src={assetUrls[asset.id]} muted preload="metadata" onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.min(0.1, asset.duration / 2); }} aria-hidden="true" /> : asset.kind === "audio" ? "♫" : "T"}{asset.kind !== "image" && <span className="studio-asset-duration">{formatAssetDuration(asset.duration)}</span>}</span><strong title={asset.name}>{asset.name}</strong></button>)}</div>{mediaAssetCount > 0 && !visibleMediaAssets.length && <p className="studio-bin-hint studio-bin-no-results">No {mediaFilter} media in this project.</p>}{!mediaAssetCount && <div className="studio-bin-empty"><span>▣</span><strong>Start with your media</strong><p>Import video, audio, or images. Your files stay on this device.</p></div>}</> : activeBinTab === "library" ? <><div className="studio-bin-heading"><strong>Library</strong><span>On this device</span></div><div className="studio-library-tabs" role="tablist" aria-label="Library categories">{(["image", "video", "sound"] as const).map((tab) => <button type="button" key={tab} role="tab" aria-selected={libraryTab === tab} className={libraryTab === tab ? "active" : ""} onClick={() => setLibraryTab(tab)}>{tab === "sound" ? "Sound effects" : `${tab[0].toUpperCase()}${tab.slice(1)}s`}</button>)}</div>{libraryTab === "image" ? <div className="studio-library-grid"><div className="studio-library-color-tile"><button type="button" className="studio-library-color-preview" aria-label="Add color background to timeline" title="Add color background to timeline" style={{ backgroundColor: libraryBackgroundColor }} disabled={Boolean(projectId && !ready) || exporting} onClick={() => void addLibraryColorBackground()} /><label className="studio-library-color-picker" title="Choose background color"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5a7.5 7.5 0 1 0 0 15h1a2 2 0 0 0 1.5-3.3c-.7-.8-.2-2.2.9-2.2H15a2.5 2.5 0 0 0 2.5-2.5C17.5 5.6 14.1 2.5 10 2.5Z"/><circle cx="6.5" cy="9" r=".7"/><circle cx="9.5" cy="6.5" r=".7"/><circle cx="13" cy="7" r=".7"/></svg><input aria-label="Choose background color" type="color" value={libraryBackgroundColor} onChange={(event) => setLibraryBackgroundColor(event.currentTarget.value)} /></label></div></div> : libraryTab === "video" ? <p className="studio-bin-hint">Library videos are not available yet.</p> : <p className="studio-bin-hint">Sound effects are not available yet.</p>}</> : activeBinTab === "text" ? <><div className="studio-bin-heading"><strong>Text</strong></div><button className="studio-template-card" disabled={!projectId || !ready || exporting} onClick={addTitle}><span>Text</span><strong>Default title</strong><small>Add at the playhead</small></button></> : <><div className="studio-bin-heading"><strong>Transitions</strong></div><p className="studio-bin-hint">Select a clip on the timeline, then apply a transition to the next clip on the same track.</p><button className="studio-template-card" disabled={!selectedClip || selectedClip.track < 0} onClick={() => createTransitionToNext("dissolve")}><span>◇</span><strong>Dissolve</strong><small>Blend adjacent visuals</small></button><button className="studio-template-card" disabled={!selectedClip || selectedClip.track >= 0} onClick={() => createTransitionToNext("crossfade")}><span>♫</span><strong>Crossfade</strong><small>Blend adjacent audio</small></button></>}</div></aside>
-      <section className={`editor-preview${playerExpanded ? " expanded" : ""}`} ref={previewRef}><div className="preview-heading"><strong>Composite preview</strong><span>{previewAsset?.name ?? "Nothing at playhead"} · {timeline.playhead.toFixed(2)} s · {timeline.width}×{timeline.height}</span></div><div className="editor-stage" ref={stageRef}><canvas ref={canvasRef} aria-label="Composited video timeline preview" />{titleOverlay && <div className={`studio-title-overlay ${selected === editableTitleClip?.id ? "selected" : ""}`} role="group" aria-label="Selected title: drag to move, use corner to resize, top handle to rotate" style={{ left: titleOverlay.left, top: titleOverlay.top, width: titleOverlay.width, height: titleOverlay.height, transform: `translate(-50%, -50%) rotate(${editableTitleTransform.rotation}deg)` }} onPointerDown={beginTextGesture} onPointerMove={moveTextGesture} onPointerUp={finishTextGesture} onPointerCancel={finishTextGesture}><span className="studio-title-rotate" data-title-handle="rotate" title="Rotate text" /><span className="studio-title-resize" data-title-handle="scale" title="Resize text" /></div>}<div className="media-sources" aria-hidden="true">{timeline.assets.filter((asset) => asset.kind === "image").map((asset) => <img key={asset.id} ref={(el) => { if (el) imageRefs.current[asset.id] = el; else delete imageRefs.current[asset.id]; }} src={assetUrls[asset.id]} alt="" onLoad={() => setMediaRevision((n) => n + 1)} />)}{timeline.clips.filter((clip) => timeline.assets.find((asset) => asset.id === clip.assetId)?.kind === "video").map((clip) => <video key={clip.id} ref={(el) => { if (el) videoRefs.current[clip.id] = el; else delete videoRefs.current[clip.id]; }} src={assetUrls[clip.assetId]} playsInline preload="auto" onLoadedData={() => setMediaRevision((n) => n + 1)} onSeeked={() => setMediaRevision((n) => n + 1)} />)}{timeline.clips.filter((clip) => clip.track < 0).map((clip) => <audio key={clip.id} ref={(el) => { if (el) audioRefs.current[clip.id] = el; else delete audioRefs.current[clip.id]; }} src={assetUrls[clip.assetId]} preload="auto" />)}</div></div><div className="editor-transport">
+      <section className={`editor-preview${playerExpanded ? " expanded" : ""}`} ref={previewRef}><div className="preview-heading"><strong>Composite preview</strong><span>{previewAsset?.name ?? "Nothing at playhead"} · {timeline.playhead.toFixed(2)} s · {timeline.width}×{timeline.height}</span></div><div className="editor-stage" ref={stageRef}><canvas ref={canvasRef} aria-label="Composited video timeline preview" />{titleOverlay && <div className={`studio-title-overlay ${selected === editableTitleClip?.id ? "selected" : ""}`} role="group" aria-label="Selected title: drag to move, use corner to resize, top handle to rotate" style={{ left: titleOverlay.left, top: titleOverlay.top, width: titleOverlay.width, height: titleOverlay.height, transform: `translate(-50%, -50%) rotate(${editableTitleTransform.rotation}deg)` }} onPointerDown={beginTextGesture} onPointerMove={moveTextGesture} onPointerUp={finishTextGesture} onPointerCancel={finishTextGesture}><span className="studio-title-rotate" data-title-handle="rotate" title="Rotate text" /><span className="studio-title-resize" data-title-handle="scale" title="Resize text" /></div>}{imageOverlay && <div className="studio-image-overlay" role="group" aria-label="Selected image: drag to move, use corner to resize" style={{ left: imageOverlay.left, top: imageOverlay.top, width: imageOverlay.width, height: imageOverlay.height, transform: `translate(-50%, -50%) rotate(${selectedTransform.rotation}deg)` }} onPointerDown={beginImageGesture} onPointerMove={moveImageGesture} onPointerUp={finishImageGesture} onPointerCancel={finishImageGesture}><span className="studio-image-resize" data-image-handle="resize" title="Resize image" /></div>}<div className="media-sources" aria-hidden="true">{timeline.assets.filter((asset) => asset.kind === "image").map((asset) => <img key={asset.id} ref={(el) => { if (el) imageRefs.current[asset.id] = el; else delete imageRefs.current[asset.id]; }} src={assetUrls[asset.id]} alt="" onLoad={() => setMediaRevision((n) => n + 1)} />)}{timeline.clips.filter((clip) => timeline.assets.find((asset) => asset.id === clip.assetId)?.kind === "video").map((clip) => <video key={clip.id} ref={(el) => { if (el) videoRefs.current[clip.id] = el; else delete videoRefs.current[clip.id]; }} src={assetUrls[clip.assetId]} playsInline preload="auto" onLoadedData={() => setMediaRevision((n) => n + 1)} onSeeked={() => setMediaRevision((n) => n + 1)} />)}{timeline.clips.filter((clip) => clip.track < 0).map((clip) => <audio key={clip.id} ref={(el) => { if (el) audioRefs.current[clip.id] = el; else delete audioRefs.current[clip.id]; }} src={assetUrls[clip.assetId]} preload="auto" />)}</div></div><div className="editor-transport">
         <span className="studio-timecode" aria-label="Current time and timeline duration">{formatTimecode(timeline.playhead, timeline.fps)} <span>/</span> {formatTimecode(timeline.duration, timeline.fps)}</span>
         <div className="studio-playback-controls">
           <button type="button" aria-label="Previous frame" title="Previous frame" disabled={!timeline.clips.length} onClick={() => stepFrame(-1)}>⏮</button>
@@ -1211,7 +1310,7 @@ export default function VideoStudio() {
         <div className="studio-player-tools"><span>{timeline.width} × {timeline.height}</span><details className="studio-ratio-menu"><summary aria-label="Canvas aspect ratio">Ratio</summary><div className="studio-ratio-options">{ASPECT_RATIOS.map((option) => <button type="button" key={option.value} className={(timeline.aspectRatioMode ?? "custom") === option.value ? "active" : ""} onClick={() => selectAspectRatio(option.value)}>{option.label}</button>)}{(timeline.aspectRatioMode ?? "custom") === "custom" && <div className="studio-custom-ratio"><label>Width <input type="number" min="16" max="7680" step="1" value={widthDraft} onChange={(event) => setWidthDraft(event.currentTarget.value)} onBlur={commitCustomCanvas} /></label><label>Height <input type="number" min="16" max="4320" step="1" value={heightDraft} onChange={(event) => setHeightDraft(event.currentTarget.value)} onBlur={commitCustomCanvas} /></label></div>}</div></details><button type="button" aria-label={playerExpanded ? "Exit fullscreen player" : "Fullscreen player"} title={playerExpanded ? "Exit fullscreen player" : "Fullscreen player"} onClick={() => void toggleFullscreen()}>⛶</button></div>
       </div></section>
       <aside className="video-inspector">
-        <div className="preview-heading"><strong>{selectedClip ? selectedAsset?.kind === "audio" ? "Audio" : selectedAsset?.kind === "text" ? "Text" : "Video" : "Details"}</strong><span>{selectedClip ? "Clip settings" : "Project settings"}</span></div>
+        <div className="preview-heading"><strong>{selectedClip ? selectedAsset?.kind === "audio" ? "Audio" : selectedAsset?.kind === "text" ? "Text" : selectedAsset?.kind === "image" ? "Image" : "Video" : "Details"}</strong><span>{selectedClip ? "Clip settings" : "Project settings"}</span></div>
         {!selectedClip && <div className="studio-project-details"><h2>Project</h2><dl><div><dt>Media</dt><dd>{mediaAssetCount} files</dd></div><div><dt>Tracks</dt><dd>3 video · 3 audio</dd></div><div><dt>Resolution</dt><dd>{timeline.width} × {timeline.height}</dd></div><div><dt>Frame rate</dt><dd>{timeline.fps} fps</dd></div><div><dt>Duration</dt><dd>{timeline.duration.toFixed(2)} s</dd></div><div><dt>Storage</dt><dd>On this device</dd></div></dl><button className="editor-action" onClick={() => setExportOpen(true)}>Export settings</button></div>}
         {selectedClip && <>
           <div className="studio-inspector-tabs" role="tablist" aria-label="Clip settings">{(["basic", "speed", "adjust"] as const).map((tab) => <button key={tab} role="tab" aria-selected={inspectorTab === tab} className={inspectorTab === tab ? "active" : ""} onClick={() => setInspectorTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}</div>
@@ -1220,13 +1319,40 @@ export default function VideoStudio() {
             <div className="clip-control-group"><strong>Transform</strong>
               <div className="clip-range-pair"><EditorRange label="Scale" min={0.1} max={8} step={0.01} value={selectedTransform.scale} unit="×" onChange={(scale) => editClip(selectedClip.id, { transform: { ...selectedTransform, scale } })} />
               <EditorRange label="Rotate" min={-180} max={180} step={0.1} value={selectedTransform.rotation} unit="°" onChange={(rotation) => editClip(selectedClip.id, { transform: { ...selectedTransform, rotation } })} /></div>
-              <div className="clip-align-controls" aria-label="Align video overlay"><span>Align</span>{(["left", "center", "right"] as const).map((horizontal) => <button type="button" key={horizontal} onClick={() => alignSelectedVideo(horizontal, "middle")} aria-label={`Align ${horizontal}`} title={`Align ${horizontal}`}>{horizontal === "left" ? "⇤" : horizontal === "right" ? "⇥" : "↔"}</button>)}{(["top", "middle", "bottom"] as const).map((vertical) => <button type="button" key={vertical} onClick={() => alignSelectedVideo("center", vertical)} aria-label={`Align ${vertical}`} title={`Align ${vertical}`}>{vertical === "top" ? "⇡" : vertical === "bottom" ? "⇣" : "↕"}</button>)}</div>
+              <div className="clip-align-controls" aria-label="Align video overlay"><span>Align</span>{(["left", "center", "right"] as const).map((horizontal) => <button type="button" key={horizontal} onClick={() => alignSelectedVisual(horizontal, "middle")} aria-label={`Align ${horizontal}`} title={`Align ${horizontal}`}>{horizontal === "left" ? "⇤" : horizontal === "right" ? "⇥" : "↔"}</button>)}{(["top", "middle", "bottom"] as const).map((vertical) => <button type="button" key={vertical} onClick={() => alignSelectedVisual("center", vertical)} aria-label={`Align ${vertical}`} title={`Align ${vertical}`}>{vertical === "top" ? "⇡" : vertical === "bottom" ? "⇣" : "↕"}</button>)}</div>
               <div className="clip-align-controls"><span>Mirror</span><button type="button" aria-pressed={Boolean(selectedTransform.mirrorX)} onClick={() => editClip(selectedClip.id, { transform: { ...selectedTransform, mirrorX: !selectedTransform.mirrorX } })}>X</button><button type="button" aria-pressed={Boolean(selectedTransform.mirrorY)} onClick={() => editClip(selectedClip.id, { transform: { ...selectedTransform, mirrorY: !selectedTransform.mirrorY } })}>Y</button></div>
             </div>
             <EditorRange label="Audio volume" min={0} max={4} step={0.01} value={selectedValues?.volume ?? selectedClip.volume} unit="×" onChange={(volume) => editClip(selectedClip.id, { volume })} />
             <label className="ratio-toggle"><input type="checkbox" checked={selectedClip.muted} onChange={(event) => editClip(selectedClip.id, { muted: event.currentTarget.checked })} />Silence audio</label>
             <div className="clip-action-row"><button className="editor-action" disabled={extractingAudio} onClick={() => void detachVideoAudio()}>{extractingAudio ? `Extracting ${extractProgress}%` : "Extract audio"}</button><button className="editor-action" onClick={splitSelected}>Split</button><button className="editor-action" onClick={() => duplicateClip(selectedClip.id)}>Duplicate</button></div>
           </>}
+          {selectedClip.track >= 0 && selectedAsset?.kind === "image" && selectedImageGeometry && <div className="clip-control-group studio-image-controls">
+            <strong>Image size and position</strong>
+            <div className="filter-fields two-column transform-fields">
+              <ImageNumberInput label="Width" unit="canvas px" value={selectedImageGeometry.width} min={1} max={32768} step="1" onCommit={(value) => setSelectedImageSize("width", value)} />
+              <ImageNumberInput label="Height" unit="canvas px" value={selectedImageGeometry.height} min={1} max={32768} step="1" onCommit={(value) => setSelectedImageSize("height", value)} />
+            </div>
+            <label className="ratio-toggle"><input type="checkbox" checked={Boolean(selectedClip.imageMatchAspect)} onChange={(event) => {
+              const match = event.currentTarget.checked;
+              const scale = Math.max(0.001, selectedTransform.scale);
+              editClip(selectedClip.id, { imageMatchAspect: match, ...(match ? { imageSize: { width: selectedImageGeometry.width / scale, height: selectedImageGeometry.width / (selectedImageGeometry.source.width / selectedImageGeometry.source.height) / scale } } : {}) });
+            }} />Match image aspect ratio</label>
+            <div className="filter-fields two-column transform-fields">
+              <ImageNumberInput label="Position X" unit="canvas px" value={selectedTransform.x} min={-32768} max={32768} onCommit={(x) => editClip(selectedClip.id, { transform: { ...selectedTransform, x } })} />
+              <ImageNumberInput label="Position Y" unit="canvas px" value={selectedTransform.y} min={-32768} max={32768} onCommit={(y) => editClip(selectedClip.id, { transform: { ...selectedTransform, y } })} />
+              <ImageNumberInput label="Rotation" unit="degrees" value={selectedTransform.rotation} min={-3600} max={3600} onCommit={(rotation) => editClip(selectedClip.id, { transform: { ...selectedTransform, rotation } })} />
+              <ImageNumberInput label="Opacity" unit="percent" value={selectedTransform.opacity * 100} min={0} max={100} onCommit={(opacity) => editClip(selectedClip.id, { transform: { ...selectedTransform, opacity: opacity / 100 } })} />
+            </div>
+            <div className="clip-align-controls" aria-label="Align image"><span>Align</span>{(["left", "center", "right"] as const).map((horizontal) => <button type="button" key={horizontal} onClick={() => alignSelectedVisual(horizontal, "middle")} aria-label={`Align ${horizontal}`} title={`Align ${horizontal}`}>{horizontal === "left" ? "⇤" : horizontal === "right" ? "⇥" : "↔"}</button>)}{(["top", "middle", "bottom"] as const).map((vertical) => <button type="button" key={vertical} onClick={() => alignSelectedVisual("center", vertical)} aria-label={`Align ${vertical}`} title={`Align ${vertical}`}>{vertical === "top" ? "⇡" : vertical === "bottom" ? "⇣" : "↕"}</button>)}</div>
+            <div className="clip-align-controls"><span>Mirror</span><button type="button" aria-pressed={Boolean(selectedTransform.mirrorX)} onClick={() => editClip(selectedClip.id, { transform: { ...selectedTransform, mirrorX: !selectedTransform.mirrorX } })}>X</button><button type="button" aria-pressed={Boolean(selectedTransform.mirrorY)} onClick={() => editClip(selectedClip.id, { transform: { ...selectedTransform, mirrorY: !selectedTransform.mirrorY } })}>Y</button></div>
+            <button type="button" className="editor-action" onClick={() => editClip(selectedClip.id, { imageSize: undefined, imageMatchAspect: false })}>Reset size to fit</button>
+            <strong>Crop source</strong>
+            <p className="resize-note">Crop percentages remove edges from this clip only. Drag the image in the preview to move it; drag its corner to resize.</p>
+            <div className="filter-fields two-column transform-fields">
+              {(["left", "top", "right", "bottom"] as const).map((edge) => <ImageNumberInput key={`${selectedClip.id}-crop-${edge}`} label={`Crop ${edge}`} unit="percent" value={imageCrop[edge] * 100} min={0} max={99.9} onCommit={(value) => setSelectedImageCrop(edge, value)} />)}
+            </div>
+            <button type="button" className="editor-action" onClick={resetSelectedImageCrop}>Reset crop</button>
+          </div>}
           {selectedClip.track < 0 && selectedAsset?.kind === "audio" && <EditorRange label="Audio volume" min={0} max={4} step={0.01} value={selectedValues?.volume ?? selectedClip.volume} unit="×" onChange={(volume) => editClip(selectedClip.id, { volume })} />}
           <div className="clip-placement-pair">
             <label className="speed-field">Track<input type="number" step="1" value={selectedClip.track} onChange={(event) => { const value = Number(event.currentTarget.value); if (Number.isInteger(value)) editClip(selectedClip.id, { track: selectedClip.track < 0 ? Math.min(-1, value) : Math.max(0, value) }); }} /></label>

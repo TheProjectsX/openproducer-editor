@@ -16,6 +16,8 @@ export function evaluateClipKeyframes(clip: VideoTimelineClip, time: number) {
       x: interpolate(left.transform.x, right.transform.x), y: interpolate(left.transform.y, right.transform.y),
       scale: interpolate(left.transform.scale, right.transform.scale), rotation: interpolate(left.transform.rotation, right.transform.rotation),
       opacity: interpolate(left.transform.opacity, right.transform.opacity),
+      ...(left.transform.mirrorX !== undefined || right.transform.mirrorX !== undefined ? { mirrorX: ratio < 0.5 ? Boolean(left.transform.mirrorX) : Boolean(right.transform.mirrorX) } : {}),
+      ...(left.transform.mirrorY !== undefined || right.transform.mirrorY !== undefined ? { mirrorY: ratio < 0.5 ? Boolean(left.transform.mirrorY) : Boolean(right.transform.mirrorY) } : {}),
     },
     volume: interpolate(left.volume, right.volume),
   };

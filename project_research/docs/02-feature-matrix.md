@@ -90,6 +90,7 @@ Implementation status (2026-11-15): `/studio/video` has a local media bin, six i
 | Release | Capability | Required behavior |
 |---|---|---|
 | Core | Media bin and timeline | Import video, audio, and images. Multiple video/overlay, text, and audio tracks; clip move, reorder, trim, split, duplicate, delete, snapping, click-to-seek and drag-to-scrub playhead, timeline zoom, and undo/redo. Space controls playback even when non-text controls have focus. |
+| Core | Image clips in video | On main or overlay visual lanes, edit independent width/height, optional aspect match, position, rotation, opacity, mirror, and per-edge crop without changing the source image. Preview and export use the same saved clip geometry. |
 | Core | Preview and composition | Canvas with output aspect ratio and safe bounds; show current frame, overlays, titles, audio, effects, and transitions at timeline time. |
 | Core | Audio | Detach source audio, mute, replace, adjust volume, fade, mix tracks, and maintain sync. |
 | Core | Speed | Custom decimal 0.1×–16× on each clip; recompute timeline duration. Preserve pitch by default for attached audio; allow natural-pitch mode. |
