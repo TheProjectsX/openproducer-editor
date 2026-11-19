@@ -977,3 +977,22 @@
 # 2026-11-17 — Interactive preview titles
 
 - Added direct title selection, move, resize, and rotation in the video preview. Gestures edit the persisted clip transform and produce one undo entry on release. The overlay aligns to the contained preview canvas and is excluded from the rendered export.
+
+# 2026-11-19 — Restore mixed media batch placement
+
+- Removed the first-sorted-item restriction from Video Studio batch drops. A mixed audio/visual selection can be dropped on either lane type and the planner separates items into audio and visual lanes at the same start time. Single-type selections still require a compatible lane.
+- Added placement tests for audio-first and visual-first sorted batches and both lane types. Core tests pass 38/38, typecheck passes, and the production build verifies 28 prerendered routes plus 107 service-worker assets. Browser pointer drop, project reopen, and offline export remain to verify.
+
+# 2026-11-19 — Video Studio caption import
+
+- Added Caption beside Text, with local SRT/VTT import that creates editable timed text clips. Media import accepts matching subtitle sidecars and loads their cues when the video is placed; unmatched subtitle files load immediately. Subtitle sources are saved with the project.
+- Added parser, sidecar matching, and timing tests. Core tests pass 42/42, typecheck passes, and the production build verifies 28 prerendered routes and 107 cached assets. In a fresh local production browser, VTT import and matching MP4/SRT auto-load passed preview and save/reopen checks. A 320×180 MP4 rendered with the caption visible in the in-app result preview. Export dimensions now scale the project composition without changing the project canvas; cue list times show milliseconds. Chrome's extension blocked local fixture selection without its file-URL permission. After stopping the local server, Chrome showed prerendered editor markup but the Caption tab did not respond, so an interactive offline pass was not established. Independent player inspection and offline export remain open.
+
+# 2026-11-19 — Keep imported subtitles in Caption
+
+- User clarified that import must retain subtitle files in CC without creating timeline blocks. SRT/VTT imports now appear as file tiles with cue counts; matching sidecars remain identifiable beside their video names. Clicking or dragging a file to an overlay lane explicitly creates editable cue clips. Placing a video no longer places its sidecar captions. Older saved subtitle source assets recover their cues from the stored file when the project reopens. Core tests and TypeScript pass; the production build verified 28 routes and 107 cached assets. In a fresh production browser, a standalone VTT remained one CC file with an empty timeline after import and refresh, then created one cue when clicked. A matching MP4/SRT import showed one video in Media and one file in CC; placing the video created only the video clip, and clicking the SRT created two cue clips.
+
+# 2026-11-19 — Caption selection and absolute timing
+
+- Added multi selection, Select all/Deselect all, Remove selected, and Add to timeline in CC. Selected file drag now uses the Media drag ghost and count badge. Dropping anywhere in the timeline places each file on a new overlay lane at its own absolute subtitle timestamps. Removing a CC file deletes its stored source while preserving placed editable clips.
+- Core tests, TypeScript, and production build pass. In a fresh local browser, two selected files dragged to the far right of the empty timeline created three clips across two overlay lanes, starting at 0.25 s; total duration was 3.00 s. Removing both files emptied the CC tab while timeline clips remained. Undo history now drops removed source references; Undo did not restore the deleted CC file. After the local save completed, direct project reload retained the caption clip at 0.25 s and kept CC empty. Offline operation and export after this change remain open.

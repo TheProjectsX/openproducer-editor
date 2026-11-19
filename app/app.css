@@ -758,6 +758,11 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .studio-template-card { display: flex; flex-direction: column; gap: 5px; width: 100%; margin: 0 0 9px; padding: 12px; border: 1px solid #45484b; border-radius: 6px; background: #303235; color: #e7e8ea; text-align: left; font: inherit; cursor: pointer; }
 .studio-template-card > span { display: grid; place-items: center; width: 74px; height: 55px; margin-bottom: 5px; border-radius: 4px; background: #3e4145; font-size: 18px; }.studio-template-card strong { font-size: 12px; }.studio-template-card small { color: #a3a7ac; }.studio-template-card:disabled { opacity: .48; cursor: default; }
 .studio-preset-tile:disabled { opacity: .45; cursor: not-allowed; }
+.studio-caption-help { margin: 12px 0; color: #aeb5ba; font-size: 11px; line-height: 1.5; }
+.studio-media-toolbar .studio-caption-remove, .studio-media-toolbar .studio-caption-place { min-width: 0; padding: 7px 6px; border: 1px solid #4b5558; border-radius: 4px; background: #30383b; color: #e6f2f3; font: inherit; font-size: 10px; white-space: nowrap; cursor: pointer; }
+.studio-media-toolbar .studio-caption-remove:hover, .studio-media-toolbar .studio-caption-place:hover { border-color: #25cbd8; }
+.studio-media-toolbar .studio-caption-remove:disabled, .studio-media-toolbar .studio-caption-place:disabled { opacity: .45; cursor: default; }
+.studio-caption-file small { display: block; overflow: hidden; max-width: 100%; color: #aeb5ba; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .studio-text-preview-box { padding: 6px; background: #26292d; }
 .studio-text-preview-sample { max-width: 100%; padding: 3px 6px; overflow: hidden; font-size: 11px; line-height: 1.15; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .studio-shape-preview-box { padding: 8px; background: #26292d; }

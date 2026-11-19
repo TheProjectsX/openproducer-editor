@@ -1,5 +1,7 @@
 # Core media fixtures
 
+`sync-markers-24fps.srt` and `standalone.vtt` are locally authored subtitle fixtures for Video Studio caption import. They contain no third-party text.
+
 These fixtures were generated locally on 2026-11-14 and 2026-11-15. They contain no user media, third-party recordings, or external assets. The generated test patterns and audio signals are dedicated to the public domain (CC0-1.0).
 
 | File | Expected streams | Expected duration |

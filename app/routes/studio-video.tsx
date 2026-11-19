@@ -11,6 +11,7 @@ import { canPlaceAssetOnTrack, canvasDimensionsForAspect, planMediaBatchPlacemen
 import { inspectMediaFile } from "../lib/media-inspection";
 import { isMediaAsset, sortMediaAssets, updateMediaSelection, type MediaFilter, type MediaSort, type SortDirection } from "../lib/video-media-bin";
 import { EMPTY_IMAGE_CROP, imageClipGeometry } from "../lib/video-image-layout";
+import { createCaptionClips, isSubtitleFile, matchingSidecar, parseSubtitleText, type SubtitleCue } from "../lib/video-captions";
 import wasmUrl from "bungee-web/bungee.wasm?url";
 
 const EMPTY: VideoTimelineProject = { version: 1, width: 1920, height: 1080, aspectRatioMode: "original", fps: 30, duration: 0, playhead: 0, assets: [], clips: [] };
@@ -134,12 +135,14 @@ export default function VideoStudio() {
   const [clipContextMenu, setClipContextMenu] = useState<{ clipId: string; x: number; y: number } | null>(null);
   const copiedClipRef = useRef<VideoTimelineClip | null>(null);
   const [hoveredClipId, setHoveredClipId] = useState("");
-  const [activeBinTab, setActiveBinTab] = useState<"media" | "library" | "text" | "shapes" | "transitions">("media");
+  const [activeBinTab, setActiveBinTab] = useState<"media" | "library" | "text" | "caption" | "shapes" | "transitions">("media");
   const [shapeColor, setShapeColor] = useState("#38d2e0");
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
   const [mediaSort, setMediaSort] = useState<MediaSort>("imported");
   const [mediaSortDirection, setMediaSortDirection] = useState<SortDirection>("desc");
   const [selectedBinIds, setSelectedBinIds] = useState<string[]>([]);
+  const [selectedCaptionIds, setSelectedCaptionIds] = useState<string[]>([]);
+  const captionSelectionAnchorRef = useRef<string | null>(null);
   const [binMarquee, setBinMarquee] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const binSelectionAnchorRef = useRef<string | null>(null);
   const binMarqueeRef = useRef<{ pointerId: number; startX: number; startY: number; selectedAtStart: string[]; additive: boolean; dragging: boolean } | null>(null);
@@ -181,6 +184,9 @@ export default function VideoStudio() {
   const [frameRateDraft, setFrameRateDraft] = useState("30");
   const [widthDraft, setWidthDraft] = useState("1920");
   const [heightDraft, setHeightDraft] = useState("1080");
+  const [exportWidthDraft, setExportWidthDraft] = useState("1920");
+  const [exportHeightDraft, setExportHeightDraft] = useState("1080");
+  const [exportFrameRateDraft, setExportFrameRateDraft] = useState("30");
   const cancelExportRef = useRef(false);
   const cancelOutputRef = useRef<(() => void) | null>(null);
   const audioConversionRef = useRef<import("mediabunny").Conversion | null>(null);
@@ -223,6 +229,7 @@ export default function VideoStudio() {
   const availableAudioAssets = timeline.assets.filter((asset) => asset.kind === "audio");
   const mediaAssetCount = timeline.assets.filter(isMediaAsset).length;
   const visibleMediaAssets = useMemo(() => sortMediaAssets(timeline.assets, mediaFilter, mediaSort, mediaSortDirection), [timeline.assets, mediaFilter, mediaSort, mediaSortDirection]);
+  const captionSourceAssets = timeline.assets.filter((asset) => asset.kind === "text" && asset.captionSourceName);
   const selectedReplacementAudioAssetId = availableAudioAssets.some((asset) => asset.id === replacementAudioAssetId) ? replacementAudioAssetId : availableAudioAssets[0]?.id ?? "";
   const selectedValues = selectedClip ? evaluateClipKeyframes(selectedClip, Math.max(0, timeline.playhead - selectedClip.start)) : null;
   const selectedTransform = selectedValues?.transform ?? IDENTITY_TRANSFORM;
@@ -351,10 +358,19 @@ export default function VideoStudio() {
         if (!project || project.kind !== "video") throw new Error("This video workspace is missing or has the wrong project type.");
         setProjectTitle(project.title);
         const saved = project.videoTimeline ?? EMPTY;
-        const loaded = await Promise.all(saved.assets.map(async (asset) => [asset.id, await readVideoAsset(asset.id)] as const));
+        const loaded = await Promise.all(saved.assets.filter((asset) => asset.kind !== "text" || asset.size > 0).map(async (asset) => [asset.id, await readVideoAsset(asset.id)] as const));
         if (cancelled) return;
         const restored = Object.fromEntries(loaded.filter((item): item is readonly [string, File] => Boolean(item[1])));
-        setFiles(restored); setTimeline(saved); setSelected(saved.clips[0]?.id ?? ""); setSelectedBinIds([]); binSelectionAnchorRef.current = null;
+        const assets = await Promise.all(saved.assets.map(async (asset) => {
+          if (!asset.captionSourceName || asset.captionCues?.length || !restored[asset.id]) return asset;
+          try {
+            const cues = parseSubtitleText(await restored[asset.id].text(), asset.name);
+            const matchingVideo = saved.assets.find((item) => item.kind === "video" && matchingSidecar(item.name, asset.name));
+            return { ...asset, captionCues: cues, duration: Math.max(...cues.map((cue) => cue.end)), derivedFromAssetId: matchingVideo?.id };
+          } catch { return asset; }
+        }));
+        if (cancelled) return;
+        setFiles(restored); setTimeline({ ...saved, assets }); setSelected(saved.clips[0]?.id ?? ""); setSelectedBinIds([]); binSelectionAnchorRef.current = null; setSelectedCaptionIds([]); captionSelectionAnchorRef.current = null;
         setFrameRateDraft(String(saved.fps));
         setWidthDraft(String(saved.width)); setHeightDraft(String(saved.height));
         setReady(true);
@@ -470,14 +486,47 @@ export default function VideoStudio() {
     return () => window.clearInterval(timer);
   }, [playing]);
 
+  async function importCaptionFiles(list: FileList | File[] | null) {
+    if (!list?.length) return;
+    setError("");
+    try {
+      let updated = projectId ? timelineRef.current : EMPTY;
+      const sourceFiles: { id: string; file: File }[] = [];
+      for (const file of Array.from(list)) {
+        if (!isSubtitleFile(file.name)) throw new Error(`${file.name}: Choose an .srt or .vtt subtitle file.`);
+        if (file.size > 1024 * 1024) throw new Error(`${file.name}: Subtitle files must be 1 MiB or smaller.`);
+        const cues = parseSubtitleText(await file.text(), file.name);
+        const sourceId = crypto.randomUUID();
+        const matchingVideo = updated.assets.find((asset) => asset.kind === "video" && matchingSidecar(asset.name, file.name));
+        const sourceAsset: VideoTimelineAsset = { id: sourceId, name: file.name, type: file.type || (file.name.toLowerCase().endsWith(".vtt") ? "text/vtt" : "application/x-subrip"), size: file.size, duration: Math.max(...cues.map((cue) => cue.end)), kind: "text", importedAt: Date.now(), captionSourceName: file.name, captionCues: cues, derivedFromAssetId: matchingVideo?.id };
+        updated = { ...updated, assets: [...updated.assets, sourceAsset] };
+        sourceFiles.push({ id: sourceId, file });
+      }
+      const targetProject = projectId || (await createProject("Untitled video", "video")).id;
+      await saveVideoTimeline(targetProject, updated, sourceFiles);
+      if (projectId) applyTimelineEdit(() => updated);
+      else setParams({ project: targetProject });
+      setStatus(`Imported ${sourceFiles.length} subtitle file(s) into Caption. Place a file on an overlay lane to add its cues.`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not import subtitles."); }
+  }
+
   async function importFiles(list: FileList | File[] | null) {
     if (!list?.length) return;
     setError("");
+    const incoming = Array.from(list);
+    const subtitleFiles = incoming.filter((file) => isSubtitleFile(file.name));
+    const mediaFiles = incoming.filter((file) => !isSubtitleFile(file.name));
+    if (!mediaFiles.length) { await importCaptionFiles(subtitleFiles); return; }
+    const sidecars: { file: File; cues: SubtitleCue[] }[] = [];
+    for (const file of subtitleFiles) {
+      try { if (file.size > 1024 * 1024) throw new Error(`${file.name}: Subtitle files must be 1 MiB or smaller.`); sidecars.push({ file, cues: parseSubtitleText(await file.text(), file.name) }); }
+      catch (cause) { setError(cause instanceof Error ? cause.message : `Could not read ${file.name}.`); }
+    }
     const baseTimeline = projectId ? timeline : EMPTY;
     const assets: VideoTimelineAsset[] = [];
     const nextFiles: Record<string, File> = {};
     const inspectedMedia: string[] = [];
-    for (const file of Array.from(list)) {
+    for (const file of mediaFiles) {
       if (file.size > MAX_ASSET_BYTES) { setError(`${file.name} is over the 256 MiB per-file limit.`); continue; }
       const id = crypto.randomUUID(); let duration = 0; let kind: VideoTimelineAsset["kind"] | null = null;
       let mediaWidth: number | undefined; let mediaHeight: number | undefined; let hasAudio: boolean | undefined;
@@ -512,14 +561,18 @@ export default function VideoStudio() {
       if ([...baseTimeline.assets, ...assets].reduce((total, item) => total + item.size, file.size) > 512 * 1024 * 1024) { setError("The total local media limit for this prototype is 512 MiB per project."); continue; }
       assets.push(asset); nextFiles[id] = file;
     }
-    if (!assets.length) return;
-    const updated = { ...baseTimeline, assets: [...baseTimeline.assets, ...assets] };
+    if (!assets.length) { if (sidecars.length) await importCaptionFiles(sidecars.map((item) => item.file)); return; }
+    const sourceAssets: VideoTimelineAsset[] = sidecars.map(({ file, cues }) => {
+      const matchingVideo = [...assets, ...baseTimeline.assets].find((asset) => asset.kind === "video" && matchingSidecar(asset.name, file.name));
+      return { id: crypto.randomUUID(), name: file.name, type: file.type || (file.name.toLowerCase().endsWith(".vtt") ? "text/vtt" : "application/x-subrip"), size: file.size, duration: Math.max(...cues.map((cue) => cue.end)), kind: "text", importedAt: Date.now(), captionSourceName: file.name, captionCues: cues, derivedFromAssetId: matchingVideo?.id };
+    });
+    const updated = { ...baseTimeline, assets: [...baseTimeline.assets, ...assets, ...sourceAssets] };
     try {
       const targetProject = projectId || (await createProject("Untitled video", "video")).id;
-      await saveVideoTimeline(targetProject, updated, assets.map((asset) => ({ id: asset.id, file: nextFiles[asset.id] })));
+      await saveVideoTimeline(targetProject, updated, [...assets.map((asset) => ({ id: asset.id, file: nextFiles[asset.id] })), ...sourceAssets.map((asset, index) => ({ id: asset.id, file: sidecars[index].file }))]);
       if (projectId) { setFiles((current) => ({ ...current, ...nextFiles })); applyTimelineEdit(() => updated); }
       else setParams({ project: targetProject });
-      setStatus(`${assets.length} media item(s) imported into the bin. Drag one onto a track or click it to add it to the timeline.${inspectedMedia.length ? ` Decoder support confirmed: ${inspectedMedia.join("; ")}.` : ""}`);
+      setStatus(`${assets.length} media item(s) imported into the bin.${sourceAssets.length ? ` ${sourceAssets.length} subtitle file(s) are in Caption, ready for manual placement.` : ""} Drag media onto a track or press Enter to add it.${inspectedMedia.length ? ` Decoder support confirmed: ${inspectedMedia.join("; ")}.` : ""}`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save imported media in this browser."); }
   }
 
@@ -559,7 +612,11 @@ export default function VideoStudio() {
   function addAssetToTimeline(assetId: string, targetTrack?: number, targetStart?: number) {
     const current = timelineRef.current;
     const asset = current.assets.find((item) => item.id === assetId);
-    if (!asset || asset.kind === "text") return;
+    if (!asset) return;
+    if (asset.kind === "text") {
+      placeCaptionBatch([assetId]);
+      return;
+    }
     let track = targetTrack ?? (asset.kind === "audio" ? -1 : 0);
     if ((asset.kind === "audio") !== (track < 0)) { setError("Drop audio on an audio track and video or images on a video track."); return; }
     if (asset.kind === "audio" && targetStart !== undefined && current.clips.some((item) => item.track === track && targetStart < item.start + clipLength(item) && targetStart + asset.duration > item.start)) {
@@ -586,6 +643,38 @@ export default function VideoStudio() {
     setSelectedBinIds((current) => updateMediaSelection(visibleIds, current, binSelectionAnchorRef.current, id, shift, toggle));
     if (!shift) binSelectionAnchorRef.current = id;
   }
+  function selectCaptionAsset(id: string, shift: boolean, toggle: boolean) {
+    const visibleIds = captionSourceAssets.map((asset) => asset.id);
+    if (!visibleIds.includes(id)) return;
+    setSelectedCaptionIds((current) => updateMediaSelection(visibleIds, current, captionSelectionAnchorRef.current, id, shift, toggle));
+    if (!shift) captionSelectionAnchorRef.current = id;
+  }
+  function placeCaptionBatch(ids: readonly string[]) {
+    const current = timelineRef.current;
+    const sources = current.assets.filter((asset) => ids.includes(asset.id) && asset.captionSourceName && asset.captionCues?.length);
+    if (!sources.length) return;
+    const firstTrack = Math.max(0, ...current.clips.map((clip) => clip.track)) + 1;
+    const additions = sources.map((asset, index) => createCaptionClips(asset.captionCues!, asset.name, 0, firstTrack + index, current.height, () => crypto.randomUUID()));
+    applyTimelineEdit((previous) => {
+      const clips = [...previous.clips, ...additions.flatMap((item) => item.clips)];
+      return { ...previous, assets: [...previous.assets, ...additions.flatMap((item) => item.assets)], clips, duration: Math.max(0, ...clips.map((clip) => clip.start + clipLength(clip))) };
+    });
+    setSelected(additions[0]?.clips[0]?.id ?? ""); setError("");
+    setStatus(`Placed ${additions.reduce((total, item) => total + item.clips.length, 0)} cue(s) from ${sources.length} subtitle file(s) at their original timestamps.`);
+  }
+  function removeCaptionFiles(ids: readonly string[]) {
+    const removable = new Set(captionSourceAssets.filter((asset) => ids.includes(asset.id)).map((asset) => asset.id));
+    if (!removable.size) return;
+    const withoutSources = (project: VideoTimelineProject) => ({ ...project, assets: project.assets.filter((asset) => !removable.has(asset.id)) });
+    historyRef.current.past = historyRef.current.past.map(withoutSources);
+    historyRef.current.future = historyRef.current.future.map(withoutSources);
+    const next = withoutSources(timelineRef.current);
+    timelineRef.current = next; setTimeline(next); setHistoryVersion((value) => value + 1);
+    setFiles((current) => Object.fromEntries(Object.entries(current).filter(([id]) => !removable.has(id))));
+    setSelectedCaptionIds((current) => current.filter((id) => !removable.has(id)));
+    captionSelectionAnchorRef.current = null;
+    setStatus(`Removed ${removable.size} subtitle file(s) from Caption. Existing timeline captions remain editable.`);
+  }
   function placeMediaBatch(ids: readonly string[], targetTrack: number, pointerTime: number) {
     const assets = visibleMediaAssets.filter((asset) => ids.includes(asset.id));
     if (!assets.length) return;
@@ -593,7 +682,7 @@ export default function VideoStudio() {
     const current = timelineRef.current;
     const existing = current.clips.map((clip) => ({ id: clip.id, track: clip.track, start: clip.start, end: clip.start + clipLength(clip) }));
     const placement = planMediaBatchPlacement(assets, targetTrack, pointerTime, existing, Number(snapThreshold), snapEnabled);
-    if (!placement) { setError("Drop the first item in the sorted selection on a compatible lane: visuals on a visual lane, audio on an audio lane. Text titles cannot be placed from the media bin."); return; }
+    if (!placement) { setError("Drop video or images on a visual lane, audio on an audio lane, or a mixed selection on either lane. Text titles cannot be placed from the media bin."); return; }
     const firstVisual = !current.clips.some((clip) => clip.track >= 0 && current.assets.some((asset) => asset.id === clip.assetId && (asset.kind === "video" || asset.kind === "image")));
     const visualAsset = firstVisual && assets.find((asset) => asset.kind === "video" || asset.kind === "image");
     const dimensions = visualAsset && (current.aspectRatioMode ?? "custom") === "original" && visualAsset.width && visualAsset.height
@@ -633,10 +722,21 @@ export default function VideoStudio() {
     const drag = binPointerRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     if (!drag.dragging && Math.hypot(event.clientX - drag.initialX, event.clientY - drag.initialY) < 6) return;
-    if (!drag.dragging) { setSelectedBinIds(drag.ids); binSelectionAnchorRef.current = drag.id; }
+    const captionDrag = timelineRef.current.assets.some((asset) => asset.id === drag.id && asset.captionSourceName);
+    if (!drag.dragging) {
+      if (captionDrag) { setSelectedCaptionIds(drag.ids); captionSelectionAnchorRef.current = drag.id; }
+      else { setSelectedBinIds(drag.ids); binSelectionAnchorRef.current = drag.id; }
+    }
     drag.dragging = true;
     setBinDragPreview({ id: drag.id, count: drag.ids.length, x: event.clientX, y: event.clientY });
     const target = binTrackAtPointer(event.clientX, event.clientY);
+    if (captionDrag) {
+      const overTimeline = document.elementFromPoint(event.clientX, event.clientY)?.closest(".timeline-scroll");
+      const sources = timelineRef.current.assets.filter((asset) => drag.ids.includes(asset.id) && asset.captionSourceName);
+      const duration = Math.max(0, ...sources.map((asset) => asset.duration));
+      setDropPreview(overTimeline ? { track: Math.max(0, ...timelineRef.current.clips.map((clip) => clip.track)) + 1, start: 0, duration } : null);
+      return;
+    }
     const assets = visibleMediaAssets.filter((asset) => drag.ids.includes(asset.id));
     const existing = timelineRef.current.clips.map((clip) => ({ id: clip.id, track: clip.track, start: clip.start, end: clip.start + clipLength(clip) }));
     const placement = target && planMediaBatchPlacement(assets, target.track, timelinePointerTime(event, target.lane), existing, Number(snapThreshold), snapEnabled);
@@ -655,7 +755,9 @@ export default function VideoStudio() {
       const target = binTrackAtPointer(event.clientX, event.clientY);
       const asset = timelineRef.current.assets.find((item) => item.id === drag.id);
       const overTimeline = document.elementFromPoint(event.clientX, event.clientY)?.closest(".timeline-scroll");
-      if (asset?.kind === "audio" && overTimeline) {
+      if (asset?.captionSourceName) {
+        if (overTimeline) placeCaptionBatch(drag.ids);
+      } else if (asset?.kind === "audio" && overTimeline) {
         if (target && target.track < 0) placeMediaBatch(drag.ids, target.track, timelinePointerTime(event, target.lane));
         else if (!target) {
           const audioEnd = Math.max(0, ...timelineRef.current.clips.filter((clip) => clip.track === -1).map((clip) => clip.start + clipLength(clip)));
@@ -1352,7 +1454,8 @@ export default function VideoStudio() {
     draggingRef.current = null; setActiveTrackDragKind(null); setDropPreview(null);
     if (!drag) return;
     const pointerTime = timelinePointerTime(event, event.currentTarget);
-    if (drag.kind === "asset") addAssetToTimeline(drag.id, track, pointerTime);
+    if (drag.kind === "asset" && timelineRef.current.assets.some((asset) => asset.id === drag.id && asset.captionSourceName)) placeCaptionBatch(selectedCaptionIds.includes(drag.id) ? selectedCaptionIds : [drag.id]);
+    else if (drag.kind === "asset") addAssetToTimeline(drag.id, track, pointerTime);
     else moveClipToTrack(drag.id, track, pointerTime, drag.grabOffset);
   }
   function snapTimelinePlayhead(rawTime: number, disableSnap = false) {
@@ -1417,10 +1520,10 @@ export default function VideoStudio() {
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [playerExpanded]);
-  const outputSettingsValid = Number.isInteger(Number(widthDraft)) && Number(widthDraft) >= 16 && Number(widthDraft) <= 7680
-    && Number.isInteger(Number(heightDraft)) && Number(heightDraft) >= 16 && Number(heightDraft) <= 4320
-    && Number(widthDraft) * Number(heightDraft) <= 4_000_000
-    && Number(frameRateDraft) >= 12 && Number(frameRateDraft) <= 60
+  const outputSettingsValid = Number.isInteger(Number(exportWidthDraft)) && Number(exportWidthDraft) >= 16 && Number(exportWidthDraft) <= 7680
+    && Number.isInteger(Number(exportHeightDraft)) && Number(exportHeightDraft) >= 16 && Number(exportHeightDraft) <= 4320
+    && Number(exportWidthDraft) * Number(exportHeightDraft) <= 4_000_000
+    && Number(exportFrameRateDraft) >= 12 && Number(exportFrameRateDraft) <= 60
     && Number(videoBitrate) >= 0.5 && Number(videoBitrate) <= 40
     && (!timeline.clips.some((clip) => !clip.muted && clip.volume > 0 && (clip.track < 0 || timeline.assets.some((asset) => asset.id === clip.assetId && asset.kind === "video"))) || (Number(audioBitrate) >= 64 && Number(audioBitrate) <= 320));
 
@@ -1589,9 +1692,16 @@ export default function VideoStudio() {
     setPlaying(true);
   }
 
+  function openExportSettings() {
+    setExportWidthDraft(String(timelineRef.current.width));
+    setExportHeightDraft(String(timelineRef.current.height));
+    setExportFrameRateDraft(String(timelineRef.current.fps));
+    setExportOpen(true);
+  }
+
   async function exportTimeline() {
     if (!timeline.clips.length || !timeline.duration || timeline.duration > 120) return;
-    const frameRate = Number(frameRateDraft);
+    const frameRate = Number(exportFrameRateDraft);
     const videoRate = Number(videoBitrate); const audioRate = Number(audioBitrate);
     if (!Number.isFinite(frameRate) || frameRate < 12 || frameRate > 60) { setError("Enter a frame rate from 12 to 60 fps."); return; }
     if (!Number.isFinite(videoRate) || videoRate < 0.5 || videoRate > 40 || !Number.isFinite(audioRate) || audioRate < 64 || audioRate > 320) { setError("Video bitrate must be 0.5–40 Mbps and audio bitrate must be 64–320 kbps."); return; }
@@ -1600,11 +1710,12 @@ export default function VideoStudio() {
     let outputOverLimit = false;
     try {
       const { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality, WebMOutputFormat, canEncodeAudio, canEncodeVideo } = await import("mediabunny");
-      const width = Number(widthDraft); const height = Number(heightDraft); const { duration } = timeline;
+      const width = Number(exportWidthDraft); const height = Number(exportHeightDraft); const { duration } = timeline;
       const fps = frameRate;
       if (!Number.isInteger(width) || width < 16 || width > 7680 || !Number.isInteger(height) || height < 16 || height > 4320) throw new Error("Enter whole-number canvas dimensions from 16×16 up to 7680×4320 pixels.");
       if (width * height > 4_000_000) throw new Error("Timeline export is limited to 4 megapixels in this first browser renderer.");
-      const renderTimeline = { ...timeline, width, height, fps, clips: timeline.clips.map((clip) => (timeline.trackStates?.[clip.track]?.muted ? { ...clip, muted: true } : clip)) };
+      if (timeline.width * timeline.height > 4_000_000) throw new Error("The project canvas exceeds the 4-megapixel timeline renderer limit.");
+      const renderTimeline = { ...timeline, fps, clips: timeline.clips.map((clip) => (timeline.trackStates?.[clip.track]?.muted ? { ...clip, muted: true } : clip)) };
       const hasAudio = renderTimeline.clips.some((clip) => !clip.muted && clip.volume > 0 && (clip.track < 0 || timeline.assets.some((asset) => asset.id === clip.assetId && asset.kind === "video")));
       const mp4Video = await canEncodeVideo("avc", { width, height, frameRate: fps, bitrate: videoRate * 1_000_000 });
       const mp4Audio = !hasAudio || await canEncodeAudio("aac", { numberOfChannels: 2, sampleRate: 48_000, bitrate: audioRate * 1_000 });
@@ -1622,8 +1733,12 @@ export default function VideoStudio() {
       target.on("write", ({ end }) => { written = Math.max(written, end); if (written > 512 * 1024 * 1024) { outputOverLimit = true; cancelExportRef.current = true; } });
       output = new Output({ format: useMp4 ? new Mp4OutputFormat() : new WebMOutputFormat(), target });
       cancelOutputRef.current = () => { if (output && output.state !== "canceled" && output.state !== "finalized") void output.cancel().catch(() => undefined); };
-      const canvas = canvasRef.current;
-      if (!canvas) throw new Error("The timeline canvas is not ready.");
+      const compositionCanvas = document.createElement("canvas");
+      compositionCanvas.width = timeline.width; compositionCanvas.height = timeline.height;
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      const outputContext = canvas.getContext("2d");
+      if (!outputContext) throw new Error("This browser cannot create an export canvas.");
       const videoSource = new CanvasSource(canvas, { codec, quality: new Quality({ bitrate: videoRate * 1_000_000 }) });
       output.addVideoTrack(videoSource, { frameRate: fps });
       let audioSource: InstanceType<typeof AudioBufferSource> | null = null;
@@ -1658,7 +1773,8 @@ export default function VideoStudio() {
           if (!video) throw new Error("A timeline video source is missing from the media preview.");
           return seekVideo(video, clip.sourceStart + (timestamp - clip.start) * clip.speed);
         }));
-        drawVideoComposition(canvas, renderTimeline, timestamp, { videos: videoRefs.current, images: imageRefs.current }, renderTimeline.assets);
+        drawVideoComposition(compositionCanvas, renderTimeline, timestamp, { videos: videoRefs.current, images: imageRefs.current }, renderTimeline.assets);
+        outputContext.drawImage(compositionCanvas, 0, 0, width, height);
         await videoSource.add(timestamp, 1 / fps);
         if (frame % Math.max(1, Math.floor(fps / 2)) === 0) {
           setExportProgress(40 + Math.round((frame / frameCount) * 58));
@@ -1696,14 +1812,15 @@ export default function VideoStudio() {
         {!projectId && <button className="studio-new-project" onClick={() => void createVideoProject()}>New project</button>}
         <span className="studio-local-badge">● Local project</span>
         <button type="button" className="studio-shortcuts-button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" onClick={() => setShortcutsOpen(true)}>?</button>
-        <button className="studio-export-trigger" onClick={() => setExportOpen(true)}>Export video</button>
+        <button className="studio-export-trigger" onClick={openExportSettings}>Export video</button>
       </div>
     </div>
     {error && <p className="resize-error" role="alert">{error}</p>}
     {extractingAudio && <p className="source-info" role="status">Detaching source audio: {extractProgress}% <button className="editor-action danger" onClick={() => void cancelAudioExtraction()}>Cancel</button></p>}
     <section className="video-editor-layout" inert={exporting || extractingAudio}>
-      <aside className="video-bin"><div className="studio-bin-tabs" role="tablist" aria-label="Editor tools">{(["media", "library", "text", "shapes", "transitions"] as const).map((tab) => <button key={tab} role="tab" aria-selected={activeBinTab === tab} className={activeBinTab === tab ? "active" : ""} onClick={() => setActiveBinTab(tab)}>{tab === "media" ? "▣" : tab === "library" ? "▤" : tab === "text" ? "T" : tab === "shapes" ? "□" : "◇"}<span>{tab[0].toUpperCase() + tab.slice(1)}</span></button>)}</div>
-        <div className="studio-bin-body" ref={binBodyRef} onPointerDown={beginBinMarquee} onPointerMove={moveBinMarquee} onPointerUp={finishBinMarquee} onPointerCancel={cancelBinMarquee}>{activeBinTab === "media" ? <><div className="studio-bin-heading"><strong>Your media</strong><div className="studio-bin-heading-actions"><button type="button" disabled={!visibleMediaAssets.length} onClick={() => { setSelectedBinIds(visibleMediaAssets.map((asset) => asset.id)); binSelectionAnchorRef.current = visibleMediaAssets[0]?.id ?? null; }}>Select all</button><button type="button" disabled={!selectedBinIds.length} onClick={() => { setSelectedBinIds([]); binSelectionAnchorRef.current = null; }}>Deselect all</button><span>{mediaAssetCount} items</span></div></div><div className="studio-media-toolbar"><label className="studio-import-button">＋ Import media<input type="file" multiple accept="video/*,audio/*,image/*" disabled={Boolean(projectId && !ready) || exporting} onChange={(event) => { const chosen = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void importFiles(chosen); }} /></label><MediaBinControls filter={mediaFilter} onFilter={(filter) => { setMediaFilter(filter); setSelectedBinIds([]); binSelectionAnchorRef.current = null; }} sort={mediaSort} onSort={(sort) => { setMediaSort(sort); setMediaSortDirection(sort === "name" || sort === "type" ? "asc" : "desc"); }} direction={mediaSortDirection} onDirection={setMediaSortDirection} /></div><div className="studio-bin-grid">{visibleMediaAssets.map((asset) => <button key={asset.id} data-asset-id={asset.id} className={`bin-item ${selectedBinIds.includes(asset.id) ? "bin-selected" : ""}`} aria-pressed={selectedBinIds.includes(asset.id)} onPointerDown={(event) => { if (event.button !== 0 || asset.kind === "text") return; const ids = selectedBinIds.includes(asset.id) && !event.ctrlKey && !event.metaKey && !event.shiftKey ? visibleMediaAssets.filter((item) => selectedBinIds.includes(item.id)).map((item) => item.id) : [asset.id]; binPointerRef.current = { pointerId: event.pointerId, id: asset.id, ids, initialX: event.clientX, initialY: event.clientY, dragging: false }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={moveBinPointer} onPointerUp={finishBinPointer} onPointerCancel={cancelBinPointer} onClick={(event) => { if (suppressBinClickRef.current) { event.preventDefault(); return; } if (event.detail === 0) return; selectBinAsset(asset.id, event.shiftKey, event.ctrlKey || event.metaKey); }} onKeyDown={(event) => { if (asset.kind === "text") return; if (event.key === "Enter" && (event.ctrlKey || event.metaKey || event.shiftKey)) { event.preventDefault(); selectBinAsset(asset.id, event.shiftKey, event.ctrlKey || event.metaKey); } else if (event.key === "Enter") { event.preventDefault(); const ids = selectedBinIds.includes(asset.id) ? selectedBinIds : [asset.id]; placeMediaBatch(ids, asset.kind === "audio" ? -1 : 0, timeline.playhead); } }} title={`Select ${asset.name}. Ctrl-click to toggle, Shift-click to select a range; drag selected media to the timeline.`}><span className={`studio-asset-thumb ${asset.kind}`}>{asset.kind === "image" && assetUrls[asset.id] ? <img src={assetUrls[asset.id]} alt="" /> : asset.kind === "video" && assetUrls[asset.id] ? <video src={assetUrls[asset.id]} muted preload="metadata" onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.min(0.1, asset.duration / 2); }} aria-hidden="true" /> : asset.kind === "audio" ? "♫" : "T"}{asset.kind !== "image" && <span className="studio-asset-duration">{formatAssetDuration(asset.duration)}</span>}</span><strong title={asset.name}>{asset.name}</strong></button>)}</div>{mediaAssetCount > 0 && !visibleMediaAssets.length && <p className="studio-bin-hint studio-bin-no-results">No {mediaFilter} media in this project.</p>}{!mediaAssetCount && <div className="studio-bin-empty"><span>▣</span><strong>Start with your media</strong><p>Import video, audio, or images. Your files stay on this device.</p></div>}</> : activeBinTab === "library" ? <><div className="studio-bin-heading"><strong>Library</strong><span>On this device</span></div><div className="studio-library-tabs" role="tablist" aria-label="Library categories">{(["image", "video", "sound"] as const).map((tab) => <button type="button" key={tab} role="tab" aria-selected={libraryTab === tab} className={libraryTab === tab ? "active" : ""} onClick={() => setLibraryTab(tab)}>{tab === "sound" ? "Sound effects" : `${tab[0].toUpperCase()}${tab.slice(1)}s`}</button>)}</div>{libraryTab === "image" ? <div className="studio-library-grid"><div className="studio-library-color-tile"><button type="button" className="studio-library-color-preview" aria-label="Add color background to timeline" title="Add color background to timeline" style={{ backgroundColor: libraryBackgroundColor }} disabled={Boolean(projectId && !ready) || exporting} onClick={() => void addLibraryColorBackground()} /><label className="studio-library-color-picker" title="Choose background color"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5a7.5 7.5 0 1 0 0 15h1a2 2 0 0 0 1.5-3.3c-.7-.8-.2-2.2.9-2.2H15a2.5 2.5 0 0 0 2.5-2.5C17.5 5.6 14.1 2.5 10 2.5Z"/><circle cx="6.5" cy="9" r=".7"/><circle cx="9.5" cy="6.5" r=".7"/><circle cx="13" cy="7" r=".7"/></svg><input aria-label="Choose background color" type="color" value={libraryBackgroundColor} onChange={(event) => setLibraryBackgroundColor(event.currentTarget.value)} /></label></div></div> : libraryTab === "video" ? <p className="studio-bin-hint">Library videos are not available yet.</p> : <p className="studio-bin-hint">Sound effects are not available yet.</p>}</> : activeBinTab === "text" ? <><div className="studio-bin-heading"><strong>Text presets</strong><span>Click to add</span></div><div className="studio-bin-grid">{TEXT_PRESETS.map((preset) => <button type="button" key={preset.id} className="bin-item studio-preset-tile" disabled={!projectId || !ready || exporting} onClick={() => addTitlePreset(preset)} title={preset.label}><span className="studio-asset-thumb studio-text-preview-box"><span className="studio-text-preview-sample" style={{ fontFamily: preset.settings.fontFamily ?? "system-ui, sans-serif", fontWeight: preset.settings.bold === false ? 400 : 700, fontStyle: preset.settings.italic ? "italic" : "normal", color: preset.settings.color, backgroundColor: preset.settings.showBackground ? preset.settings.backgroundColor : "transparent", borderRadius: preset.settings.backgroundRadius ? `${Math.min(8, preset.settings.backgroundRadius)}px` : undefined, textShadow: preset.settings.shadow ? `0 1px ${Math.min(10, preset.settings.shadowBlur ?? 8)}px ${preset.settings.shadowColor ?? "#000"}` : preset.settings.strokeWidth ? `0 0 2px ${preset.settings.strokeColor ?? "#000"}` : undefined }}>{preset.preview}</span></span><strong title={preset.label}>{preset.label}</strong></button>)}</div></>
+      <aside className="video-bin"><div className="studio-bin-tabs" role="tablist" aria-label="Editor tools">{(["media", "library", "text", "caption", "shapes", "transitions"] as const).map((tab) => <button key={tab} role="tab" aria-selected={activeBinTab === tab} className={activeBinTab === tab ? "active" : ""} onClick={() => setActiveBinTab(tab)}>{tab === "media" ? "▣" : tab === "library" ? "▤" : tab === "text" ? "T" : tab === "caption" ? "CC" : tab === "shapes" ? "□" : "◇"}<span>{tab[0].toUpperCase() + tab.slice(1)}</span></button>)}</div>
+        <div className="studio-bin-body" ref={binBodyRef} onPointerDown={beginBinMarquee} onPointerMove={moveBinMarquee} onPointerUp={finishBinMarquee} onPointerCancel={cancelBinMarquee}>{activeBinTab === "media" ? <><div className="studio-bin-heading"><strong>Your media</strong><div className="studio-bin-heading-actions"><button type="button" disabled={!visibleMediaAssets.length} onClick={() => { setSelectedBinIds(visibleMediaAssets.map((asset) => asset.id)); binSelectionAnchorRef.current = visibleMediaAssets[0]?.id ?? null; }}>Select all</button><button type="button" disabled={!selectedBinIds.length} onClick={() => { setSelectedBinIds([]); binSelectionAnchorRef.current = null; }}>Deselect all</button><span>{mediaAssetCount} items</span></div></div><div className="studio-media-toolbar"><label className="studio-import-button">＋ Import media<input type="file" multiple accept="video/*,audio/*,image/*,.srt,.vtt" disabled={Boolean(projectId && !ready) || exporting} onChange={(event) => { const chosen = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void importFiles(chosen); }} /></label><MediaBinControls filter={mediaFilter} onFilter={(filter) => { setMediaFilter(filter); setSelectedBinIds([]); binSelectionAnchorRef.current = null; }} sort={mediaSort} onSort={(sort) => { setMediaSort(sort); setMediaSortDirection(sort === "name" || sort === "type" ? "asc" : "desc"); }} direction={mediaSortDirection} onDirection={setMediaSortDirection} /></div><div className="studio-bin-grid">{visibleMediaAssets.map((asset) => <button key={asset.id} data-asset-id={asset.id} className={`bin-item ${selectedBinIds.includes(asset.id) ? "bin-selected" : ""}`} aria-pressed={selectedBinIds.includes(asset.id)} onPointerDown={(event) => { if (event.button !== 0 || asset.kind === "text") return; const ids = selectedBinIds.includes(asset.id) && !event.ctrlKey && !event.metaKey && !event.shiftKey ? visibleMediaAssets.filter((item) => selectedBinIds.includes(item.id)).map((item) => item.id) : [asset.id]; binPointerRef.current = { pointerId: event.pointerId, id: asset.id, ids, initialX: event.clientX, initialY: event.clientY, dragging: false }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={moveBinPointer} onPointerUp={finishBinPointer} onPointerCancel={cancelBinPointer} onClick={(event) => { if (suppressBinClickRef.current) { event.preventDefault(); return; } if (event.detail === 0) return; selectBinAsset(asset.id, event.shiftKey, event.ctrlKey || event.metaKey); }} onKeyDown={(event) => { if (asset.kind === "text") return; if (event.key === "Enter" && (event.ctrlKey || event.metaKey || event.shiftKey)) { event.preventDefault(); selectBinAsset(asset.id, event.shiftKey, event.ctrlKey || event.metaKey); } else if (event.key === "Enter") { event.preventDefault(); const ids = selectedBinIds.includes(asset.id) ? selectedBinIds : [asset.id]; placeMediaBatch(ids, asset.kind === "audio" ? -1 : 0, timeline.playhead); } }} title={`Select ${asset.name}. Ctrl-click to toggle, Shift-click to select a range; drag selected media to the timeline.`}><span className={`studio-asset-thumb ${asset.kind}`}>{asset.kind === "image" && assetUrls[asset.id] ? <img src={assetUrls[asset.id]} alt="" /> : asset.kind === "video" && assetUrls[asset.id] ? <video src={assetUrls[asset.id]} muted preload="metadata" onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.min(0.1, asset.duration / 2); }} aria-hidden="true" /> : asset.kind === "audio" ? "♫" : "T"}{asset.kind !== "image" && <span className="studio-asset-duration">{formatAssetDuration(asset.duration)}</span>}</span><strong title={asset.name}>{asset.name}</strong></button>)}</div>{mediaAssetCount > 0 && !visibleMediaAssets.length && <p className="studio-bin-hint studio-bin-no-results">No {mediaFilter} media in this project.</p>}{!mediaAssetCount && <div className="studio-bin-empty"><span>▣</span><strong>Start with your media</strong><p>Import video, audio, or images. Your files stay on this device.</p></div>}</> : activeBinTab === "library" ? <><div className="studio-bin-heading"><strong>Library</strong><span>On this device</span></div><div className="studio-library-tabs" role="tablist" aria-label="Library categories">{(["image", "video", "sound"] as const).map((tab) => <button type="button" key={tab} role="tab" aria-selected={libraryTab === tab} className={libraryTab === tab ? "active" : ""} onClick={() => setLibraryTab(tab)}>{tab === "sound" ? "Sound effects" : `${tab[0].toUpperCase()}${tab.slice(1)}s`}</button>)}</div>{libraryTab === "image" ? <div className="studio-library-grid"><div className="studio-library-color-tile"><button type="button" className="studio-library-color-preview" aria-label="Add color background to timeline" title="Add color background to timeline" style={{ backgroundColor: libraryBackgroundColor }} disabled={Boolean(projectId && !ready) || exporting} onClick={() => void addLibraryColorBackground()} /><label className="studio-library-color-picker" title="Choose background color"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5a7.5 7.5 0 1 0 0 15h1a2 2 0 0 0 1.5-3.3c-.7-.8-.2-2.2.9-2.2H15a2.5 2.5 0 0 0 2.5-2.5C17.5 5.6 14.1 2.5 10 2.5Z"/><circle cx="6.5" cy="9" r=".7"/><circle cx="9.5" cy="6.5" r=".7"/><circle cx="13" cy="7" r=".7"/></svg><input aria-label="Choose background color" type="color" value={libraryBackgroundColor} onChange={(event) => setLibraryBackgroundColor(event.currentTarget.value)} /></label></div></div> : libraryTab === "video" ? <p className="studio-bin-hint">Library videos are not available yet.</p> : <p className="studio-bin-hint">Sound effects are not available yet.</p>}</> : activeBinTab === "text" ? <><div className="studio-bin-heading"><strong>Text presets</strong><span>Click to add</span></div><div className="studio-bin-grid">{TEXT_PRESETS.map((preset) => <button type="button" key={preset.id} className="bin-item studio-preset-tile" disabled={!projectId || !ready || exporting} onClick={() => addTitlePreset(preset)} title={preset.label}><span className="studio-asset-thumb studio-text-preview-box"><span className="studio-text-preview-sample" style={{ fontFamily: preset.settings.fontFamily ?? "system-ui, sans-serif", fontWeight: preset.settings.bold === false ? 400 : 700, fontStyle: preset.settings.italic ? "italic" : "normal", color: preset.settings.color, backgroundColor: preset.settings.showBackground ? preset.settings.backgroundColor : "transparent", borderRadius: preset.settings.backgroundRadius ? `${Math.min(8, preset.settings.backgroundRadius)}px` : undefined, textShadow: preset.settings.shadow ? `0 1px ${Math.min(10, preset.settings.shadowBlur ?? 8)}px ${preset.settings.shadowColor ?? "#000"}` : preset.settings.strokeWidth ? `0 0 2px ${preset.settings.strokeColor ?? "#000"}` : undefined }}>{preset.preview}</span></span><strong title={preset.label}>{preset.label}</strong></button>)}</div></>
+: activeBinTab === "caption" ? <><div className="studio-bin-heading"><strong>Captions</strong><div className="studio-bin-heading-actions"><button type="button" disabled={!captionSourceAssets.length} onClick={() => { setSelectedCaptionIds(captionSourceAssets.map((asset) => asset.id)); captionSelectionAnchorRef.current = captionSourceAssets[0]?.id ?? null; }}>Select all</button><button type="button" disabled={!selectedCaptionIds.length} onClick={() => { setSelectedCaptionIds([]); captionSelectionAnchorRef.current = null; }}>Deselect all</button><span>{captionSourceAssets.length} files</span></div></div><div className="studio-media-toolbar"><label className="studio-import-button">＋ Import subtitles<input type="file" multiple accept=".srt,.vtt,text/vtt,application/x-subrip" disabled={Boolean(projectId && !ready) || exporting} onChange={(event) => { const chosen = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void importCaptionFiles(chosen); }} /></label><button type="button" className="studio-caption-remove" disabled={!selectedCaptionIds.length} onClick={() => removeCaptionFiles(selectedCaptionIds)}>Remove selected</button><button type="button" className="studio-caption-place" disabled={!selectedCaptionIds.length} onClick={() => placeCaptionBatch(selectedCaptionIds)}>Add to timeline</button></div><p className="studio-caption-help">SRT and VTT files stay here until placed. Select multiple files with Ctrl or Shift, then drag them anywhere on the timeline. Cue times always follow the subtitle files.</p><div className="studio-bin-grid">{captionSourceAssets.map((asset) => { const matchedVideo = timeline.assets.find((item) => item.id === asset.derivedFromAssetId && item.kind === "video"); return <button type="button" key={asset.id} data-asset-id={asset.id} className={`bin-item studio-caption-file ${selectedCaptionIds.includes(asset.id) ? "bin-selected" : ""}`} aria-pressed={selectedCaptionIds.includes(asset.id)} title={`Select ${asset.name}. Ctrl-click to toggle, Shift-click to select a range; drag selected subtitles to the timeline.`} onPointerDown={(event) => { if (event.button !== 0) return; const ids = selectedCaptionIds.includes(asset.id) && !event.ctrlKey && !event.metaKey && !event.shiftKey ? captionSourceAssets.filter((item) => selectedCaptionIds.includes(item.id)).map((item) => item.id) : [asset.id]; binPointerRef.current = { pointerId: event.pointerId, id: asset.id, ids, initialX: event.clientX, initialY: event.clientY, dragging: false }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={moveBinPointer} onPointerUp={finishBinPointer} onPointerCancel={cancelBinPointer} onClick={(event) => { if (suppressBinClickRef.current) { event.preventDefault(); return; } if (event.detail === 0) return; selectCaptionAsset(asset.id, event.shiftKey, event.ctrlKey || event.metaKey); }} onKeyDown={(event) => { if (event.key === "Enter" && (event.ctrlKey || event.metaKey || event.shiftKey)) { event.preventDefault(); selectCaptionAsset(asset.id, event.shiftKey, event.ctrlKey || event.metaKey); } else if (event.key === "Enter") { event.preventDefault(); placeCaptionBatch(selectedCaptionIds.includes(asset.id) ? selectedCaptionIds : [asset.id]); } }}><span className="studio-asset-thumb text">CC<span className="studio-asset-duration">{asset.captionCues?.length ?? 0} cues</span></span><strong title={asset.name}>{asset.name}</strong>{matchedVideo && <small>Matches {matchedVideo.name}</small>}</button>; })}</div>{!captionSourceAssets.length && <div className="studio-bin-empty"><span>CC</span><strong>No subtitle files</strong><p>Import an SRT or VTT file to add it to this bin.</p></div>}</>
 : activeBinTab === "shapes" ? <><div className="studio-bin-heading"><strong>Shapes</strong><span>Vector overlays</span></div><label className="speed-field">Shape color<input type="color" value={shapeColor} onChange={(event) => setShapeColor(event.currentTarget.value)} /></label><div className="studio-bin-grid">{SVG_SHAPES.map((shape) => <button type="button" key={shape.id} className="bin-item studio-preset-tile" disabled={Boolean(projectId && !ready) || exporting} onClick={() => void addShapeOverlay(shape.id)} title={shape.label}><span className="studio-asset-thumb studio-shape-preview-box"><img src={`data:image/svg+xml;utf8,${encodeURIComponent(shape.svg(shapeColor))}`} alt="" aria-hidden="true" /></span><strong title={shape.label}>{shape.label}</strong></button>)}</div></>
 : <><div className="studio-bin-heading"><strong>Transitions</strong></div><p className="studio-bin-hint">Select a clip on the timeline, then apply a transition to the next clip on the same track.</p><label className="speed-field">Duration <span>seconds</span><input type="number" min="0.01" max="10" step="0.05" value={transitionDuration} onChange={(event) => setTransitionDuration(event.currentTarget.value)} /></label><div className="studio-bin-grid">{([["dissolve", "Dissolve", "Blend adjacent visuals"], ["fade-black", "Fade black", "Fade out then fade in"], ["wipe-left", "Wipe left", "Reveal next clip from left"], ["wipe-right", "Wipe right", "Reveal next clip from right"], ["wipe-up", "Wipe up", "Reveal next clip from top"], ["wipe-down", "Wipe down", "Reveal next clip from bottom"], ["slide-left", "Slide left", "Slide next clip in from right"], ["slide-right", "Slide right", "Slide next clip in from left"], ["zoom-in", "Zoom in", "Scale next clip up"]] as const).map(([kind, label, desc]) => <button type="button" key={kind} className="bin-item studio-preset-tile" disabled={!selectedClip || selectedClip.track < 0} onClick={() => createTransitionToNext(kind)} title={desc}><span className={`studio-asset-thumb studio-transition-preview-box tr-${kind}`} aria-hidden="true"><i className="tr-a" /><i className="tr-b" /></span><strong title={label}>{label}</strong></button>)}<button type="button" className="bin-item studio-preset-tile" disabled={!selectedClip || selectedClip.track >= 0} onClick={() => createTransitionToNext("crossfade")} title="Blend adjacent audio"><span className="studio-asset-thumb studio-transition-preview-box tr-crossfade" aria-hidden="true"><i className="tr-a" /><i className="tr-b" /></span><strong title="Crossfade">Crossfade</strong></button></div></>}</div></aside>
       <section className={`editor-preview${playerExpanded ? " expanded" : ""}`} ref={previewRef}><div className="preview-heading"><strong>Composite preview</strong><span>{previewAsset?.name ?? "Nothing at playhead"} · {timeline.playhead.toFixed(2)} s · {timeline.width}×{timeline.height}</span></div><div className="editor-stage" ref={stageRef} title="Drag empty area to pan when zoomed, or Ctrl+scroll to zoom" onPointerDown={beginStagePan} onPointerMove={moveStagePan} onPointerUp={finishStagePan} onPointerCancel={finishStagePan}><div className="editor-stage-viewport" ref={viewportRef} style={{ transform: `translate(${previewPan.x}px, ${previewPan.y}px) scale(${previewZoom})` }}><canvas ref={canvasRef} aria-label="Composited video timeline preview" />{previewSnapGuides.x !== null && <div className="studio-snap-guide vertical" aria-hidden="true" style={{ left: previewSnapGuides.x }} />}{previewSnapGuides.y !== null && <div className="studio-snap-guide horizontal" aria-hidden="true" style={{ top: previewSnapGuides.y }} />}{previewOverlays.map((item, index) => {
@@ -1749,7 +1866,7 @@ export default function VideoStudio() {
               {timeline.backgroundColor && timeline.backgroundColor !== "#11131a" && <button type="button" className="editor-action" onClick={() => applyTimelineEdit((current) => ({ ...current, backgroundColor: undefined }))}>Reset</button>}
             </div>
           </div>
-          <button className="editor-action" onClick={() => setExportOpen(true)}>Export settings</button>
+          <button className="editor-action" onClick={openExportSettings}>Export settings</button>
         </div>}
         {selectedClip && (() => {
           const isMultiSelect = selectedClips.length > 1;
@@ -2033,8 +2150,8 @@ export default function VideoStudio() {
     {exportOpen && <div className="studio-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !exporting) setExportOpen(false); }} onKeyDown={(event) => { if (event.key === "Escape" && !exporting) setExportOpen(false); }}><section className="video-export-panel" role="dialog" aria-modal="true" aria-label="Export video settings">
       <div className="resize-controls">
         <div className="studio-export-heading"><div><span>LOCAL EXPORT</span><h2>Export video</h2></div><button type="button" autoFocus aria-label="Close export settings" disabled={exporting} onClick={() => setExportOpen(false)}>×</button></div>
-        <div className="filter-fields"><label>Canvas width <span>custom px</span><input type="number" min="16" max="7680" value={widthDraft} disabled={exporting} onChange={(event) => setWidthDraft(event.currentTarget.value)} onBlur={commitCustomCanvas} /></label><label>Canvas height <span>custom px</span><input type="number" min="16" max="4320" value={heightDraft} disabled={exporting} onChange={(event) => setHeightDraft(event.currentTarget.value)} onBlur={commitCustomCanvas} /></label></div>
-        <div className="filter-fields"><label>Frame rate <span>custom · 12–60 fps</span><input type="number" min="12" max="60" step="any" value={frameRateDraft} disabled={exporting} onChange={(event) => setFrameRateDraft(event.currentTarget.value)} onBlur={() => { const value = Number(frameRateDraft); if (Number.isFinite(value) && value >= 12 && value <= 60) applyTimelineEdit((current) => ({ ...current, fps: value })); }} /></label><label>Video bitrate <span>custom · Mbps</span><input type="number" min="0.5" max="40" step="any" value={videoBitrate} disabled={exporting} onChange={(event) => setVideoBitrate(event.currentTarget.value)} /></label></div>
+        <div className="filter-fields"><label>Output width <span>custom px</span><input type="number" min="16" max="7680" value={exportWidthDraft} disabled={exporting} onChange={(event) => setExportWidthDraft(event.currentTarget.value)} /></label><label>Output height <span>custom px</span><input type="number" min="16" max="4320" value={exportHeightDraft} disabled={exporting} onChange={(event) => setExportHeightDraft(event.currentTarget.value)} /></label></div>
+        <div className="filter-fields"><label>Frame rate <span>custom · 12–60 fps</span><input type="number" min="12" max="60" step="any" value={exportFrameRateDraft} disabled={exporting} onChange={(event) => setExportFrameRateDraft(event.currentTarget.value)} /></label><label>Video bitrate <span>custom · Mbps</span><input type="number" min="0.5" max="40" step="any" value={videoBitrate} disabled={exporting} onChange={(event) => setVideoBitrate(event.currentTarget.value)} /></label></div>
         {timeline.clips.some((clip) => clip.track < 0) && <label className="speed-field">Audio bitrate <span>custom · 64–320 kbps</span><input type="number" min="64" max="320" step="any" value={audioBitrate} disabled={exporting} onChange={(event) => setAudioBitrate(event.currentTarget.value)} /></label>}
         <p className="resize-note">The renderer chooses MP4 or WebM after checking this browser’s video and audio encoders. First renderer limits: 120 seconds, 4 megapixels per frame, 180 seconds of source audio, and 512 MiB output. Export is local and may run slower than playback. Audio in video clips is included in preview and export; detaching or replacing it mutes the original clip audio.</p>
         {timeline.width * timeline.height > 4_000_000 && <p className="resize-error" role="alert">Choose canvas dimensions under 4 megapixels for this first export renderer.</p>}
@@ -2049,7 +2166,7 @@ export default function VideoStudio() {
     <p className="resize-note editor-disclaimer">Timeline preview composites active visual clips from bottom to top, including per-clip transforms, text titles, and custom linear fade transitions. Audio lanes play in sync with the project clock. Timeline render/export is available in supported browsers; verify output playback for your media and device.</p>
     {binMarquee && typeof document !== "undefined" && createPortal(<div className="studio-bin-marquee" style={binMarquee} aria-hidden="true" />, document.body)}
     {timelineMarquee && typeof document !== "undefined" && createPortal(<div className="studio-bin-marquee" style={timelineMarquee} aria-hidden="true" />, document.body)}
-    {binDragPreview && draggedBinAsset && typeof document !== "undefined" && createPortal(<div className="studio-bin-drag-ghost" style={{ left: binDragPreview.x + 12, top: binDragPreview.y + 12 }} aria-hidden="true">{draggedBinAsset.kind === "image" && assetUrls[draggedBinAsset.id] ? <img src={assetUrls[draggedBinAsset.id]} alt="" /> : draggedBinAsset.kind === "video" && assetUrls[draggedBinAsset.id] ? <video src={assetUrls[draggedBinAsset.id]} muted preload="metadata" onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.min(0.1, draggedBinAsset.duration / 2); }} /> : <span>{draggedBinAsset.kind === "audio" ? "♫" : "T"}</span>}{binDragPreview.count > 1 && <span className="studio-bin-drag-count">{binDragPreview.count}</span>}</div>, document.body)}
+    {binDragPreview && draggedBinAsset && typeof document !== "undefined" && createPortal(<div className="studio-bin-drag-ghost" style={{ left: binDragPreview.x + 12, top: binDragPreview.y + 12 }} aria-hidden="true">{draggedBinAsset.kind === "image" && assetUrls[draggedBinAsset.id] ? <img src={assetUrls[draggedBinAsset.id]} alt="" /> : draggedBinAsset.kind === "video" && assetUrls[draggedBinAsset.id] ? <video src={assetUrls[draggedBinAsset.id]} muted preload="metadata" onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.min(0.1, draggedBinAsset.duration / 2); }} /> : <span>{draggedBinAsset.captionSourceName ? "CC" : draggedBinAsset.kind === "audio" ? "♫" : "T"}</span>}{binDragPreview.count > 1 && <span className="studio-bin-drag-count">{binDragPreview.count}</span>}</div>, document.body)}
     {clipContextMenu && typeof document !== "undefined" && (() => {
       const targetClip = timeline.clips.find((clip) => clip.id === clipContextMenu.clipId);
       const targetAsset = targetClip && timeline.assets.find((asset) => asset.id === targetClip.assetId);

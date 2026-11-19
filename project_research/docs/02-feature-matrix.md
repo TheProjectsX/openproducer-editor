@@ -6,7 +6,13 @@ Compact icon menus beside Import media filter All, Images, Videos, or Audio and 
 
 Media tiles support single selection, Ctrl/Command toggle, Shift range selection, and mouse drag selection across tiles. Select all and Deselect all sit in the Your media header before the item count. Clicking empty bin space clears selection. Dragging a selected tile places the selected media in the visible sort order as one undoable edit. Visuals run sequentially on a visual lane and audio runs sequentially on an audio lane, with both lane sequences beginning at the chosen start time. Keyboard Enter places the selected set at the playhead. Pure selection and batch placement checks pass. Local production browser checks confirmed sorted two-video placement, refresh, one-step undo, drag selection, blank-space deselection, and mixed media placement with both lanes starting at zero. Offline export remains to verify.
 
+Mixed-selection regression fix (2026-11-19): a sorted selection may begin with audio or a visual item. Dropping it on either compatible lane places visuals and audio on their respective lanes. Homogeneous selections still require their own lane type. The placement unit check and TypeScript pass; the reported pointer-drop case still needs a browser retest.
+
 Video and image thumbnails in the media bin and on timeline clips now fit their full source frame inside fixed tile bounds. Thumbnail elements cannot set grid track size or spill beyond the tile; letterboxing is used for mismatched aspect ratios. Browser visual checks with wide and portrait fixtures remain open.
+
+Caption import (2026-11-19): Video Studio has a Caption tab beside Text. Local SRT/VTT import saves each subtitle as one file tile in Caption; it does not create timeline clips. Sidecars selected with a video are detected by matching filename and also remain in Caption. Explicit placement creates editable timed text clips. The source subtitle file and parsed cues stay in the local project. Preview and export use the existing text composition path. Parsing, time placement, and sidecar matching have pure tests. An earlier browser check confirmed file-first import, sidecar detection, preview, save/reopen, and MP4 export for generated captions. Independent player inspection, offline export, and cross-browser gates remain open. Automatic speech transcription remains a Later feature.
+
+Caption interaction update (2026-11-19): Caption files now support Ctrl/Command and Shift multi selection, Select all/Deselect all, Remove selected, and Add to timeline. Dragging a selected file set uses the media-bin ghost and count badge; dropping anywhere within the timeline creates each file's cues on its own new overlay lane at the absolute SRT/VTT timestamps, ignoring the horizontal drop position. Removing the source files leaves already placed editable clips. In a fresh production browser, two selected files dragged to the far side of an empty timeline placed three cues beginning at 0.25 s and produced a 3.00 s timeline. Removing both files emptied CC while the timeline clips remained. After the local save completed, a direct project reload restored the placed clip at 0.25 s and kept CC empty. Offline use and export after this update remain open.
 
 ## Dynamic Video Studio lanes (2026-11-17)
 
@@ -98,7 +104,7 @@ Implementation status (2026-11-15): `/studio/video` has a local media bin, six i
 | Core | Transitions | Cut, dissolve, and crossfade as initial transitions; custom duration. Other transitions require their own verified renderer. |
 | Core | Titles and effects | Editable text with font, size, color, placement, and duration; basic brightness, contrast, saturation, and grayscale controls. |
 | Core | Export | Choose supported MP4 or WebM configuration, output dimensions, frame rate, bitrate, and audio; render a synced playable file. |
-| Later | Auto captions, chroma key, advanced motion effects, stock library | Not part of Core unless separately approved as a new milestone. |
+| Later | Speech-generated captions, chroma key, advanced motion effects, stock library | Not part of Core unless separately approved as a new milestone. |
 
 ## Image
 

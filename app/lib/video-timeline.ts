@@ -70,7 +70,7 @@ export function planMediaBatchPlacement(
   existing: readonly (TimelinePlacementClip & { track: number })[], tolerance: number, magnetic: boolean,
 ) {
   if (!assets.length || assets.some((asset) => asset.kind === "text" || !Number.isFinite(asset.duration) || asset.duration <= 0)) return null;
-  if (!canPlaceAssetOnTrack(assets[0].kind, targetTrack)) return null;
+  if (!assets.some((asset) => canPlaceAssetOnTrack(asset.kind, targetTrack))) return null;
   const visualTrack = targetTrack >= 0 ? targetTrack : 0;
   const audioTrack = targetTrack < 0 ? targetTrack : -1;
   const visualDuration = assets.filter((asset) => asset.kind !== "audio").reduce((total, asset) => total + (asset.kind === "image" ? 5 : asset.duration), 0);

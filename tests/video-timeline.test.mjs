@@ -19,7 +19,15 @@ test("batch placement preserves order within lanes while starting audio alongsid
   ]);
   assert.equal(result?.shiftedStarts["audio-old"], 5);
   assert.equal(result?.duration, 9);
-  assert.equal(planMediaBatchPlacement(assets, -1, 2, [], 0.2, true), null);
+  const audioFirst = [assets[1], assets[0], assets[2]];
+  assert.deepEqual(planMediaBatchPlacement(audioFirst, 0, 2, [], 0.2, true)?.placements, [
+    { assetId: "audio", track: -1, start: 2, duration: 3 },
+    { assetId: "video", track: 0, start: 2, duration: 4 },
+    { assetId: "image", track: 0, start: 6, duration: 5 },
+  ]);
+  assert.deepEqual(planMediaBatchPlacement(assets, -1, 2, [], 0.2, true)?.placements, result?.placements);
+  assert.equal(planMediaBatchPlacement(assets.filter((asset) => asset.kind === "audio"), 0, 2, [], 0.2, true), null);
+  assert.equal(planMediaBatchPlacement(assets.filter((asset) => asset.kind !== "audio"), -1, 2, [], 0.2, true), null);
 });
 
 test("text clips can move on existing and new overlay lanes", () => {
