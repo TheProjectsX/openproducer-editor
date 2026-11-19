@@ -1,5 +1,40 @@
 # Work log
 
+## 2026-11-19 — Multi-asset editing, text wrap width, preview & media UX, and in-place transitions
+
+- **Multi-asset batch editing (`app/components/studio-video/`, `app/lib/video-timeline.ts`):**
+  - Added `resolveAnchorClip` to anchor multi-clip edits to the selected clip under the seekbar (or the 1st selected clip if none is under the seekbar).
+  - Added relative-delta field patchers (`patchSelectedTransform`, `patchSelectedTransitions`, `patchSelectedStart`, `patchSelectedSpeed`, `patchSelectedVolume`, `patchSelectedDuration`, `patchSelectedEffects`, `editSelectedTitleAssets`) so editing one property shifts all selected unlocked clips relative to the anchor without overwriting unrelated properties.
+  - Updated `PreviewOverlays` and preview pointer gestures (`moveTextGesture`, `moveImageGesture`) to highlight and move/scale/rotate all selected visual clips together, and fixed click-to-select/deselect in `finishStagePan`, `finishTextGesture`, and `finishImageGesture`.
+  - Updated `VideoInspector` to show type-specific tabs for same-type multi-selections and added `inspector/clip-global-tab.tsx` (`Global` tab) for mixed-type multi-selections.
+- **Text max-width & auto line break (`app/lib/video-text-layout.ts`, `app/lib/video-composition.ts`, `clip-text-tab.tsx`, `preview-overlays.tsx`):**
+  - Added `VideoTextSettings.maxWidth`, shared `applyTextCase` and `wrapTextLines` across preview composition, export, and overlay boxes, added full-width `Max width` slider + custom numeric input + `Auto` reset in `ClipTextTab`, and added the on-screen right-edge `.studio-title-width` drag handle.
+- **Timeline spacing, preview flicker fix, Media delete, & transitions:**
+  - Added `TIMELINE_TRACK_GAP = 12` (`column-gap: 12px` on `.video-studio-page .timeline-track`) between left track labels and timeline lanes.
+  - Fixed video preview flicker by pre-seeking upcoming video clips within `1.5 s` to `sourceStart`, avoiding redundant `play()`/seek calls, and removing `timeline.playhead` from the playback `requestAnimationFrame` effect dependencies.
+  - Added Media bin deletion (`removeMediaAssets`, `Delete` button, and `Delete`/`Backspace` shortcut) in `MediaTab`.
+  - Updated `createTransitionToNext` to keep all clips in place without shifting `next.start` or leaving gaps behind clips.
+- **Next:** Work on transitions (compositing/rendering A-to-B transitions smoothly with clips kept in place).
+- **Verification:** `npm.cmd run test:core` passed 44/44 tests, `npx.cmd tsc --noEmit --pretty false` passed with 0 errors, and `npm.cmd run build` succeeded with all 28 routes prerendered and verified.
+
+
+## 2026-11-19 — Modularize Video Studio into component architecture
+
+- Refactored the monolithic `app/routes/studio-video.tsx` (~2,203 lines) into a clean, modular component architecture under `app/components/studio-video/`:
+  - `video-studio-context.tsx`: Shared `VideoStudioProvider` and `useVideoStudio()` context managing project persistence, undo/redo, timeline playback, clip manipulations, composition, and export state without prop drilling.
+  - `header/video-studio-header.tsx`: Project name input, auto-save status, New Project, Shortcuts, and Export triggers.
+  - `bin/`: Bin container and tab panels (`media-tab.tsx`, `library-tab.tsx`, `text-tab.tsx`, `captions-tab.tsx`, `shapes-tab.tsx`, `transitions-tab.tsx`).
+  - `preview/`: `video-studio-preview.tsx`, `video-studio-transport.tsx`, and `preview-overlays.tsx` (interactive on-canvas transform handles for text/images/video).
+  - `inspector/`: `video-inspector.tsx`, `project-details-panel.tsx`, and dedicated tab panels (`clip-basic-tab.tsx`, `clip-speed-tab.tsx`, `clip-audio-tab.tsx`, `clip-text-tab.tsx`, `clip-duration-tab.tsx`, `clip-adjust-tab.tsx`).
+  - `timeline/`: `video-studio-timeline.tsx`, `timeline-toolbar.tsx`, `timeline-ruler.tsx`, `timeline-track.tsx`, `timeline-playhead.tsx`.
+  - `modals/`: `export-modal.tsx`, `shortcuts-modal.tsx`, and `clip-context-menu.tsx`.
+  - `controls/`: `editor-range.tsx`, `image-number-input.tsx`, and `media-bin-controls.tsx`.
+  - `types.ts` & `utils.ts`: Pure constants, types, and timecode/timeline calculation helpers.
+  - `index.tsx`: Top-level `VideoStudio` component providing the context and rendering the layout.
+- Reduced `app/routes/studio-video.tsx` to 10 lines containing only route metadata and `<VideoStudio />`.
+- Verification: `npm.cmd run test:core` passed 42/42 tests, `npx.cmd tsc --noEmit --pretty false` passed with 0 errors, and production build `npm.cmd run build` passed with full static route prerendering.
+
+
 ## 2026-11-18 — Timeline marquee multi-select and CapCut-style Video Studio inspector
 
 - Added mouse marquee multi-selection on the Video Studio timeline (`beginTimelineMarquee`..`cancelTimelineMarquee` in `app/routes/studio-video.tsx`, `resolveMarqueeSelection` in `app/lib/video-timeline.ts`, `user-select: none` on `.timeline-scroll` in `app/app.css`, and unit test in `tests/video-timeline.test.mjs`).

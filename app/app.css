@@ -802,9 +802,9 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .video-timeline { flex: 1 1 42%; display: flex; flex-direction: column; min-height: 220px; margin: 6px 0 0; padding: 0; }.timeline-toolbar { flex: 0 0 auto; gap: 12px; min-height: 44px; padding: 6px 11px; border-bottom: 1px solid #373a3d; }.timeline-toolbar > strong { font-size: 12px; white-space: nowrap; }.timeline-actions { flex-wrap: wrap; justify-content: flex-end; }.timeline-actions button { padding: 5px 8px; border-color: #484c50; background: #313336; color: #dedfe2; font-size: 11px; }.timeline-toolbar label { color: #b8bdc2; }.timeline-toolbar input { padding: 4px; background: #1e2022; color: #eef0f2; }.timeline-scroll { flex: 1; min-height: 0; border: 0; border-radius: 0; background: #202123; }.timeline-ruler { background: #27292b; }.timeline-track { min-height: 52px; border-color: #383a3d; }.timeline-track > strong { background: #2b2d30; color: #bec3c8; border-color: #3c3e41; }.track-lane { min-height: 51px; background-image: linear-gradient(to right, #35383b 1px, transparent 1px); }.timeline-clip { top: 5px; height: 42px; border-color: #168c9b; border-radius: 3px; background: #075d6a; color: #e3fcff; }.timeline-clip.audio { border-color: #2a7fc0; background: #164873; color: #d7eeff; }.timeline-clip.selected { outline-color: #e6f8fa; }.timeline-playhead { background: #e9ecef; }
 .video-studio-page .timeline-scroll { display: flex; flex-direction: column; }
 .timeline-ruler { flex: 0 0 32px; }
-.timeline-track { flex: 0 0 52px; }
+.video-studio-page .timeline-track { flex: 0 0 52px; column-gap: 12px; }
 .timeline-center-spacer { flex: 1 0 0; pointer-events: none; }
-.timeline-new-overlay-target { position: absolute; z-index: 5; top: 32px; left: 104px; width: calc(100% - 104px); height: 28px; min-height: 0; display: grid; place-items: center; border: 1px dashed #25cbd8; border-radius: 3px; background: #16444bd9; color: #d9fbff; font-size: 11px; }
+.timeline-new-overlay-target { position: absolute; z-index: 5; top: 32px; left: 116px; width: calc(100% - 116px); height: 28px; min-height: 0; display: grid; place-items: center; border: 1px dashed #25cbd8; border-radius: 3px; background: #16444bd9; color: #d9fbff; font-size: 11px; }
 .timeline-new-audio-target { position: relative; top: auto; margin-top: 2px; border-color: #3ca3eb; background: #143652d9; color: #dff2ff; }
 .timeline-track.empty-main { border: 0; }
 .timeline-track.empty-main > strong { background: #202123; border-right-color: #303235; }
@@ -829,10 +829,11 @@ h1, h2, h3, h4, .brand, .tool-card strong, .catalog-tool-copy strong { font-fami
 .video-studio-page .editor-stage canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; }
 .studio-title-overlay { position: absolute; z-index: 5; box-sizing: border-box; border: 1px solid #f2f5f7; outline: 1px solid #111a; cursor: move; touch-action: none; }
 .studio-title-overlay:not(.selected) { border-color: transparent; outline: 0; cursor: pointer; }
-.studio-title-overlay:not(.selected)::before, .studio-title-overlay:not(.selected)::after, .studio-title-overlay:not(.selected) .studio-title-resize, .studio-title-overlay:not(.selected) .studio-title-rotate { display: none; }
+.studio-title-overlay:not(.selected)::before, .studio-title-overlay:not(.selected)::after, .studio-title-overlay:not(.selected) .studio-title-resize, .studio-title-overlay:not(.selected) .studio-title-rotate, .studio-title-overlay:not(.selected) .studio-title-width { display: none; }
 .studio-title-overlay::before, .studio-title-overlay::after { position: absolute; width: 7px; height: 7px; border: 1px solid #1d252a; background: #fff; content: ""; }
 .studio-title-overlay::before { top: -4px; left: -4px; }.studio-title-overlay::after { bottom: -4px; left: -4px; }
 .studio-title-resize { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border: 1px solid #1d252a; background: #fff; cursor: nwse-resize; }
+.studio-title-width { position: absolute; top: calc(50% - 10px); right: -4px; width: 6px; height: 20px; border: 1px solid #1d252a; border-radius: 3px; background: #fff; cursor: ew-resize; }
 .studio-image-overlay { position: absolute; z-index: 6; box-sizing: border-box; border: 1px solid #e5f7ff; outline: 1px solid #102027a8; cursor: move; touch-action: none; }
 .studio-image-overlay:not(.selected) { border-color: transparent; outline: 0; cursor: pointer; }
 .studio-image-overlay:not(.selected) .studio-image-resize, .studio-image-overlay:not(.selected) .studio-image-rotate { display: none; }

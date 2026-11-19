@@ -64,6 +64,7 @@ export type VideoTextSettings = {
   align?: "left" | "center" | "right";
   lineHeight?: number;
   letterSpacing?: number;
+  maxWidth?: number;
   strokeColor?: string;
   strokeWidth?: number;
   shadow?: boolean;
