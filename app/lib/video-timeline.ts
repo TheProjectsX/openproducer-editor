@@ -1,4 +1,6 @@
 const TIMELINE_TRACK_LABEL_WIDTH = 104;
+const TIMELINE_TRACK_GAP = 12;
+const TIMELINE_LEADING_OFFSET = TIMELINE_TRACK_LABEL_WIDTH + TIMELINE_TRACK_GAP;
 const CANVAS_LONG_SIDE = 1920;
 
 export function canPlaceAssetOnTrack(kind: "audio" | "video" | "image" | "text", track: number) {
@@ -31,11 +33,11 @@ export function zoomPixelsPerSecond(current: number, wheelDelta: number) {
 }
 
 export function timelineContentWidth(duration: number, pixelsPerSecond: number, viewportWidth: number) {
-  return TIMELINE_TRACK_LABEL_WIDTH + Math.max(800, Math.max(0, duration) * pixelsPerSecond + Math.max(0, viewportWidth));
+  return TIMELINE_LEADING_OFFSET + Math.max(800, Math.max(0, duration) * pixelsPerSecond + Math.max(0, viewportWidth));
 }
 
 export function timelineZoomScrollLeft(timeAtPointer: number, pointerX: number, pixelsPerSecond: number) {
-  return Math.max(0, TIMELINE_TRACK_LABEL_WIDTH + timeAtPointer * pixelsPerSecond - pointerX);
+  return Math.max(0, TIMELINE_LEADING_OFFSET + timeAtPointer * pixelsPerSecond - pointerX);
 }
 
 export function timelineTimeAtPointer(
@@ -51,7 +53,7 @@ export function timelineTimeAtPointer(
 }
 
 export function timelineRulerOffset() {
-  return TIMELINE_TRACK_LABEL_WIDTH;
+  return TIMELINE_LEADING_OFFSET;
 }
 
 export function timelineDropStart(pointerTime: number, grabOffsetPx: number, pixelsPerSecond: number) {
@@ -70,7 +72,7 @@ export function planMediaBatchPlacement(
   existing: readonly (TimelinePlacementClip & { track: number })[], tolerance: number, magnetic: boolean,
 ) {
   if (!assets.length || assets.some((asset) => asset.kind === "text" || !Number.isFinite(asset.duration) || asset.duration <= 0)) return null;
-  if (!canPlaceAssetOnTrack(assets[0].kind, targetTrack)) return null;
+  if (!assets.some((asset) => canPlaceAssetOnTrack(asset.kind, targetTrack))) return null;
   const visualTrack = targetTrack >= 0 ? targetTrack : 0;
   const audioTrack = targetTrack < 0 ? targetTrack : -1;
   const visualDuration = assets.filter((asset) => asset.kind !== "audio").reduce((total, asset) => total + (asset.kind === "image" ? 5 : asset.duration), 0);
@@ -136,4 +138,29 @@ export function resolveTimelinePlacement(
 
 export function resolveMarqueeSelection(selectedAtStart: string[], hitIds: string[], additive: boolean): string[] {
   return additive ? [...new Set([...selectedAtStart, ...hitIds])] : hitIds;
+}
+
+/**
+ * Resolves the focused/anchor clip among multiple selected clips:
+ * prefers a selected clip under the seekbar (playhead); otherwise falls back to the 1st selected clip.
+ */
+export function resolveAnchorClip<T extends { id: string; start: number; sourceStart: number; sourceEnd: number; speed: number }>(
+  clips: T[],
+  selectedIds: string[],
+  playhead: number,
+  preferredId?: string
+): { clip: T | undefined; reason: "playhead" | "first" | "none" } {
+  const selectedSet = new Set(selectedIds);
+  const selectedClips = clips.filter((clip) => selectedSet.has(clip.id));
+  if (selectedClips.length === 0) return { clip: undefined, reason: "none" };
+  const underPlayhead = selectedClips.filter((clip) => {
+    const len = Math.max(0.01, (clip.sourceEnd - clip.sourceStart) / Math.max(0.1, clip.speed));
+    return playhead >= clip.start - 0.0001 && playhead <= clip.start + len + 0.0001;
+  });
+  if (underPlayhead.length > 0) {
+    const preferred = preferredId ? underPlayhead.find((clip) => clip.id === preferredId) : undefined;
+    return { clip: preferred ?? underPlayhead[0], reason: "playhead" };
+  }
+  const ordered = [...selectedClips].sort((a, b) => a.start - b.start);
+  return { clip: ordered[0], reason: "first" };
 }

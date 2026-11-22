@@ -1,5 +1,42 @@
 # Session handoff — Local Studio Core
 
+## Current handoff — 2026-11-19 (Afternoon, Asia/Dhaka)
+
+### Checkout and guardrails
+
+- Workspace: `c:\Users\Modasser Hasan\Contents\openproducer-editor`. Branch `main` is at `e024d33` (`feat: add video caption import, management, and timeline placement`), ahead of `origin/main` by 1 commit.
+- Uncommitted changes are present in `WORK_LOG.md`, `app/app.css`, `app/lib/project-store.ts`, `app/lib/video-composition.ts`, `app/lib/video-timeline.ts`, `app/routes/studio-video.tsx`, `tests/video-timeline.test.mjs`, and untracked `app/components/studio-video/` and `app/lib/video-text-layout.ts`. Preserve all work; do not reset or clean. Run `git status --short` before further work.
+- Read root `README.md`, `AGENTS.md`, and `project_research/` guides before implementation. Keep all media, projects, processing, preview, and export on-device. The roadmap and test/release gate remain binding; **M6/Core is not complete** until browser, export, and offline verification pass.
+- Sections below this one are historical checkpoints.
+
+### Work completed in this session
+
+- **Modularized `/studio/video` (`app/components/studio-video/`, `app/routes/studio-video.tsx`):**
+  - Split the ~2,203-line route into `video-studio-context.tsx` (`VideoStudioProvider`, `useVideoStudio`), `index.tsx`, `types.ts`, `utils.ts`, and subdirectories `header/`, `bin/`, `preview/`, `inspector/`, `timeline/`, `modals/`, `controls/`. Reduced `app/routes/studio-video.tsx` to 10 lines.
+- **Multi-Asset Editing & `Global` Inspector (`app/components/studio-video/`, `app/lib/video-timeline.ts`):**
+  - Added `resolveAnchorClip` to anchor multi-clip edits to the selected clip under the seekbar (or 1st selected clip if none is under the seekbar).
+  - Added relative-delta field patchers (`patchSelectedTransform`, `patchSelectedTransitions`, `patchSelectedStart`, `patchSelectedSpeed`, `patchSelectedVolume`, `patchSelectedDuration`, `patchSelectedEffects`, `editSelectedTitleAssets`) so editing one setting shifts all selected unlocked clips relative to the anchor without overwriting unrelated properties.
+  - Updated `PreviewOverlays` and `moveTextGesture`/`moveImageGesture` to highlight and move/scale/rotate all selected visual clips together, and fixed preview overlay click selection/deselection (`finishStagePan`, `beginTextGesture`/`finishTextGesture`, `beginImageGesture`/`finishImageGesture`).
+  - Updated `VideoInspector` to show type-specific tabs for same-type multi-selections and added `inspector/clip-global-tab.tsx` (`Global` tab) for mixed-type multi-selections.
+- **Text Max Width & Auto Line Break (`app/lib/video-text-layout.ts`, `app/lib/video-composition.ts`, `clip-text-tab.tsx`, `preview-overlays.tsx`, `app/app.css`):**
+  - Added `VideoTextSettings.maxWidth`, shared `applyTextCase` and `wrapTextLines` across preview, export, and overlay boxes, added full-width `Max width` slider + numeric input + `Auto` reset in `ClipTextTab`, and added the on-screen `.studio-title-width` drag handle on the right edge of text overlays.
+- **Timeline Gap, Preview Flicker, Media Delete, & In-Place Transitions:**
+  - Added `TIMELINE_TRACK_GAP = 12` (`column-gap: 12px` on `.video-studio-page .timeline-track`) between track labels and timeline lanes.
+  - Fixed video preview flicker by pre-seeking upcoming video clips within `1.5 s` to `sourceStart`, avoiding redundant `play()`/seek calls, and removing `timeline.playhead` from the playback `requestAnimationFrame` effect dependencies.
+  - Added Media bin deletion (`removeMediaAssets`, `Delete` button, `Delete`/`Backspace` shortcut) in `MediaTab`.
+  - Updated `createTransitionToNext` to keep all clips in place without modifying `next.start` or leaving gaps behind clips.
+
+### Verification and next priorities
+
+- **Verified in this session:**
+  - `npx.cmd tsc --noEmit --pretty false`: passed with **0 errors**.
+  - `npm.cmd run test:core`: passed **44/44** tests.
+  - `npm.cmd run build` (run outside sandbox for local prerender port binding): passed, prerendering all 28 routes and verifying service worker output.
+- **Next priorities:**
+  1. **Transitions work (next requested item):** Design and implement smooth A-to-B transition rendering/compositing (and any desired transition UX/controls) while keeping clips in place on the timeline.
+  2. **Browser & export verification:** Test `/studio/video` in Chrome/Edge (modularized UI, multi-asset relative edits + `Global` tab, text wrap width handle, preview click-to-select, flicker-free playback, Media delete, save/reopen, export parity, and offline mode).
+  3. **Remaining Core release gates:** Retest `/tools/video/extract-audio` on AAC MP4 / Opus WebM fixtures, verify Audio Split ZIP archive integrity, and complete offline/external-player checks across Audio, Video, and Image tools.
+
 ## Current handoff — 2026-11-18 (Night, Asia/Dhaka)
 
 ### Checkout and guardrails

@@ -2,6 +2,7 @@ import type { VideoTimelineAsset, VideoTimelineClip, VideoTimelineProject } from
 import { evaluateAnimatedEffect, evaluateClipKeyframes, evaluateClipTransition } from "./video-keyframes";
 import { getClipLength } from "./video-timing";
 import { imageClipGeometry } from "./video-image-layout";
+import { applyTextCase, wrapTextLines } from "./video-text-layout";
 export { getClipLength } from "./video-timing";
 
 export type VideoMediaElements = { videos: Record<string, HTMLVideoElement>; images: Record<string, HTMLImageElement> };
@@ -47,15 +48,7 @@ export function drawVideoComposition(
       const transform = evaluateClipKeyframes(clip, clipTime).transform;
       const settings = asset.textSettings;
       const fontSize = Math.max(8, Math.min(512, settings.fontSize * transform.scale * transitionScale));
-      const textCase = settings.textCase ?? (settings.uppercase ? "uppercase" : "none");
-      const transformedText = textCase === "uppercase"
-        ? settings.text.toUpperCase()
-        : textCase === "lowercase"
-          ? settings.text.toLowerCase()
-          : textCase === "capitalize"
-            ? settings.text.toLowerCase().replace(/\b\p{L}/gu, (char) => char.toUpperCase())
-            : settings.text;
-      const lines = transformedText.split("\n");
+      const transformedText = applyTextCase(settings.text, settings.textCase, settings.uppercase);
       const alpha = Math.max(0, Math.min(1, transform.opacity * transitionAlpha));
       context.save();
       applyTransitionClip();
@@ -70,6 +63,8 @@ export function drawVideoComposition(
       if ("letterSpacing" in context) {
         (context as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${(settings.letterSpacing ?? 0) * transform.scale}px`;
       }
+      const effectiveMaxWidth = settings.maxWidth && settings.maxWidth > 0 ? settings.maxWidth * transform.scale * transitionScale : undefined;
+      const lines = wrapTextLines(transformedText, effectiveMaxWidth, (segment) => context.measureText(segment).width);
       const align = settings.align ?? "center";
       context.textAlign = align; context.textBaseline = "middle";
       const lineHeight = fontSize * (settings.lineHeight ?? 1.2);

@@ -11,22 +11,55 @@
 - Supports multi-image import, slide reordering/removal, `Total video length` (proportional scaling) or `Per-image length` modes, 9 motion presets (`Static`, `Zoom in`, `Zoom out`, `Pan left/right/up/down`, `Gentle tilt`, `Pulse fade`), transitions (`Dissolve`, `Zoom in`, `Wipe`, `Slide`), custom per-slide keyframes (`Time`, `Pos X/Y`, `Scale`, `Rotation`, `Opacity`, plus `linear`/`ease-in`/`ease-out`/`ease-in-out` easing in `app/lib/video-keyframes.ts`), optional background audio (volume, fades, loop), live `<canvas>` preview via `drawVideoComposition`, and cancellable local MP4/WebM export via Mediabunny.
 - Added unit tests in `tests/image-to-video.test.mjs`.
 
+## 2026-11-19 — Multi-asset editing, text wrap width, preview & media UX, and in-place transitions
+
+- **Multi-asset batch editing (`app/components/studio-video/`, `app/lib/video-timeline.ts`):**
+    - Added `resolveAnchorClip` to anchor multi-clip edits to the selected clip under the seekbar (or the 1st selected clip if none is under the seekbar).
+    - Added relative-delta field patchers (`patchSelectedTransform`, `patchSelectedTransitions`, `patchSelectedStart`, `patchSelectedSpeed`, `patchSelectedVolume`, `patchSelectedDuration`, `patchSelectedEffects`, `editSelectedTitleAssets`) so editing one property shifts all selected unlocked clips relative to the anchor without overwriting unrelated properties.
+    - Updated `PreviewOverlays` and preview pointer gestures (`moveTextGesture`, `moveImageGesture`) to highlight and move/scale/rotate all selected visual clips together, and fixed click-to-select/deselect in `finishStagePan`, `finishTextGesture`, and `finishImageGesture`.
+    - Updated `VideoInspector` to show type-specific tabs for same-type multi-selections and added `inspector/clip-global-tab.tsx` (`Global` tab) for mixed-type multi-selections.
+- **Text max-width & auto line break (`app/lib/video-text-layout.ts`, `app/lib/video-composition.ts`, `clip-text-tab.tsx`, `preview-overlays.tsx`):**
+    - Added `VideoTextSettings.maxWidth`, shared `applyTextCase` and `wrapTextLines` across preview composition, export, and overlay boxes, added full-width `Max width` slider + custom numeric input + `Auto` reset in `ClipTextTab`, and added the on-screen right-edge `.studio-title-width` drag handle.
+- **Timeline spacing, preview flicker fix, Media delete, & transitions:**
+    - Added `TIMELINE_TRACK_GAP = 12` (`column-gap: 12px` on `.video-studio-page .timeline-track`) between left track labels and timeline lanes.
+    - Fixed video preview flicker by pre-seeking upcoming video clips within `1.5 s` to `sourceStart`, avoiding redundant `play()`/seek calls, and removing `timeline.playhead` from the playback `requestAnimationFrame` effect dependencies.
+    - Added Media bin deletion (`removeMediaAssets`, `Delete` button, and `Delete`/`Backspace` shortcut) in `MediaTab`.
+    - Updated `createTransitionToNext` to keep all clips in place without shifting `next.start` or leaving gaps behind clips.
+- **Next:** Work on transitions (compositing/rendering A-to-B transitions smoothly with clips kept in place).
+- **Verification:** `npm.cmd run test:core` passed 44/44 tests, `npx.cmd tsc --noEmit --pretty false` passed with 0 errors, and `npm.cmd run build` succeeded with all 28 routes prerendered and verified.
+
+## 2026-11-19 — Modularize Video Studio into component architecture
+
+- Refactored the monolithic `app/routes/studio-video.tsx` (~2,203 lines) into a clean, modular component architecture under `app/components/studio-video/`:
+    - `video-studio-context.tsx`: Shared `VideoStudioProvider` and `useVideoStudio()` context managing project persistence, undo/redo, timeline playback, clip manipulations, composition, and export state without prop drilling.
+    - `header/video-studio-header.tsx`: Project name input, auto-save status, New Project, Shortcuts, and Export triggers.
+    - `bin/`: Bin container and tab panels (`media-tab.tsx`, `library-tab.tsx`, `text-tab.tsx`, `captions-tab.tsx`, `shapes-tab.tsx`, `transitions-tab.tsx`).
+    - `preview/`: `video-studio-preview.tsx`, `video-studio-transport.tsx`, and `preview-overlays.tsx` (interactive on-canvas transform handles for text/images/video).
+    - `inspector/`: `video-inspector.tsx`, `project-details-panel.tsx`, and dedicated tab panels (`clip-basic-tab.tsx`, `clip-speed-tab.tsx`, `clip-audio-tab.tsx`, `clip-text-tab.tsx`, `clip-duration-tab.tsx`, `clip-adjust-tab.tsx`).
+    - `timeline/`: `video-studio-timeline.tsx`, `timeline-toolbar.tsx`, `timeline-ruler.tsx`, `timeline-track.tsx`, `timeline-playhead.tsx`.
+    - `modals/`: `export-modal.tsx`, `shortcuts-modal.tsx`, and `clip-context-menu.tsx`.
+    - `controls/`: `editor-range.tsx`, `image-number-input.tsx`, and `media-bin-controls.tsx`.
+    - `types.ts` & `utils.ts`: Pure constants, types, and timecode/timeline calculation helpers.
+    - `index.tsx`: Top-level `VideoStudio` component providing the context and rendering the layout.
+- Reduced `app/routes/studio-video.tsx` to 10 lines containing only route metadata and `<VideoStudio />`.
+- Verification: `npm.cmd run test:core` passed 42/42 tests, `npx.cmd tsc --noEmit --pretty false` passed with 0 errors, and production build `npm.cmd run build` passed with full static route prerendering.
+
 ## 2026-11-18 — Timeline marquee multi-select and CapCut-style Video Studio inspector
 
 - Added mouse marquee multi-selection on the Video Studio timeline (`beginTimelineMarquee`..`cancelTimelineMarquee` in `app/routes/studio-video.tsx`, `resolveMarqueeSelection` in `app/lib/video-timeline.ts`, `user-select: none` on `.timeline-scroll` in `app/app.css`, and unit test in `tests/video-timeline.test.mjs`).
 - Fixed `editClip` and `patchSelectedEffects` in `app/routes/studio-video.tsx` to apply edits atomically across all unlocked clips in `selectedClips` while guarding track-incompatible moves.
 - Recorded and completed all 6 phases of the CapCut PC right-side inspector parity plan in `project_research/docs/13-inspector-capcut-parity.md`:
-  - **Details (no selection):** Inline project rename, editable `Aspect ratio`, `Width`/`Height`, `Frame rate`, and shared preview/export `backgroundColor` (`app/lib/project-store.ts`, `app/lib/video-composition.ts`).
-  - **Per-asset inspector tabs & controls:** `Audio` (`Basic`, `Speed` + fade sliders), `Video` (`Basic`, `Audio`, `Speed`, `Adjust` + `Transform` `Position X/Y`, `Opacity`, `Reset`, `Freeze frame`), `Image` (`Basic`, `Duration`, `Adjust` + `Scale` slider, `Mirror` SVG icons), `Text` (`Text`, `Basic`, `Duration` + `Font size` slider, `Underline`, `TT`/`tt`/`Tt` case, `Character` spacing, `Shadow Offset X/Y`, `Background Padding`, SVG alignment icons), `Target duration`/`Duration` seekbars, and `Selection` multi-clip inspector filtering. Removed redundant `Split`/`Duplicate`/`Delete` buttons from the inspector.
+    - **Details (no selection):** Inline project rename, editable `Aspect ratio`, `Width`/`Height`, `Frame rate`, and shared preview/export `backgroundColor` (`app/lib/project-store.ts`, `app/lib/video-composition.ts`).
+    - **Per-asset inspector tabs & controls:** `Audio` (`Basic`, `Speed` + fade sliders), `Video` (`Basic`, `Audio`, `Speed`, `Adjust` + `Transform` `Position X/Y`, `Opacity`, `Reset`, `Freeze frame`), `Image` (`Basic`, `Duration`, `Adjust` + `Scale` slider, `Mirror` SVG icons), `Text` (`Text`, `Basic`, `Duration` + `Font size` slider, `Underline`, `TT`/`tt`/`Tt` case, `Character` spacing, `Shadow Offset X/Y`, `Background Padding`, SVG alignment icons), `Target duration`/`Duration` seekbars, and `Selection` multi-clip inspector filtering. Removed redundant `Split`/`Duplicate`/`Delete` buttons from the inspector.
 - Verification: `npx.cmd tsc --noEmit --pretty false`, `npm.cmd run test:core` (38/38), and `git diff --check` passed.
 
 ## 2026-11-18 — Header navigation polish and CapCut PC Video Studio parity (Batches 1–5)
 
 - Moved `.tool-breadcrumbs` out of `.tool-page-header` to the top-left of tool pages above `.resize-intro`, added hover/outside-click/Escape auto-close for header tool-group dropdowns and Video Studio `<details>` menus.
 - Logged the CapCut PC feature gap analysis in `project_research/docs/12-capcut-pc-gap-analysis.md` and implemented Batches 1–5 in `/studio/video`:
-  - **Preview & Canvas:** Click-to-select any active visual clip in `.editor-stage`, image preview rotation handle, default-on `Maintain aspect ratio when resizing`, video overlay move/resize/rotate handles, 6 px center/edge magnetic snap guides, click-empty-stage deselection, and zoomable/pannable preview stage (`Fit / 50%–200% / 25%–400%`, `Ctrl+wheel`, drag-to-pan).
-  - **Timeline & Tracks:** Per-lane `Hide`, `Mute`, and `Lock` gutter controls (`trackStates` across preview/playback/export); `−`/slider/`+`/`Fit` timeline zoom; `Ctrl`/`Shift` multi-clip selection; right-click context menu (`Split`, `Copy`, `Paste`, `Duplicate`, `Freeze frame`, `Detach audio`, `Delete`); dynamic Project Details track counts; non-overlapping `Audio N` placement on detach and `Move to new Audio N` drop target on audio drag; magnetic playhead snapping; preserved clip selection during seekbar movement and restricted `.track-lane` clicks to deselection.
-  - **Inspector, Left Panel, & Shortcuts:** Inline `◇`/`◆` keyframe toggles; text styling parity (font, bold/italic, align, line height, stroke, shadow, background radius/opacity); `Hue`/`Sepia`/`Blur` + reset; blend modes; speed presets + reverse `Target duration` input; 6 text presets, `Shapes` tab (6 SVG shapes + color picker), and Wipe/Slide/Zoom/Fade-to-black transitions rendered as 3-column rectangular preview tiles; `Q`/`W`/`J`/`K`/`L`/`-`/`+`/`?` shortcuts, shortcut modal, and inline `renameProject`.
+    - **Preview & Canvas:** Click-to-select any active visual clip in `.editor-stage`, image preview rotation handle, default-on `Maintain aspect ratio when resizing`, video overlay move/resize/rotate handles, 6 px center/edge magnetic snap guides, click-empty-stage deselection, and zoomable/pannable preview stage (`Fit / 50%–200% / 25%–400%`, `Ctrl+wheel`, drag-to-pan).
+    - **Timeline & Tracks:** Per-lane `Hide`, `Mute`, and `Lock` gutter controls (`trackStates` across preview/playback/export); `−`/slider/`+`/`Fit` timeline zoom; `Ctrl`/`Shift` multi-clip selection; right-click context menu (`Split`, `Copy`, `Paste`, `Duplicate`, `Freeze frame`, `Detach audio`, `Delete`); dynamic Project Details track counts; non-overlapping `Audio N` placement on detach and `Move to new Audio N` drop target on audio drag; magnetic playhead snapping; preserved clip selection during seekbar movement and restricted `.track-lane` clicks to deselection.
+    - **Inspector, Left Panel, & Shortcuts:** Inline `◇`/`◆` keyframe toggles; text styling parity (font, bold/italic, align, line height, stroke, shadow, background radius/opacity); `Hue`/`Sepia`/`Blur` + reset; blend modes; speed presets + reverse `Target duration` input; 6 text presets, `Shapes` tab (6 SVG shapes + color picker), and Wipe/Slide/Zoom/Fade-to-black transitions rendered as 3-column rectangular preview tiles; `Q`/`W`/`J`/`K`/`L`/`-`/`+`/`?` shortcuts, shortcut modal, and inline `renameProject`.
 - Verification: `npx.cmd tsc --noEmit --pretty false`, `npm.cmd run test:core` (37/37), and `git diff --check` passed.
 
 ## 2026-11-17 — Dynamic Video Studio lanes
@@ -577,6 +610,7 @@
 
 - The service worker now stays waiting after a new cache is fully prepared. The app shell detects a waiting update, asks the user to finish/save active edits, and exposes a reload action that signals the worker to activate. The static verifier rejects automatic `skipWaiting` and requires the explicit activation message.
 - Typecheck, 12 core tests, production build, 27-route static verification, and `git diff --check` passed. Update installation and active-edit behavior still need a deployed/offline browser run.
+
 # 2026-11-14 — Studio import codec inspection
 
 - Added byte-based container and codec inspection to Audio and Video Studio import using the already pinned Mediabunny dependency.
@@ -692,6 +726,7 @@
 - Updated Audio Studio feature and gate notes. Route-level history and save/reopen checks are pending.
 - Verification: `npm.cmd run typecheck` passed; `npm.cmd run test:core` passed 18/18; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable) and 51 cached assets. The existing ~643 kB bundle warning and Bungee WASM dynamic-import notice remain. Route-level history and save/reopen interaction checks remain pending.
 - Follow-up: recorded the preview graph and bounded history design plus validation limits in `project_research/docs/10-decisions-and-sources.md`.
+
 # 2026-11-15 — Design: source-first tool entry, custom previews, and full-screen workspaces
 
 - Added a reusable drag/drop and local-file picker screen for audio, video, and image workflows. Audio Merge and Image Collage accept multiple files from the same screen; saved-project loading remains supported for collage. The multitrack Video Studio remains directly open as the requested exception.
@@ -700,6 +735,7 @@
 - Replaced visible browser-native media controls in the standalone audio/video tools and Audio/Video Studio export previews with app-styled local play and timeline controls. Audio previews use a designed media surface; Video Speed keeps its capture-capable media element and uses app transport controls.
 - Updated the interface direction and status in the feature matrix. Image pointer controls and trim timeline interactions still need a human browser review.
 - Verification: `npm.cmd run typecheck` passed; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable) with 95 service-worker assets. Existing Bungee dynamic-import warning remains.
+
 # 2026-11-15 — Design: waveform ranges and split markers
 
 - Added a shared waveform range timeline with direct edge trim, selection move, and drag-to-create behavior. Noise Reduction uses it to choose a noise-only sample; Volume/Fades uses it to place fade boundaries; Audio Studio uses it to select source in/out points.
@@ -707,6 +743,7 @@
 - Updated the feature matrix. Browser interaction, accessibility, and narrow viewport review are still pending.
 - Verification: `npm.cmd run typecheck` passed; `npm.cmd run build` passed and verified 27 prerendered routes (22 indexable), with 97 service-worker assets. Browser interaction, accessibility, and narrow viewport review are still pending.
 - Commit: `90e7ae2 feat: add interactive audio timelines`.
+
 # 2026-11-15 — Design: merge and replacement-audio timelines
 
 - Added a proportional audio merge sequence above its existing reorder list so users can see clip order and relative duration at a glance.
@@ -834,6 +871,7 @@
 - Confirmed the follow-up changes: cached Audio Trim waveform peaks and debounced preview rebuilds to reduce drag lag; corrected edge-drag bounds; synchronized custom-player metadata on source changes; kept the upscale canvas mounted before inference; and changed video extraction to include all tracks while discarding video.
 - The handoff records targeted Chrome fixture results and remaining gaps. Audio Extract still needs browser retest on AAC MP4 and Opus WebM; Audio Split ZIP integrity/download, collage SVG messaging, small-output title fitting, offline operation, and recovery/accessibility checks remain open.
 - Corrected the handoff's stale latest-commit line. No application code was modified during this sync.
+
 ## 2026-11-16 — Dedicated image downscale tool
 
 - Added `/tools/image/downscale` as a focused entry point over the existing local canvas resampling/export pipeline. It initializes to half the source dimensions, preserves the original aspect ratio by default, and requires output dimensions to stay within the source with at least one dimension reduced.
@@ -906,7 +944,6 @@
 - Sized the absolute crop overlay to the rendered output aspect and preview bounds so enabling selection does not enlarge or reflow the image preview.
 - Verification: `tsc --noEmit` passed. Browser visual validation was not available in this turn.
 
-
 ## 2026-11-16 — Resize crop selector immediate activation
 
 - The Crop Image toggle now immediately displays the Resize tool's own selector over the existing preview; removed the extra Crop Selection activation button from the expanded controls.
@@ -975,7 +1012,6 @@
 - Kept both actions enabled at all times and added predictable target fallback plus clear handling when the playhead is outside a clip. Typecheck passes.
 - Fixed target priority after a reported split case: selection now beats stale hover state, and splitting assigns the new right segment as both selected and hovered. Clips are addressed by project IDs, never by names.
 
-
 # 2026-11-17 — Timeline toolbar grouping
 
 - Added thin vertical separator lines between side-delete tools, undo/redo, split/delete, ripple/snap, and timeline setting groups.
@@ -988,3 +1024,22 @@
 # 2026-11-17 — Interactive preview titles
 
 - Added direct title selection, move, resize, and rotation in the video preview. Gestures edit the persisted clip transform and produce one undo entry on release. The overlay aligns to the contained preview canvas and is excluded from the rendered export.
+
+# 2026-11-19 — Restore mixed media batch placement
+
+- Removed the first-sorted-item restriction from Video Studio batch drops. A mixed audio/visual selection can be dropped on either lane type and the planner separates items into audio and visual lanes at the same start time. Single-type selections still require a compatible lane.
+- Added placement tests for audio-first and visual-first sorted batches and both lane types. Core tests pass 38/38, typecheck passes, and the production build verifies 28 prerendered routes plus 107 service-worker assets. Browser pointer drop, project reopen, and offline export remain to verify.
+
+# 2026-11-19 — Video Studio caption import
+
+- Added Caption beside Text, with local SRT/VTT import that creates editable timed text clips. Media import accepts matching subtitle sidecars and loads their cues when the video is placed; unmatched subtitle files load immediately. Subtitle sources are saved with the project.
+- Added parser, sidecar matching, and timing tests. Core tests pass 42/42, typecheck passes, and the production build verifies 28 prerendered routes and 107 cached assets. In a fresh local production browser, VTT import and matching MP4/SRT auto-load passed preview and save/reopen checks. A 320×180 MP4 rendered with the caption visible in the in-app result preview. Export dimensions now scale the project composition without changing the project canvas; cue list times show milliseconds. Chrome's extension blocked local fixture selection without its file-URL permission. After stopping the local server, Chrome showed prerendered editor markup but the Caption tab did not respond, so an interactive offline pass was not established. Independent player inspection and offline export remain open.
+
+# 2026-11-19 — Keep imported subtitles in Caption
+
+- User clarified that import must retain subtitle files in CC without creating timeline blocks. SRT/VTT imports now appear as file tiles with cue counts; matching sidecars remain identifiable beside their video names. Clicking or dragging a file to an overlay lane explicitly creates editable cue clips. Placing a video no longer places its sidecar captions. Older saved subtitle source assets recover their cues from the stored file when the project reopens. Core tests and TypeScript pass; the production build verified 28 routes and 107 cached assets. In a fresh production browser, a standalone VTT remained one CC file with an empty timeline after import and refresh, then created one cue when clicked. A matching MP4/SRT import showed one video in Media and one file in CC; placing the video created only the video clip, and clicking the SRT created two cue clips.
+
+# 2026-11-19 — Caption selection and absolute timing
+
+- Added multi selection, Select all/Deselect all, Remove selected, and Add to timeline in CC. Selected file drag now uses the Media drag ghost and count badge. Dropping anywhere in the timeline places each file on a new overlay lane at its own absolute subtitle timestamps. Removing a CC file deletes its stored source while preserving placed editable clips.
+- Core tests, TypeScript, and production build pass. In a fresh local browser, two selected files dragged to the far right of the empty timeline created three clips across two overlay lanes, starting at 0.25 s; total duration was 3.00 s. Removing both files emptied the CC tab while timeline clips remained. Undo history now drops removed source references; Undo did not restore the deleted CC file. After the local save completed, direct project reload retained the caption clip at 0.25 s and kept CC empty. Offline operation and export after this change remain open.

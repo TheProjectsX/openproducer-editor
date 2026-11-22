@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canPlaceAssetOnTrack, canvasDimensionsForAspect, planMediaBatchPlacement, resolveMarqueeSelection, resolveTimelinePlacement, timelineContentWidth, timelineDropStart, timelineRulerOffset, timelineTimeAtPointer, timelineZoomScrollLeft, visibleTimelineTracks, zoomPixelsPerSecond } from "../app/lib/video-timeline.ts";
+import { canPlaceAssetOnTrack, canvasDimensionsForAspect, planMediaBatchPlacement, resolveAnchorClip, resolveMarqueeSelection, resolveTimelinePlacement, timelineContentWidth, timelineDropStart, timelineRulerOffset, timelineTimeAtPointer, timelineZoomScrollLeft, visibleTimelineTracks, zoomPixelsPerSecond } from "../app/lib/video-timeline.ts";
+import { wrapTextLines } from "../app/lib/video-text-layout.ts";
 
 test("batch placement preserves order within lanes while starting audio alongside visuals", () => {
   const assets = [
@@ -19,7 +20,15 @@ test("batch placement preserves order within lanes while starting audio alongsid
   ]);
   assert.equal(result?.shiftedStarts["audio-old"], 5);
   assert.equal(result?.duration, 9);
-  assert.equal(planMediaBatchPlacement(assets, -1, 2, [], 0.2, true), null);
+  const audioFirst = [assets[1], assets[0], assets[2]];
+  assert.deepEqual(planMediaBatchPlacement(audioFirst, 0, 2, [], 0.2, true)?.placements, [
+    { assetId: "audio", track: -1, start: 2, duration: 3 },
+    { assetId: "video", track: 0, start: 2, duration: 4 },
+    { assetId: "image", track: 0, start: 6, duration: 5 },
+  ]);
+  assert.deepEqual(planMediaBatchPlacement(assets, -1, 2, [], 0.2, true)?.placements, result?.placements);
+  assert.equal(planMediaBatchPlacement(assets.filter((asset) => asset.kind === "audio"), 0, 2, [], 0.2, true), null);
+  assert.equal(planMediaBatchPlacement(assets.filter((asset) => asset.kind !== "audio"), -1, 2, [], 0.2, true), null);
 });
 
 test("text clips can move on existing and new overlay lanes", () => {
@@ -32,7 +41,7 @@ test("text clips can move on existing and new overlay lanes", () => {
 });
 
 test("zoom keeps the hovered clip time at the pointer on a short timeline", () => {
-  const pointerX = 254;
+  const pointerX = timelineRulerOffset() + 150;
   const time = (pointerX - timelineRulerOffset()) / 60;
   const scrollLeft = timelineZoomScrollLeft(time, pointerX, 120);
   assert.equal(scrollLeft, 150);
@@ -55,7 +64,7 @@ test("timeline pointer positions account for horizontal scrolling", () => {
 
 test("ruler positions account for the track label gutter", () => {
   const gutter = timelineRulerOffset();
-  assert.equal(timelineTimeAtPointer(224, 120, 300, 60, gutter), 5);
+  assert.equal(timelineTimeAtPointer(120 + gutter, 120, 300, 60, gutter), 5);
   assert.equal(timelineTimeAtPointer(120, 120, 0, 60, gutter), 0);
 });
 
@@ -103,4 +112,24 @@ test("marquee selection replaces or adds to starting clip selection", () => {
   assert.deepEqual(resolveMarqueeSelection(["a", "b"], ["b", "c"], false), ["b", "c"]);
   assert.deepEqual(resolveMarqueeSelection(["a", "b"], ["b", "c"], true), ["a", "b", "c"]);
   assert.deepEqual(resolveMarqueeSelection(["a"], [], false), []);
+});
+
+test("resolveAnchorClip prefers the selected clip under the seekbar, otherwise the first selected clip", () => {
+  const clips = [
+    { id: "c1", start: 0, sourceStart: 0, sourceEnd: 3, speed: 1 },
+    { id: "c2", start: 4, sourceStart: 0, sourceEnd: 4, speed: 1 },
+    { id: "c3", start: 10, sourceStart: 0, sourceEnd: 2, speed: 1 },
+  ];
+  assert.deepEqual(resolveAnchorClip(clips, ["c1", "c2", "c3"], 5.5).clip?.id, "c2");
+  assert.equal(resolveAnchorClip(clips, ["c1", "c2", "c3"], 5.5).reason, "playhead");
+  assert.deepEqual(resolveAnchorClip(clips, ["c2", "c3"], 1.0).clip?.id, "c2");
+  assert.equal(resolveAnchorClip(clips, ["c2", "c3"], 1.0).reason, "first");
+  assert.equal(resolveAnchorClip(clips, [], 1.0).reason, "none");
+});
+
+test("wrapTextLines wraps overflowing words and breaks long tokens at maxWidth", () => {
+  const measure = (s) => s.length * 10;
+  assert.deepEqual(wrapTextLines("hello world\nsecond", undefined, measure), ["hello world", "second"]);
+  assert.deepEqual(wrapTextLines("hello world from studio", 110, measure), ["hello world", "from studio"]);
+  assert.deepEqual(wrapTextLines("abcdefghij", 40, measure), ["abcd", "efgh", "ij"]);
 });

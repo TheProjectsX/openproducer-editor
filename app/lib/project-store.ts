@@ -66,6 +66,7 @@ export type VideoTextSettings = {
   align?: "left" | "center" | "right";
   lineHeight?: number;
   letterSpacing?: number;
+  maxWidth?: number;
   strokeColor?: string;
   strokeWidth?: number;
   shadow?: boolean;
@@ -77,7 +78,7 @@ export type VideoTextSettings = {
   backgroundOpacity?: number;
   backgroundPadding?: number;
 };
-export type VideoTimelineAsset = { id: string; name: string; type: string; size: number; duration: number; kind: "video" | "audio" | "image" | "text"; importedAt?: number; fileModifiedAt?: number; width?: number; height?: number; hasAudio?: boolean; derivedFromAssetId?: string; textSettings?: VideoTextSettings };
+export type VideoTimelineAsset = { id: string; name: string; type: string; size: number; duration: number; kind: "video" | "audio" | "image" | "text"; importedAt?: number; fileModifiedAt?: number; width?: number; height?: number; hasAudio?: boolean; derivedFromAssetId?: string; textSettings?: VideoTextSettings; captionCues?: { start: number; end: number; text: string }[]; captionSourceName?: string };
 export type VideoClipTransform = { x: number; y: number; scale: number; rotation: number; opacity: number; mirrorX?: boolean; mirrorY?: boolean };
 export type VideoImageCrop = { left: number; top: number; right: number; bottom: number };
 export type VideoImageSize = { width: number; height: number };
@@ -340,7 +341,7 @@ export async function duplicateProject(id: string): Promise<LocalProject> {
     } else if (original.kind === "video" && original.videoTimeline) {
       const idMap = new Map(original.videoTimeline.assets.map((asset) => [asset.id, crypto.randomUUID()]));
       const assets = original.videoTimeline.assets.map((asset) => ({ ...asset, id: idMap.get(asset.id)!, derivedFromAssetId: asset.derivedFromAssetId ? idMap.get(asset.derivedFromAssetId) : undefined }));
-      const files = await Promise.all(original.videoTimeline.assets.filter((asset) => asset.kind !== "text").map(async (asset) => {
+      const files = await Promise.all(original.videoTimeline.assets.filter((asset) => asset.kind !== "text" || asset.size > 0).map(async (asset) => {
         const file = await readVideoAsset(asset.id);
         if (!file) throw new Error(`The source “${asset.name}” is missing. The project was not duplicated.`);
         return { id: idMap.get(asset.id)!, file };
