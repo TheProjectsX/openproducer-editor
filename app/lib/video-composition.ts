@@ -1,5 +1,5 @@
 import type { VideoTimelineAsset, VideoTimelineClip, VideoTimelineProject } from "./project-store";
-import { evaluateClipKeyframes, evaluateClipTransition } from "./video-keyframes";
+import { evaluateAnimatedEffect, evaluateClipKeyframes, evaluateClipTransition } from "./video-keyframes";
 import { getClipLength } from "./video-timing";
 import { imageClipGeometry } from "./video-image-layout";
 export { getClipLength } from "./video-timing";
@@ -130,20 +130,47 @@ export function drawVideoComposition(
     if (!source || width === 0 || height === 0 || (source instanceof HTMLVideoElement && source.readyState < 2)) continue;
     const fitScale = Math.min(canvas.width / width, canvas.height / height);
     const transform = evaluateClipKeyframes(clip, clipTime).transform;
-    const imageGeometry = asset?.kind === "image" ? imageClipGeometry(width, height, canvas.width, canvas.height, clip.imageCrop, clip.imageSize, transform.scale) : null;
-    const drawWidth = imageGeometry?.width ?? width * fitScale * transform.scale;
-    const drawHeight = imageGeometry?.height ?? height * fitScale * transform.scale;
+    const fx = evaluateAnimatedEffect(clip.animatedEffect, clipTime, clipDuration);
+    const imageGeometry = asset?.kind === "image" ? imageClipGeometry(width, height, canvas.width, canvas.height, clip.imageCrop, clip.imageSize, transform.scale * fx.scaleMultiplier) : null;
+    const drawWidth = imageGeometry?.width ?? width * fitScale * transform.scale * fx.scaleMultiplier;
+    const drawHeight = imageGeometry?.height ?? height * fitScale * transform.scale * fx.scaleMultiplier;
     const effects = clip.effects ?? { brightness: 100, contrast: 100, saturation: 100, grayscale: 0 };
     context.save();
     applyTransitionClip();
     context.globalAlpha = Math.max(0, Math.min(1, transform.opacity * transitionAlpha));
     context.globalCompositeOperation = clip.blendMode ?? "source-over";
-    context.filter = `brightness(${effects.brightness}%) contrast(${effects.contrast}%) saturate(${effects.saturation}%) grayscale(${effects.grayscale}%) hue-rotate(${effects.hue ?? 0}deg) sepia(${effects.sepia ?? 0}%) blur(${effects.blur ?? 0}px)`;
-    context.translate(canvas.width / 2 + transform.x + transitionOffsetX, canvas.height / 2 + transform.y);
-    context.rotate(transform.rotation * Math.PI / 180);
+    context.filter = `brightness(${effects.brightness + fx.extraBrightnessPct}%) contrast(${effects.contrast + fx.extraContrastPct}%) saturate(${effects.saturation}%) grayscale(${effects.grayscale}%) hue-rotate(${(effects.hue ?? 0) + fx.extraHueDeg}deg) sepia(${(effects.sepia ?? 0) + fx.extraSepiaPct}%) blur(${(effects.blur ?? 0) + fx.extraBlurPx}px)`;
+    context.translate(canvas.width / 2 + transform.x + fx.offsetX + transitionOffsetX, canvas.height / 2 + transform.y + fx.offsetY);
+    context.rotate((transform.rotation + fx.rotationDelta) * Math.PI / 180);
     context.scale((transform.mirrorX ? -1 : 1) * transitionScale, (transform.mirrorY ? -1 : 1) * transitionScale);
     if (imageGeometry) context.drawImage(source, imageGeometry.source.x, imageGeometry.source.y, imageGeometry.source.width, imageGeometry.source.height, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
     else context.drawImage(source, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
     context.restore();
+    if (fx.vignetteStrength > 0) {
+      context.save();
+      const outer = Math.hypot(canvas.width, canvas.height) * 0.55;
+      const grad = context.createRadialGradient(canvas.width / 2, canvas.height / 2, outer * 0.35, canvas.width / 2, canvas.height / 2, outer);
+      grad.addColorStop(0, "rgba(0,0,0,0)");
+      grad.addColorStop(1, `rgba(0,0,0,${Math.min(0.9, fx.vignetteStrength)})`);
+      context.fillStyle = grad;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.restore();
+    }
+    if (fx.grainStrength > 0) {
+      context.save();
+      const step = Math.max(6, Math.round(Math.min(canvas.width, canvas.height) / 90));
+      let seed = Math.floor(clipTime * 24) * 2654435761 + 17;
+      for (let gx = 0; gx < canvas.width; gx += step * 3) {
+        for (let gy = 0; gy < canvas.height; gy += step * 3) {
+          seed = (seed * 1664525 + 1013904223) >>> 0;
+          if ((seed & 7) === 0) {
+            const bright = (seed & 8) !== 0;
+            context.fillStyle = bright ? `rgba(255,255,255,${fx.grainStrength * 0.45})` : `rgba(0,0,0,${fx.grainStrength * 0.55})`;
+            context.fillRect(gx + ((seed >> 4) % (step * 2)), gy + ((seed >> 8) % (step * 2)), step, step);
+          }
+        }
+      }
+      context.restore();
+    }
   }
 }

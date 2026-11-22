@@ -94,7 +94,8 @@ Implementation status (2026-11-15): `/studio/video` has a local media bin, six i
 | Core | Preview and composition | Canvas with output aspect ratio and safe bounds; show current frame, overlays, titles, audio, effects, and transitions at timeline time. |
 | Core | Audio | Detach source audio, mute, replace, adjust volume, fade, mix tracks, and maintain sync. |
 | Core | Speed | Custom decimal 0.1×–16× on each clip; recompute timeline duration. Preserve pitch by default for attached audio; allow natural-pitch mode. |
-| Core | Transform and keyframes | Position, scale, rotation, opacity, and volume keyframes with linear interpolation; typed values and time positions. |
+| Core | Transform and keyframes | Position, scale, rotation, opacity, and volume keyframes with linear and eased interpolation; typed values and time positions. |
+| Core | Image to keyframe video | `/tools/video/image-to-video` (cross-linked from Image tools): multi-image sequence with total or per-slide duration, motion presets, custom keyframes/easing, transitions, optional background audio, live canvas preview, and local MP4/WebM export. |
 | Core | Transitions | Cut, dissolve, and crossfade as initial transitions; custom duration. Other transitions require their own verified renderer. |
 | Core | Titles and effects | Editable text with font, size, color, placement, and duration; basic brightness, contrast, saturation, and grayscale controls. |
 | Core | Export | Choose supported MP4 or WebM configuration, output dimensions, frame rate, bitrate, and audio; render a synced playable file. |

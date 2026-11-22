@@ -26,12 +26,14 @@ export type CollageProjectDocument = {
   gap: string;
   cornerRadius?: string;
   deletedCells?: number;
+  customCells?: { x: number; y: number; w: number; h: number }[];
   background: string;
   fit: string;
   caption: string;
   captionSize: string;
   captionColor: string;
   assets: { id: string; name: string; type: string; size: number; slot?: number; cellFit?: "global" | "contain" | "cover"; cellScale?: string; cellOffsetX?: string; cellOffsetY?: string; rotation?: string; flipHorizontal?: boolean; brightness?: string; contrast?: string; saturation?: string }[];
+  layers?: { id: string; name: string; type: string; size: number; x: number; y: number; width: number; height: number; rotation?: string; opacity?: string; flipHorizontal?: boolean }[];
 };
 
 export type AudioProjectDocument = {
@@ -81,10 +83,13 @@ export type VideoImageCrop = { left: number; top: number; right: number; bottom:
 export type VideoImageSize = { width: number; height: number };
 export type VideoTransitionType = "fade" | "wipe-left" | "wipe-right" | "wipe-up" | "wipe-down" | "slide-left" | "slide-right" | "zoom-in";
 export type VideoClipTransitions = { fadeIn: number; fadeOut: number; inType?: VideoTransitionType; outType?: VideoTransitionType };
-export type VideoClipKeyframe = { time: number; transform: VideoClipTransform; volume: number };
+export type KeyframeEasing = "linear" | "ease-in" | "ease-out" | "ease-in-out";
+export type VideoClipKeyframe = { time: number; transform: VideoClipTransform; volume: number; easing?: KeyframeEasing };
 export type VideoClipEffects = { brightness: number; contrast: number; saturation: number; grayscale: number; hue?: number; sepia?: number; blur?: number };
 export type VideoBlendMode = "source-over" | "screen" | "multiply" | "overlay" | "lighten" | "darken";
-export type VideoTimelineClip = { id: string; assetId: string; track: number; start: number; sourceStart: number; sourceEnd: number; speed: number; volume: number; muted: boolean; pitchMode?: "preserve" | "natural"; blendMode?: VideoBlendMode; transform?: VideoClipTransform; effects?: VideoClipEffects; transitions?: VideoClipTransitions; keyframes?: VideoClipKeyframe[]; imageCrop?: VideoImageCrop; imageSize?: VideoImageSize; imageMatchAspect?: boolean };
+export type VideoAnimatedEffectKind = "none" | "float" | "pulse" | "shake" | "blur-in" | "flash" | "color-cycle" | "vignette" | "film-grain";
+export type VideoAnimatedEffect = { kind: VideoAnimatedEffectKind; intensity?: number };
+export type VideoTimelineClip = { id: string; assetId: string; track: number; start: number; sourceStart: number; sourceEnd: number; speed: number; volume: number; muted: boolean; pitchMode?: "preserve" | "natural"; blendMode?: VideoBlendMode; transform?: VideoClipTransform; effects?: VideoClipEffects; animatedEffect?: VideoAnimatedEffect; transitions?: VideoClipTransitions; keyframes?: VideoClipKeyframe[]; imageCrop?: VideoImageCrop; imageSize?: VideoImageSize; imageMatchAspect?: boolean };
 export type VideoTrackState = { hidden?: boolean; muted?: boolean; locked?: boolean };
 export type VideoAspectRatioMode = "original" | "custom" | "16:9" | "4:3" | "2.35:1" | "2:1" | "1.85:1" | "9:16" | "3:4" | "1:1";
 export type VideoTimelineProject = { version: 1; width: number; height: number; aspectRatioMode?: VideoAspectRatioMode; backgroundColor?: string; fps: number; duration: number; playhead: number; assets: VideoTimelineAsset[]; clips: VideoTimelineClip[]; trackStates?: Record<number, VideoTrackState> };
@@ -469,8 +474,8 @@ export async function saveCollageProject(id: string, document: CollageProjectDoc
     const request = projects.get(id) as IDBRequest<LocalProject | undefined>;
     request.onsuccess = () => {
       if (!request.result || request.result.kind !== "image") { transaction.abort(); return; }
-      const nextIds = new Set(document.assets.map((asset) => asset.id));
-      for (const asset of request.result.collageDocument?.assets ?? []) if (!nextIds.has(asset.id)) transaction.objectStore(ASSETS_STORE).delete(asset.id);
+      const nextIds = new Set([...document.assets.map((asset) => asset.id), ...(document.layers ?? []).map((layer) => layer.id)]);
+      for (const asset of [...(request.result.collageDocument?.assets ?? []), ...(request.result.collageDocument?.layers ?? [])]) if (!nextIds.has(asset.id)) transaction.objectStore(ASSETS_STORE).delete(asset.id);
       for (const asset of files) transaction.objectStore(ASSETS_STORE).put(asset);
       projects.put({ ...request.result, title: title?.trim() || request.result.title, collageDocument: document, updatedAt: Date.now() });
     };

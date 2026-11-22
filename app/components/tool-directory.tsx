@@ -1,3 +1,5 @@
+import { NavBackButton } from "./nav-back-button";
+
 const groups = {
   audio: {
     label: "AUDIO WORKSPACE",
@@ -13,7 +15,8 @@ const groups = {
       ["Normalize audio", "Choose a custom peak target and preview the result.", "/tools/audio/normalize", "06"],
       ["Reduce background noise", "Profile a quiet section and reduce matching noise locally.", "/tools/audio/noise-gate", "07"],
       ["Reduce centered vocals", "Try an adjustable stereo center-cancel effect.", "/tools/audio/vocal-reducer", "08"],
-      ["Audio editor", "Open the multitrack audio editing workspace.", "/studio/audio", "09"],
+      ["Voice to transcript", "Transcribe audio, video, or mic recordings locally with Whisper Base.", "/tools/audio/transcribe", "09"],
+      ["Audio editor", "Open the multitrack audio editing workspace.", "/studio/audio", "10"],
     ],
   },
   video: {
@@ -27,6 +30,7 @@ const groups = {
       ["Change video speed", "Use any supported custom playback rate for a local export.", "/tools/video/speed", "03"],
       ["Remove video audio", "Keep the picture and export a muted video copy.", "/tools/video/remove-audio", "04"],
       ["Replace video audio", "Add and mix local audio tracks against a video.", "/tools/video/replace-audio", "05"],
+      ["Image to video", "Animate one or more images with keyframes, motion presets, and audio into an MP4 or WebM.", "/tools/video/image-to-video", "06"],
     ],
   },
   image: {
@@ -35,20 +39,22 @@ const groups = {
     description: "Prepare exact dimensions, refine a composition, and export images without sending them anywhere.",
     color: "image",
     tools: [
-      ["Image editor and resize", "Set exact pixel dimensions and make non-destructive adjustments.", "/tools/image/resize", "01"],
-      ["Downscale image", "Scale by a custom percentage or reduction factor while preserving proportions.", "/tools/image/downscale", "02"],
-      ["Upscale image", "Enlarge images with browser-based AI upscaling.", "/tools/image/upscale", "03"],
-      ["Crop image", "Choose a crop rectangle directly in source-image pixels.", "/tools/image/crop", "04"],
-      ["Make a collage", "Arrange, fit, and caption images on a custom canvas.", "/tools/image/collage", "05"],
-      ["Image editor project", "Open a saved local image workspace and its editable layers.", "/studio/image", "06"],
+      ["Image editor", "Start from a blank, colored, or transparent canvas or insert an image with editable layers.", "/tools/image/editor", "01"],
+      ["Image resize", "Set exact pixel dimensions and make non-destructive adjustments.", "/tools/image/resize", "02"],
+      ["Downscale image", "Scale by a custom percentage or reduction factor while preserving proportions.", "/tools/image/downscale", "03"],
+      ["Upscale image", "Enlarge images with browser-based AI upscaling.", "/tools/image/upscale", "04"],
+      ["Crop image", "Choose a crop rectangle directly in source-image pixels.", "/tools/image/crop", "05"],
+      ["Make a collage", "Arrange, fit, and caption images on a custom canvas.", "/tools/image/collage", "06"],
+      ["Image to video", "Animate images with keyframes, motion presets, and audio into a video.", "/tools/video/image-to-video", "07"],
+      ["Image editor project", "Open a saved local image workspace and its editable layers.", "/studio/image", "08"],
     ],
   },
 } as const;
 
 const categories = [
-  { key: "audio", title: "Audio editor tools", text: "Shape sound, clean recordings, adjust speed, and bring tracks together.", href: "/tools/audio", count: "09 TOOLS" },
-  { key: "video", title: "Video editor tools", text: "Make precise cuts, retime a clip, or compose a multitrack edit.", href: "/tools/video", count: "05 TOOLS" },
-  { key: "image", title: "Image tools", text: "Resize, downscale, crop, refine, and compose image projects.", href: "/tools/image", count: "06 TOOLS" },
+  { key: "audio", title: "Audio editor tools", text: "Shape sound, clean recordings, adjust speed, and bring tracks together.", href: "/tools/audio", count: "10 TOOLS" },
+  { key: "video", title: "Video editor tools", text: "Make precise cuts, retime a clip, or compose a multitrack edit.", href: "/tools/video", count: "06 TOOLS" },
+  { key: "image", title: "Image tools", text: "Resize, downscale, crop, refine, and compose image projects.", href: "/tools/image", count: "08 TOOLS" },
 ] as const;
 
 function Icon({ type }: { type: "audio" | "video" | "image" }) {
@@ -60,7 +66,7 @@ function Icon({ type }: { type: "audio" | "video" | "image" }) {
 export function ToolDirectory({ category }: { category?: keyof typeof groups }) {
   return <main className="catalog-page">
     <header className="site-header">
-      <a href="/" className="brand"><span className="brand-mark" aria-hidden="true">L</span>Local Studio</a>
+      <div className="brand-with-back"><NavBackButton fallback={category ? "/tools" : "/"} /><a href="/" className="brand"><span className="brand-mark" aria-hidden="true">L</span>Local Studio</a></div>
       <nav className="site-nav" aria-label="Main navigation"><a href="/tools">Explore tools</a><a href="/projects">Projects</a></nav>
     </header>
 

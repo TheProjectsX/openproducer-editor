@@ -1,5 +1,16 @@
 # Work log
 
+## 2026-11-22 — Collage Layout Presets (Featured, Grid, Big Photo Wrap, Wide, Tall, Square, Shapes, Instagram, Facebook Cover, Pinterest)
+
+- Redesigned Image Collage's `Layouts` sidebar (`app/routes/image-collage.tsx`, `app/app.css`) with the `Collage Wizard`, `Freeform`, `Custom`, and 10 `Layout Presets` category rows on the 1st page, plus 2nd-page SVG preset grids with `←` back navigation.
+- Added all 216 fixed collage presets in `app/lib/collage-presets.ts` across `featured` (19), `grid` (30), `big-photo-wrap` (24), `wide` (29), `tall` (17), `square` (19), `shapes` (13), `instagram` (30), `facebook-cover` (27), and `pinterest` (28), with unit tests in `tests/collage-presets.test.mjs`.
+
+## 2026-11-22 — Image to keyframe video tool (`/tools/video/image-to-video`)
+
+- Added a local Image to Keyframe Video tool at `/tools/video/image-to-video` (`app/routes/video-image-to-video.tsx`, `app/lib/image-to-video.ts`), linked from both the Video tools and Image tools directories (`app/components/tool-directory.tsx`, `app/components/tool-page-header.tsx`).
+- Supports multi-image import, slide reordering/removal, `Total video length` (proportional scaling) or `Per-image length` modes, 9 motion presets (`Static`, `Zoom in`, `Zoom out`, `Pan left/right/up/down`, `Gentle tilt`, `Pulse fade`), transitions (`Dissolve`, `Zoom in`, `Wipe`, `Slide`), custom per-slide keyframes (`Time`, `Pos X/Y`, `Scale`, `Rotation`, `Opacity`, plus `linear`/`ease-in`/`ease-out`/`ease-in-out` easing in `app/lib/video-keyframes.ts`), optional background audio (volume, fades, loop), live `<canvas>` preview via `drawVideoComposition`, and cancellable local MP4/WebM export via Mediabunny.
+- Added unit tests in `tests/image-to-video.test.mjs`.
+
 ## 2026-11-18 — Timeline marquee multi-select and CapCut-style Video Studio inspector
 
 - Added mouse marquee multi-selection on the Video Studio timeline (`beginTimelineMarquee`..`cancelTimelineMarquee` in `app/routes/studio-video.tsx`, `resolveMarqueeSelection` in `app/lib/video-timeline.ts`, `user-select: none` on `.timeline-scroll` in `app/app.css`, and unit test in `tests/video-timeline.test.mjs`).

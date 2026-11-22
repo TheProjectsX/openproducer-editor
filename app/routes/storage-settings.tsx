@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/storage-settings";
+import { NavBackButton } from "../components/nav-back-button";
 import { deleteProject, listProjects, type LocalProject } from "../lib/project-store";
 
 type StorageSummary = { usage: number | null; quota: number | null; persistent: boolean | null; canPersist: boolean };
@@ -59,7 +60,7 @@ export default function StorageSettings() {
   const persistenceLabel = storage.persistent === null ? "Not reported" : storage.persistent ? "Persistent storage granted" : "Storage may be cleared by the browser";
 
   return <main className="resize-page">
-    <header className="resize-header"><a href="/" className="brand">Local Studio</a><nav aria-label="Main navigation"><a href="/projects">Projects</a><a href="/tools">All tools</a></nav></header>
+    <header className="resize-header"><div className="brand-with-back"><NavBackButton fallback="/" /><a href="/" className="brand"><span className="brand-mark" aria-hidden="true">L</span>Local Studio</a></div><nav aria-label="Main navigation"><a href="/projects">Projects</a><a href="/tools">All tools</a></nav></header>
     <section className="resize-intro"><p className="eyebrow">ON-DEVICE STORAGE</p><h1>Storage settings</h1><p>Projects and source media are stored in this browser on this device. Local Studio does not upload them.</p></section>
     <section className="project-layout">
       <section className="resize-controls" aria-labelledby="storage-status-heading">
