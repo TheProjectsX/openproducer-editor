@@ -25,18 +25,58 @@ async function detectBackend(): Promise<"webgpu" | "wasm"> {
   return "wasm";
 }
 
+type ProgressInfo = {
+  status?: string;
+  file?: string;
+  progress?: number;
+  loaded?: number;
+  total?: number;
+};
+
 async function getTranscriber() {
   if (!transcriberPromise) {
     transcriberPromise = (async () => {
       const backend = await detectBackend();
+      const fileProgress = new Map<string, { loaded: number; total: number; progress: number; done: boolean }>();
+      let maxReportedProgress = 5;
+
       const transcriber = await pipeline("automatic-speech-recognition", "Xenova/whisper-base", {
         device: backend,
         dtype: backend === "webgpu" ? { encoder_model: "fp32", decoder_model_merged: "q4" } : "q8",
-        progress_callback: (info: { status?: string; file?: string; progress?: number }) => {
+        progress_callback: (info: ProgressInfo) => {
+          const key = info.file ?? "whisper-base";
+          const prev = fileProgress.get(key) ?? { loaded: 0, total: 0, progress: 0, done: false };
+          const next = {
+            loaded: typeof info.loaded === "number" ? info.loaded : prev.loaded,
+            total: typeof info.total === "number" ? info.total : prev.total,
+            progress: info.status === "done" ? 100 : (typeof info.progress === "number" ? info.progress : prev.progress),
+            done: info.status === "done" ? true : prev.done,
+          };
+          fileProgress.set(key, next);
+
+          let totalBytes = 0;
+          let loadedBytes = 0;
+          let sumPercent = 0;
+          for (const entry of fileProgress.values()) {
+            if (entry.total > 0) {
+              totalBytes += entry.total;
+              loadedBytes += entry.done ? entry.total : Math.min(entry.loaded, entry.total);
+            }
+            sumPercent += entry.done ? 100 : entry.progress;
+          }
+          const rawRatio = totalBytes > 0 ? loadedBytes / totalBytes : sumPercent / (fileProgress.size * 100);
+          const scaledProgress = Math.min(85, Math.max(maxReportedProgress, Math.round(5 + rawRatio * 80)));
+          maxReportedProgress = scaledProgress;
+
+          const shortName = key.split("/").pop() ?? key;
+          const phase = info.status === "progress" || info.status === "download"
+            ? `Downloading ${shortName}…`
+            : "Loading whisper-base…";
+
           self.postMessage({
             type: "progress",
-            phase: info.status === "progress" ? `Downloading ${info.file ?? "whisper-base"}…` : "Loading whisper-base…",
-            progress: typeof info.progress === "number" ? Math.round(info.progress) : undefined,
+            phase,
+            progress: scaledProgress,
             backend,
           });
         },
@@ -52,7 +92,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   if (type !== "transcribe") return;
   try {
     const { transcriber, backend } = await getTranscriber();
-    self.postMessage({ type: "progress", phase: "Transcribing locally with whisper-base…", progress: 45, backend });
+    self.postMessage({ type: "progress", phase: "Transcribing locally with whisper-base…", progress: 88, backend });
     const run = transcriber as unknown as (
       input: Float32Array,
       opts: Record<string, unknown>,

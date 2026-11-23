@@ -350,3 +350,11 @@ Added `sync-markers-24fps.mp4`, a synthetic four-second H.264/AAC fixture with a
 
 - Image width and height are optional clip-level canvas-pixel dimensions, independent by default; Match image aspect ratio is optional and recalculates height when the crop changes. Crop stores normalized source-edge fractions on the clip. The original imported bitmap is unchanged. A pure geometry function bounds crop to a nonempty source rectangle and feeds the same canvas draw path used by preview and export. Position, rotation, opacity, and mirror remain clip transforms. The selected image preview box supports drag movement and corner resizing, with one undo state per gesture.
 - Evidence: TypeScript, 37 core tests, and the static build passed. In a local production browser, a 400×340 PNG placed on Video 1 accepted 300×300 canvas-pixel size, 25% left crop, and X=100; those values survived refresh. Preview drag changed X/Y; corner drag independently changed width/height. Moving the clip to Overlay 1 retained controls and survived refresh. A one-second image-only MP4 rendered and played in the app; independent Mediabunny inspection reported AVC, 1920×1632, one second, 6,515 bytes. Offline export and cross-browser behavior remain to verify.
+
+## Image Editor PixelLab-parity upgrade (IE-1 through IE-5, 2026-11-23)
+
+- Extracted the image editor composition model, text layout, vector shapes, pixel effects, and perspective homography into `app/lib/image-editor/` (`types.ts`, `text-layout.ts`, `shapes.ts`, `effects.ts`, `perspective.ts`, `renderer.ts`) so live preview, layer merging, and PNG/JPEG/WebP export share one rendering path.
+- Added `imageEditorDocument` persistence (version 2) in `app/lib/project-store.ts` with IndexedDB/OPFS asset storage for base images, image layers, manual eraser alpha masks, and imported `.ttf`/`.otf`/`.woff`/`.woff2` custom fonts (`FontFace` API).
+- Offloaded Erase Color background removal to `app/workers/image-effects.worker.ts` with job cancellation and bitmap caching.
+- Implemented 4-corner perspective warp via solved 3x3 inverse-homography with bilinear interpolation (`solveHomographyMatrix`, `warpCanvasPerspectiveCPU`), and 3D text via stacked-slice extrusion with configurable depth, angle, and shading.
+- Browser manual checking, external viewer inspection, and offline export checks remain open.

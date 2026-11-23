@@ -1,5 +1,24 @@
 # Work log
 
+## 2026-11-23 — Session Handoff (Image Collage, Blank-Canvas Image Editor, Projects UI, Nav Back Button, & Local Voice-to-Transcript)
+
+- **Image Collage (`/tools/image/collage`, `app/routes/image-collage.tsx`, `app/lib/collage-presets.ts`):**
+  - Completed blank-canvas minimal cell styling, interactive gap dividers (`detectGapDividers`, `applyGapDividerDrag`), and 4-edge resizing for overlapping cells (`detectOverlappingCellEdges`, `applyOverlappingEdgeDrag`).
+  - Added empty-cell context menu (**Add Image**, **Delete Cell**), removed cell selection/focus colors, and removed the auto-close timer so the cell menu stays open until the pointer leaves the active cell.
+  - Added **Auto-resize neighbors when deleting a cell** (`deleteCellWithAutoResize`, enabled by default with a toggle in **Customize**).
+  - Added **Transparent** background option (checkerboard preview + true alpha PNG export), **Undo / Redo** (`Ctrl+Z` / `Ctrl+Y`, 100-step history), **floating overlay image layers** (move, corner resize, rotate, opacity, z-order, project persistence), **magnetic attachment**, and **interactive canvas edge/corner resize handles** (`app/components/canvas-resize-handles.tsx`).
+- **Image Editor (`/tools/image/editor`, `app/routes/image-editor.tsx`):**
+  - Added blank-canvas-first Image Editor in **1st position** under Image tools (`app/components/tool-directory.tsx`, `app/components/tool-page-header.tsx`, `app/routes.ts`).
+  - Supports blank/colored/transparent canvas creation, base image insertion & adjustments, drag-and-drop image layers, text layers (with font family, size, bold/italic, color, word-wrapping, exact measured bounding rect, side-width handles, and aspect-locked corner scaling), rectangle/ellipse shapes, magnetic snapping (`app/lib/canvas-snap.ts`), directional canvas edge/corner resizing, Undo/Redo, and cursor-focused `Ctrl + scroll` zoom (`20%–500%`) + panning.
+- **Projects UI & Sub-Page Navigation (`app/routes/projects.tsx`, `app/components/nav-back-button.tsx`, `app/app.css`):**
+  - Redesigned `/projects` with a storage usage meter, persistence toggle, 3-card workspace creator, filter tabs, search, and responsive project cards.
+  - Added a `←` back button beside **Local Studio** in all sub-page navbars (`tool-page-header.tsx`, `tool-directory.tsx`, `projects.tsx`, `storage-settings.tsx`).
+  - Added fast (`130ms–180ms`) UI and auto-resize transitions globally in `app/app.css` with `prefers-reduced-motion` support.
+- **Local Voice-to-Transcript (`/tools/audio/transcribe`, `app/routes/audio-transcribe.tsx`, `app/lib/whisper-worker.ts`, `app/lib/transcript-format.ts`):**
+  - Added `@huggingface/transformers` running `Xenova/whisper-base` in a Web Worker (cached in browser Cache Storage on first use, WebGPU with WASM fallback, cancellable).
+  - Supports audio/video files and live microphone recording, plus manual controls for language, task, output style (`Clean`, `Verbatim`, `Pause-split paragraphs`, `Bullets`, `Timestamped`), filler-word stripping, timestamps, casing, max line width, Find & Replace, inline manual editing, and export to `.txt`, `.md`, `.srt`, `.vtt`, and `.json`.
+- **Verification:** `npm run test:core` (`64/64` tests), `npm run typecheck`, `npm run build` (`31` prerendered routes, `116` service-worker assets), and `git diff --check` all passed.
+
 ## 2026-11-22 — Collage Layout Presets (Featured, Grid, Big Photo Wrap, Wide, Tall, Square, Shapes, Instagram, Facebook Cover, Pinterest)
 
 - Redesigned Image Collage's `Layouts` sidebar (`app/routes/image-collage.tsx`, `app/app.css`) with the `Collage Wizard`, `Freeform`, `Custom`, and 10 `Layout Presets` category rows on the 1st page, plus 2nd-page SVG preset grids with `←` back navigation.

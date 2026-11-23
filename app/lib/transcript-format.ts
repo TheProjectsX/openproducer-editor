@@ -7,7 +7,7 @@ export type TranscriptSegment = {
 export type TranscriptStyle = "clean" | "verbatim" | "paragraphs" | "bullets" | "timestamps";
 export type TranscriptCasing = "preserve" | "sentence" | "lower" | "upper";
 export type TranscriptTimestampFormat = "mm:ss" | "hh:mm:ss";
-export type TranscriptExportFormat = "txt" | "md" | "srt" | "vtt" | "json";
+export type TranscriptExportFormat = "txt" | "csv" | "srt" | "vtt" | "md" | "json";
 
 export type TranscriptStyleOptions = {
   style: TranscriptStyle;
@@ -19,6 +19,10 @@ export type TranscriptStyleOptions = {
   maxLineWidth: number;
   findText?: string;
   replaceText?: string;
+  maxWordsPerSegment?: number;
+  maxDurationSeconds?: number;
+  maxCharsPerSegment?: number;
+  sentenceAware?: boolean;
 };
 
 export function formatDisplayTimestamp(seconds: number, format: TranscriptTimestampFormat): string {
@@ -97,12 +101,98 @@ function groupIntoParagraphs(segments: TranscriptSegment[], pauseGap: number): T
   return groups;
 }
 
+function splitBySentences(text: string): string[] {
+  const parts = text.split(/(?<=[.!?])\s+/).map((p) => p.trim()).filter(Boolean);
+  return parts.length > 0 ? parts : [text];
+}
+
+function splitSegmentByLimits(
+  seg: TranscriptSegment,
+  maxWords: number,
+  maxChars: number,
+  maxDuration: number,
+): TranscriptSegment[] {
+  const words = seg.text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+  const duration = Math.max(0.1, seg.end - seg.start);
+  const byDurationCount = maxDuration > 0 ? Math.max(1, Math.ceil(duration / maxDuration)) : 1;
+  const maxWordsFromDuration = byDurationCount > 1 ? Math.max(1, Math.ceil(words.length / byDurationCount)) : Infinity;
+  const effectiveMaxWords = maxWords > 0 ? Math.min(maxWords, maxWordsFromDuration) : maxWordsFromDuration;
+
+  const chunks: string[] = [];
+  let currentWords: string[] = [];
+  let currentChars = 0;
+
+  for (const word of words) {
+    const nextChars = currentWords.length > 0 ? currentChars + 1 + word.length : word.length;
+    const exceedsWords = currentWords.length >= effectiveMaxWords;
+    const exceedsChars = maxChars > 0 && currentWords.length > 0 && nextChars > maxChars;
+    if (exceedsWords || exceedsChars) {
+      chunks.push(currentWords.join(" "));
+      currentWords = [word];
+      currentChars = word.length;
+    } else {
+      currentWords.push(word);
+      currentChars = nextChars;
+    }
+  }
+  if (currentWords.length > 0) chunks.push(currentWords.join(" "));
+
+  const totalChars = Math.max(1, chunks.reduce((sum, c) => sum + c.length, 0));
+  let cursor = seg.start;
+  return chunks.map((chunk, index) => {
+    const portion = index === chunks.length - 1 ? seg.end - cursor : (duration * chunk.length) / totalChars;
+    const nextEnd = index === chunks.length - 1 ? seg.end : Math.min(seg.end, cursor + Math.max(0.1, portion));
+    const item = { start: cursor, end: Math.max(cursor + 0.1, nextEnd), text: chunk };
+    cursor = item.end;
+    return item;
+  });
+}
+
+export function resegmentTranscript(segments: TranscriptSegment[], options: TranscriptStyleOptions): TranscriptSegment[] {
+  const maxWords = Number(options.maxWordsPerSegment) || 0;
+  const maxDuration = Number(options.maxDurationSeconds) || 0;
+  const maxChars = Number(options.maxCharsPerSegment) || 0;
+  const sentenceAware = Boolean(options.sentenceAware);
+
+  if (maxWords <= 0 && maxDuration <= 0 && maxChars <= 0 && !sentenceAware) {
+    return segments;
+  }
+
+  const sentencePieces: TranscriptSegment[] = [];
+  for (const seg of segments) {
+    if (!sentenceAware) {
+      sentencePieces.push(seg);
+      continue;
+    }
+    const sentences = splitBySentences(seg.text);
+    if (sentences.length <= 1) {
+      sentencePieces.push(seg);
+      continue;
+    }
+    const totalChars = Math.max(1, sentences.reduce((sum, s) => sum + s.length, 0));
+    const duration = Math.max(0.1, seg.end - seg.start);
+    let cursor = seg.start;
+    sentences.forEach((sentence, idx) => {
+      const nextEnd = idx === sentences.length - 1 ? seg.end : Math.min(seg.end, cursor + (duration * sentence.length) / totalChars);
+      sentencePieces.push({ start: cursor, end: Math.max(cursor + 0.1, nextEnd), text: sentence });
+      cursor = nextEnd;
+    });
+  }
+
+  if (maxWords <= 0 && maxDuration <= 0 && maxChars <= 0) {
+    return sentencePieces;
+  }
+
+  return sentencePieces.flatMap((seg) => splitSegmentByLimits(seg, maxWords, maxChars, maxDuration));
+}
+
 export function formatTranscript(
   rawSegments: TranscriptSegment[],
   format: TranscriptExportFormat,
   options: TranscriptStyleOptions,
 ): string {
-  const cleaned = rawSegments
+  const cleanedRaw = rawSegments
     .map((seg) => ({
       start: seg.start,
       end: Math.max(seg.start + 0.1, seg.end),
@@ -110,7 +200,22 @@ export function formatTranscript(
     }))
     .filter((seg) => seg.text.length > 0);
 
+  const cleaned = resegmentTranscript(cleanedRaw, options);
+
   if (!cleaned.length) return "";
+
+  if (format === "csv") {
+    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    const rows = cleaned.map((seg, i) =>
+      [
+        String(i + 1),
+        formatSubtitleTimestamp(seg.start, "."),
+        formatSubtitleTimestamp(seg.end, "."),
+        escapeCsv(seg.text),
+      ].join(","),
+    );
+    return `Index,Start,End,Text\n${rows.join("\n")}`;
+  }
 
   if (format === "json") {
     return JSON.stringify(

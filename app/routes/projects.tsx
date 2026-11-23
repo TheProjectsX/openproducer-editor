@@ -16,6 +16,7 @@ export function meta({}: Route.MetaArgs) {
 
 function projectBadge(project: LocalProject) {
   if (project.collageDocument) return { label: "IMAGE COLLAGE", tone: "collage" };
+  if (project.imageEditorDocument) return { label: "IMAGE EDITOR", tone: "image" };
   if (project.kind === "video") return { label: "VIDEO STUDIO", tone: "video" };
   if (project.kind === "audio") return { label: "AUDIO STUDIO", tone: "audio" };
   return { label: "IMAGE WORKSPACE", tone: "image" };
@@ -250,7 +251,9 @@ export default function Projects() {
                 const badge = projectBadge(project);
                 const targetUrl = project.collageDocument
                   ? `/tools/image/collage?project=${encodeURIComponent(project.id)}`
-                  : `/studio/${project.kind}?project=${encodeURIComponent(project.id)}`;
+                  : project.imageEditorDocument
+                    ? `/tools/image/editor?project=${encodeURIComponent(project.id)}`
+                    : `/studio/${project.kind}?project=${encodeURIComponent(project.id)}`;
                 return (
                   <li className="project-card" key={project.id}>
                     <div className="project-card-top">

@@ -1,3 +1,5 @@
+import type { ImageEditorDocument } from "./image-editor/types";
+
 export type ProjectKind = "audio" | "video" | "image";
 
 export type LocalProject = {
@@ -14,6 +16,7 @@ export type LocalProject = {
   videoTimeline?: VideoTimelineProject;
   audioDocument?: AudioProjectDocument;
   collageDocument?: CollageProjectDocument;
+  imageEditorDocument?: ImageEditorDocument;
 };
 
 export type CollageProjectDocument = {
@@ -334,6 +337,43 @@ export async function duplicateProject(id: string): Promise<LocalProject> {
         }));
         await saveCollageProject(copy.id, { ...structuredClone(original.collageDocument), assets: copiedAssets.map(({ asset }) => asset) }, copiedAssets.map(({ asset, file }) => ({ id: asset.id, file })));
       }
+      if (original.imageEditorDocument) {
+        const doc = structuredClone(original.imageEditorDocument);
+        const copiedFiles: { id: string; file: File }[] = [];
+        if (doc.baseImage) {
+          const file = await readVideoAsset(doc.baseImage.id);
+          if (!file) throw new Error(`The base image “${doc.baseImage.name}” is missing. The project was not duplicated.`);
+          const nextId = crypto.randomUUID();
+          doc.baseImage = { ...doc.baseImage, id: nextId };
+          copiedFiles.push({ id: nextId, file });
+        }
+        doc.layers = await Promise.all(doc.layers.map(async (layer) => {
+          if (layer.kind !== "image") return layer;
+          const file = await readVideoAsset(layer.id);
+          if (!file) throw new Error(`The image layer “${layer.assetName}” is missing. The project was not duplicated.`);
+          const nextId = crypto.randomUUID();
+          copiedFiles.push({ id: nextId, file });
+          let nextMaskId = layer.eraserMaskId;
+          if (layer.eraserMaskId) {
+            const maskFile = await readVideoAsset(layer.eraserMaskId);
+            if (maskFile) {
+              nextMaskId = crypto.randomUUID();
+              copiedFiles.push({ id: nextMaskId, file: maskFile });
+            }
+          }
+          return { ...layer, id: nextId, eraserMaskId: nextMaskId };
+        }));
+        if (doc.customFonts?.length) {
+          doc.customFonts = await Promise.all(doc.customFonts.map(async (font) => {
+            const fontFile = await readVideoAsset(font.id);
+            if (!fontFile) return font;
+            const nextId = crypto.randomUUID();
+            copiedFiles.push({ id: nextId, file: fontFile });
+            return { ...font, id: nextId };
+          }));
+        }
+        await saveImageEditorProject(copy.id, doc, copiedFiles);
+      }
     } else if (original.kind === "audio" && original.audioDocument) {
       const source = original.audioDocument.sourceAssetId ? await readAudioAsset(original.audioDocument.sourceAssetId) : null;
       const document = { ...original.audioDocument, sourceAssetId: source ? `${copy.id}:audio-source` : null };
@@ -386,6 +426,14 @@ export async function deleteProject(id: string): Promise<void> {
     if (project?.audioDocument?.sourceAssetId) transaction.objectStore(ASSETS_STORE).delete(project.audioDocument.sourceAssetId);
     if (project?.audioDocument?.sourceAssetId?.endsWith(":audio-source")) transaction.objectStore(ASSETS_STORE).delete(project.audioDocument.sourceAssetId);
     for (const asset of project?.collageDocument?.assets ?? []) transaction.objectStore(ASSETS_STORE).delete(asset.id);
+    if (project?.imageEditorDocument?.baseImage) transaction.objectStore(ASSETS_STORE).delete(project.imageEditorDocument.baseImage.id);
+    for (const font of project?.imageEditorDocument?.customFonts ?? []) transaction.objectStore(ASSETS_STORE).delete(font.id);
+    for (const layer of project?.imageEditorDocument?.layers ?? []) {
+      if (layer.kind === "image") {
+        transaction.objectStore(ASSETS_STORE).delete(layer.id);
+        if (layer.eraserMaskId) transaction.objectStore(ASSETS_STORE).delete(layer.eraserMaskId);
+      }
+    }
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("Could not delete the local project."));
   });
@@ -482,6 +530,52 @@ export async function saveCollageProject(id: string, document: CollageProjectDoc
     };
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("Could not save the collage project."));
+    transaction.onabort = () => reject(transaction.error ?? new Error("The image project is missing or no longer available."));
+  });
+}
+
+/** Save an image editor document and its referenced asset files to local project storage. */
+export async function saveImageEditorProject(
+  id: string,
+  document: ImageEditorDocument,
+  files: { id: string; file: File }[],
+  title?: string,
+): Promise<void> {
+  const database = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction([PROJECTS_STORE, ASSETS_STORE], "readwrite");
+    const projects = transaction.objectStore(PROJECTS_STORE);
+    const request = projects.get(id) as IDBRequest<LocalProject | undefined>;
+    request.onsuccess = () => {
+      if (!request.result || request.result.kind !== "image") { transaction.abort(); return; }
+      const nextIds = new Set<string>([
+        ...(document.baseImage ? [document.baseImage.id] : []),
+        ...(document.customFonts ?? []).map((f) => f.id),
+        ...document.layers.flatMap((l) => (l.kind === "image" ? [l.id, ...(l.eraserMaskId ? [l.eraserMaskId] : [])] : [])),
+      ]);
+      const prevDoc = request.result.imageEditorDocument;
+      if (prevDoc?.baseImage && !nextIds.has(prevDoc.baseImage.id)) {
+        transaction.objectStore(ASSETS_STORE).delete(prevDoc.baseImage.id);
+      }
+      for (const font of prevDoc?.customFonts ?? []) {
+        if (!nextIds.has(font.id)) transaction.objectStore(ASSETS_STORE).delete(font.id);
+      }
+      for (const layer of prevDoc?.layers ?? []) {
+        if (layer.kind === "image") {
+          if (!nextIds.has(layer.id)) transaction.objectStore(ASSETS_STORE).delete(layer.id);
+          if (layer.eraserMaskId && !nextIds.has(layer.eraserMaskId)) transaction.objectStore(ASSETS_STORE).delete(layer.eraserMaskId);
+        }
+      }
+      for (const asset of files) transaction.objectStore(ASSETS_STORE).put(asset);
+      projects.put({
+        ...request.result,
+        title: title?.trim() || request.result.title,
+        imageEditorDocument: document,
+        updatedAt: Date.now(),
+      });
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("Could not save the image editor project."));
     transaction.onabort = () => reject(transaction.error ?? new Error("The image project is missing or no longer available."));
   });
 }

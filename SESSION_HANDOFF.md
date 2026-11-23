@@ -1,5 +1,67 @@
 # Session handoff — Local Studio Core
 
+## Current handoff — 2026-11-23 (Evening, Asia/Dhaka)
+
+### Checkout and guardrails
+
+- Workspace: `e:\Coding_Practice\Live Projects\openproducer-editor`.
+- Uncommitted changes are present in `SESSION_HANDOFF.md`, `WORK_LOG.md`, `app/app.css`, `app/lib/project-store.ts`, `app/lib/transcript-format.ts`, `app/lib/whisper-worker.ts`, `app/routes/audio-transcribe.tsx`, `app/routes/image-editor.tsx`, `app/routes/projects.tsx`, `project_research/docs/02-feature-matrix.md`, `project_research/docs/10-decisions-and-sources.md`, `tests/transcript-format.test.mjs`, and untracked `app/components/image-editor/`, `app/lib/image-editor/`, `app/workers/image-effects.worker.ts`, and `tests/image-editor.test.mjs`. Preserve all work; do not reset or clean. Run `git status --short` before further work.
+- Read root `README.md`, `AGENTS.md`, and `project_research/` guides before implementation. Keep all media, projects, processing, preview, and export on-device.
+
+### Work completed in this session
+
+- **Voice to Transcript (`/tools/audio/transcribe`) recorder-in-editor flow (`app/routes/audio-transcribe.tsx`, `app/app.css`):**
+  - Updated **Record from microphone** on `MediaImportScreen` to open the editor workspace (`editorOpened`, `recorderOpen`) and display an inline **Microphone recorder** panel instead of requesting `getUserMedia` or recording on the import screen.
+  - Added **Start recording**, **Pause** / **Resume**, **Stop & use recording**, **Close** / **Discard**, elapsed `MM:SS` timer, live `AnalyserNode` input level meter, and inline `recorderError` handling.
+- **Whisper progress & layout stability (`app/routes/audio-transcribe.tsx`, `app/lib/whisper-worker.ts`, `app/app.css`):**
+  - Fixed `ProcessingProgress` receiving `progress / 100` instead of `0–100` (`progress`), which had kept the percentage stuck at `0%`.
+  - Aggregated per-file download progress in `whisper-worker.ts` with monotonic `5%`–`85%` scaling during model download/load (`88%` during transcription) and basename-only labels.
+  - Truncated `.processing-progress-label > span` to a single line (`text-overflow: ellipsis; white-space: nowrap`) so long model filenames no longer wrap and jump the layout.
+- **Clean sidebar UI, export formats & segmentation (`app/routes/audio-transcribe.tsx`, `app/lib/transcript-format.ts`, `app/app.css`, `tests/transcript-format.test.mjs`):**
+  - Replaced cramped 2-column dropdowns and cluttered formatting controls with full-width **Language** / **Task** selects, a vertical **Export formats** checklist (`TXT`, `CSV`, `SRT`, `VTT`, `MD`, `JSON`) supporting multi-file download, and a clean **Settings** section (**Section Timestamps**, **Max Words Per Segment**, and collapsible **Advanced Segmentation Settings** for **Max Duration Per Segment (Seconds)**, **Max Characters Per Segment**, and **Sentence-Aware Segmentation**).
+  - Added `csv` formatting and `resegmentTranscript` to `app/lib/transcript-format.ts`, plus unit tests in `tests/transcript-format.test.mjs`.
+  - Removed the border and `:focus` / `:focus-visible` outline from `.transcript-editor-box` in `app/app.css`.
+
+### Verification and next priorities
+
+- **Verified in this session:**
+  - `npm run typecheck`: passed (`react-router typegen && tsc`).
+  - `npm run test:core`: **77/77** tests passed (including new `csv` and `resegmentTranscript` tests; followed by a CSS-only edit to `.transcript-editor-box`).
+- **Next priorities:**
+  1. **Run `npm run build`** to verify the static production build and service worker after the `/tools/audio/transcribe` and `/tools/image/editor` changes.
+  2. **Manual browser verification of `/tools/audio/transcribe`:** Verify opening the editor via **Record from microphone**, recording/pausing/discarding/using mic audio, Whisper Base download progress & transcription, multi-format exports (`TXT`/`CSV`/`SRT`/`VTT`/`MD`/`JSON`), segmentation settings, and offline cached transcription.
+  3. **Manual browser verification of `/tools/image/editor`:** Verify all Image Editor tools, project save/reopen/duplicate, PNG/JPEG/WebP export fidelity, and offline mode (carried over from earlier today).
+
+## Current handoff — 2026-11-23 (Afternoon, Asia/Dhaka)
+
+### Checkout and guardrails
+
+- Workspace: `e:\Coding_Practice\Live Projects\openproducer-editor`.
+- Uncommitted changes are present in `WORK_LOG.md`, `app/app.css`, `app/lib/project-store.ts`, `app/routes/image-editor.tsx`, `app/routes/projects.tsx`, `project_research/docs/02-feature-matrix.md`, `project_research/docs/10-decisions-and-sources.md`, and untracked `app/components/image-editor/`, `app/lib/image-editor/`, `app/workers/image-effects.worker.ts`, and `tests/image-editor.test.mjs`. Preserve all work; do not reset or clean. Run `git status --short` before further work.
+- Read root `README.md`, `AGENTS.md`, and `project_research/` guides before implementation. Keep all media, projects, processing, preview, and export on-device.
+
+### Work completed in this session
+
+- **Image Editor PixelLab-parity upgrade (IE-1 through IE-5):**
+  - **Shared engine & persistence (`app/lib/image-editor/`, `app/lib/project-store.ts`, `app/routes/projects.tsx`):** Extracted `types.ts`, `text-layout.ts`, `shapes.ts`, `effects.ts`, `perspective.ts`, and `renderer.ts` so live preview, layer merging, and PNG/JPEG/WebP export share one composition renderer. Added `imageEditorDocument` (`version: 2`) persistence in IndexedDB/OPFS (including base image, image layers, eraser masks, and custom fonts) and `/tools/image/editor?project=<id>` loading/duplication/deletion.
+  - **Typography, gradients, shapes, stickers & layers:** Added text stroke, drop/inner shadow, background highlight box, alignment, letter/line spacing, text case, curved text, 3D stacked-slice extrusion, reflection, and local `.ttf`/`.otf`/`.woff`/`.woff2` font import (`FontFace`). Added solid/linear/radial gradients (`FillStyleControl`), expanded shapes (`rectangle`, `rounded-rect`, `ellipse`, `polygon`, `star`, `arrow`, `speech-bubble`), emoji/sticker layers, layer lock, duplicate, merge visible layers, and 8×8 alignment grid.
+  - **Draw, Bezier, Crop, Cutouts & Perspective:** Added Freehand Draw mode (smoothed strokes, dashed, neon glow), Bezier Path tool (interactive stage vertices, closed/open), per-layer crop & shape clipping (`circle` / `rounded-rect`), colorize/tint, emboss, worker-offloaded Erase Color (`app/workers/image-effects.worker.ts`), Manual Eraser Brush (persisted alpha mask), 4-corner perspective warp (3×3 inverse-homography with bilinear interpolation), and canvas Vignette/Noise/Stripes overlays.
+- **Image Editor UI/UX & layout fixes (`app/routes/image-editor.tsx`, `app/components/image-editor/`, `app/app.css`):**
+  - Fixed stage/canvas box sync (`display: inline-block; width: fit-content`, `maxHeight: "none"`, `objectFit: "fill"` on `<canvas>`) so layer selection boxes align 1:1 without gaps.
+  - Converted layer-add controls into a 2×2 grid (`+ Image`, `+ Text`, `+ Sticker`, `+ Shape…`), moved canvas size presets into a dropdown, fixed checkbox width inside `.dimension-fields`, and pinned the sidebar footer (`Save` / `Download`) with an independently scrollable middle panel.
+  - Refactored `LayerInspector` and `CanvasEffectsPanel` to a BeFunky-style drill-down menu (`←` back button + active indicator dots), pinned the `Text` textarea at the top of the text menu, added in-place WYSIWYG canvas text editing on double-click (`hiddenLayerId` hides underlying canvas text while editing), and ensured only one rail button is active at a time.
+- **Docs & unit tests:** Updated `project_research/docs/02-feature-matrix.md` and `project_research/docs/10-decisions-and-sources.md`; added 6 unit tests in `tests/image-editor.test.mjs`.
+
+### Verification and next priorities
+
+- **Verified in this session:**
+  - `npm run typecheck`: passed with **0 errors**.
+  - `npm run test:core`: **76/76** tests passed (last run prior to UI-only CSS/layout/drill-down polish).
+  - `npm run build`: passed after the final edit (117 service-worker assets and 31 prerendered routes verified).
+- **Next priorities:**
+  1. **Manual browser verification of `/tools/image/editor`:** Check all new tools (3D/curved/in-place text, custom `.ttf`/`.otf` fonts, gradients, shapes/stickers, freehand draw, Bezier paths, Erase Color worker, manual eraser brush, 4-corner perspective warp, layer merge/lock, Vignette/Noise/Stripes), project save/reopen/duplicate, PNG/JPEG/WebP export fidelity, and offline mode.
+  2. **Re-run `npm run test:core`** before any new feature work or commit.
+
 ## Current handoff — 2026-11-19 (Afternoon, Asia/Dhaka)
 
 ### Checkout and guardrails

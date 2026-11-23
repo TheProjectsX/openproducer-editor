@@ -47,4 +47,22 @@ test("formatTranscript groups paragraphs by pause threshold and formats SRT/VTT/
 
   const json = JSON.parse(formatTranscript(sampleSegments, "json", baseOptions));
   assert.equal(json.segments.length, 3);
+
+  const csv = formatTranscript(sampleSegments, "csv", baseOptions);
+  assert.ok(csv.startsWith("Index,Start,End,Text\n1,00:00:00.000,00:00:02.200,"));
+});
+
+test("resegmentTranscript splits segments by word limit and sentence boundaries", () => {
+  const longSegments = [
+    { start: 0, end: 10, text: "First sentence has five words. Second sentence also has five words." },
+  ];
+  const srt = formatTranscript(longSegments, "srt", {
+    ...baseOptions,
+    maxWordsPerSegment: 4,
+    maxDurationSeconds: 10,
+    maxCharsPerSegment: 80,
+    sentenceAware: true,
+  });
+  assert.ok(srt.includes("1\n00:00:00,000 --> "));
+  assert.ok(srt.includes("\n\n4\n"));
 });
