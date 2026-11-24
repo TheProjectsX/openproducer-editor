@@ -21,6 +21,12 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
+const MODELS = [
+  ["Xenova/whisper-base", "Fast · Whisper Base (~75 MB)"],
+  ["Xenova/whisper-small", "Balanced · Whisper Small (~250 MB)"],
+  ["Xenova/whisper-medium", "Powerful · Whisper Medium (~780 MB)"],
+] as const;
+
 const LANGUAGES = [
   ["auto", "Auto-detect"],
   ["en", "English"],
@@ -87,6 +93,10 @@ export default function AudioTranscribe() {
   const [backend, setBackend] = useState("");
   const [error, setError] = useState("");
 
+  const [modelId, setModelId] = useState<string>(MODELS[0][0]);
+  const [modelStatus, setModelStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [modelProgress, setModelProgress] = useState(0);
+  const [modelPhase, setModelPhase] = useState("");
   const [language, setLanguage] = useState("auto");
   const [task, setTask] = useState<"transcribe" | "translate">("transcribe");
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
@@ -283,10 +293,58 @@ export default function AudioTranscribe() {
     setRecorderOpen(false);
   }
 
+  function ensureWorker(): Worker {
+    if (workerRef.current) return workerRef.current;
+    const worker = new Worker(new URL("../lib/whisper-worker.ts", import.meta.url), { type: "module" });
+    worker.onmessage = (event: MessageEvent<{ type: string; modelId?: string; phase?: string; progress?: number; backend?: string; segments?: TranscriptSegment[]; message?: string }>) => {
+      const msg = event.data;
+      if (msg.type === "preload_progress") {
+        setModelStatus("loading");
+        if (msg.phase) setModelPhase(msg.phase);
+        if (typeof msg.progress === "number") setModelProgress(msg.progress);
+        if (msg.backend) setBackend(msg.backend.toUpperCase());
+      } else if (msg.type === "preload_ready") {
+        setModelStatus("ready");
+        setModelProgress(100);
+        setModelPhase("Model ready");
+        if (msg.backend) setBackend(msg.backend.toUpperCase());
+      } else if (msg.type === "preload_error") {
+        setModelStatus("error");
+        setModelPhase(msg.message ?? "Model preload failed.");
+      } else if (msg.type === "progress") {
+        if (msg.phase) setPhase(msg.phase);
+        if (typeof msg.progress === "number") setProgress(msg.progress);
+        if (msg.backend) setBackend(msg.backend.toUpperCase());
+      } else if (msg.type === "done") {
+        setSegments(msg.segments ?? []);
+        if (msg.backend) setBackend(msg.backend.toUpperCase());
+        setModelStatus("ready");
+        setProgress(100);
+        setPhase("Transcript ready.");
+        setTranscribing(false);
+      } else if (msg.type === "error") {
+        setError(msg.message ?? "Transcription failed.");
+        setTranscribing(false);
+      }
+    };
+    worker.onerror = (err) => {
+      setError(err.message || "Whisper worker failed.");
+      setModelStatus("error");
+      setTranscribing(false);
+      worker.terminate();
+      workerRef.current = null;
+    };
+    workerRef.current = worker;
+    return worker;
+  }
+
   function cancelTranscription() {
     workerRef.current?.terminate();
     workerRef.current = null;
     setTranscribing(false);
+    setModelStatus("idle");
+    setModelProgress(0);
+    setModelPhase("");
     setPhase("Cancelled.");
   }
 
@@ -294,41 +352,13 @@ export default function AudioTranscribe() {
     if (!file || transcribing) return;
     setError("");
     setTranscribing(true);
-    setProgress(5);
+    setProgress(modelStatus === "ready" ? 85 : 5);
     setPhase("Decoding audio to 16 kHz PCM…");
     setManualOverride(null);
     try {
       const pcm = await decodeAudioToMono16k(file);
-      const worker = new Worker(new URL("../lib/whisper-worker.ts", import.meta.url), { type: "module" });
-      workerRef.current = worker;
-      worker.onmessage = (event: MessageEvent<{ type: string; phase?: string; progress?: number; backend?: string; segments?: TranscriptSegment[]; message?: string }>) => {
-        const msg = event.data;
-        if (msg.type === "progress") {
-          if (msg.phase) setPhase(msg.phase);
-          if (typeof msg.progress === "number") setProgress(msg.progress);
-          if (msg.backend) setBackend(msg.backend.toUpperCase());
-        } else if (msg.type === "done") {
-          setSegments(msg.segments ?? []);
-          if (msg.backend) setBackend(msg.backend.toUpperCase());
-          setProgress(100);
-          setPhase("Transcript ready.");
-          setTranscribing(false);
-          worker.terminate();
-          workerRef.current = null;
-        } else if (msg.type === "error") {
-          setError(msg.message ?? "Transcription failed.");
-          setTranscribing(false);
-          worker.terminate();
-          workerRef.current = null;
-        }
-      };
-      worker.onerror = (err) => {
-        setError(err.message || "Whisper worker failed.");
-        setTranscribing(false);
-        worker.terminate();
-        workerRef.current = null;
-      };
-      worker.postMessage({ type: "transcribe", audio: pcm, language, task }, [pcm.buffer]);
+      const worker = ensureWorker();
+      worker.postMessage({ type: "transcribe", modelId, audio: pcm, language, task }, [pcm.buffer]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not decode this media file.");
       setTranscribing(false);
@@ -383,6 +413,15 @@ export default function AudioTranscribe() {
 
   const workspaceActive = Boolean(file || editorOpened);
 
+  useEffect(() => {
+    if (!workspaceActive || transcribing) return;
+    setModelStatus("loading");
+    setModelProgress(5);
+    setModelPhase("Preparing model in background…");
+    const worker = ensureWorker();
+    worker.postMessage({ type: "preload", modelId });
+  }, [workspaceActive, modelId]);
+
   return (
     <main className={`resize-page${workspaceActive ? " has-media" : ""}`}>
       <ToolPageHeader />
@@ -426,8 +465,26 @@ export default function AudioTranscribe() {
             </p>
 
             <details className="editor-control-group" open>
-              <summary>Recognition (Whisper Base)</summary>
+              <summary>Recognition</summary>
               <div className="editor-control-content transcribe-stack">
+                <label className="transcribe-field">
+                  Model
+                  <select value={modelId} disabled={transcribing} onChange={(e) => setModelId(e.currentTarget.value)}>
+                    {MODELS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                  </select>
+                </label>
+                {!transcribing && modelStatus !== "idle" && (
+                  <div className={`transcribe-model-status${modelStatus === "ready" ? " is-ready" : modelStatus === "error" ? " is-error" : ""}`} role="status">
+                    <span className="transcribe-model-dot" aria-hidden="true" />
+                    <span>
+                      {modelStatus === "ready"
+                        ? `Model ready${backend ? ` · ${backend}` : ""}`
+                        : modelStatus === "error"
+                          ? modelPhase || "Model preload failed"
+                          : `Preloading in background… ${modelProgress}%`}
+                    </span>
+                  </div>
+                )}
                 <label className="transcribe-field">
                   Language
                   <select value={language} onChange={(e) => setLanguage(e.currentTarget.value)}>
@@ -445,7 +502,7 @@ export default function AudioTranscribe() {
                   {transcribing ? "Transcribing…" : segments.length ? "Re-transcribe locally" : "Transcribe locally"}
                 </button>
                 {transcribing && <>
-                  <ProcessingProgress label={phase || "Running Whisper Base on this device"} value={progress} />
+                  <ProcessingProgress label={phase || "Running Whisper on this device"} value={progress} />
                   <button type="button" className="secondary-button" onClick={cancelTranscription}>Cancel transcription</button>
                 </>}
               </div>

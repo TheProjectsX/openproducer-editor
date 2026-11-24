@@ -3,14 +3,22 @@ import { env, pipeline } from "@huggingface/transformers";
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 
-type WorkerRequest = {
-  type: "transcribe";
-  audio: Float32Array;
-  language: string;
-  task: "transcribe" | "translate";
-};
+type WorkerRequest =
+  | {
+      type: "preload";
+      modelId: string;
+    }
+  | {
+      type: "transcribe";
+      modelId: string;
+      audio: Float32Array;
+      language: string;
+      task: "transcribe" | "translate";
+    };
 
+let loadedModelId: string | null = null;
 let transcriberPromise: Promise<{ transcriber: Awaited<ReturnType<typeof pipeline>>; backend: "webgpu" | "wasm" }> | null = null;
+let lastLoadMode: "preload" | "transcribe" = "preload";
 
 async function detectBackend(): Promise<"webgpu" | "wasm"> {
   try {
@@ -33,18 +41,21 @@ type ProgressInfo = {
   total?: number;
 };
 
-async function getTranscriber() {
-  if (!transcriberPromise) {
+async function getTranscriber(modelId: string, mode: "preload" | "transcribe") {
+  lastLoadMode = mode;
+  if (!transcriberPromise || loadedModelId !== modelId) {
+    loadedModelId = modelId;
+    const shortModel = modelId.split("/").pop() ?? modelId;
     transcriberPromise = (async () => {
       const backend = await detectBackend();
       const fileProgress = new Map<string, { loaded: number; total: number; progress: number; done: boolean }>();
       let maxReportedProgress = 5;
 
-      const transcriber = await pipeline("automatic-speech-recognition", "Xenova/whisper-base", {
+      const transcriber = await pipeline("automatic-speech-recognition", modelId, {
         device: backend,
         dtype: backend === "webgpu" ? { encoder_model: "fp32", decoder_model_merged: "q4" } : "q8",
         progress_callback: (info: ProgressInfo) => {
-          const key = info.file ?? "whisper-base";
+          const key = info.file ?? shortModel;
           const prev = fileProgress.get(key) ?? { loaded: 0, total: 0, progress: 0, done: false };
           const next = {
             loaded: typeof info.loaded === "number" ? info.loaded : prev.loaded,
@@ -71,10 +82,11 @@ async function getTranscriber() {
           const shortName = key.split("/").pop() ?? key;
           const phase = info.status === "progress" || info.status === "download"
             ? `Downloading ${shortName}…`
-            : "Loading whisper-base…";
+            : `Loading ${shortModel}…`;
 
           self.postMessage({
-            type: "progress",
+            type: lastLoadMode === "transcribe" ? "progress" : "preload_progress",
+            modelId,
             phase,
             progress: scaledProgress,
             backend,
@@ -88,11 +100,31 @@ async function getTranscriber() {
 }
 
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
-  const { type, audio, language, task } = event.data;
-  if (type !== "transcribe") return;
+  const msg = event.data;
+  if (msg.type === "preload") {
+    try {
+      const { backend } = await getTranscriber(msg.modelId, "preload");
+      self.postMessage({ type: "preload_ready", modelId: msg.modelId, backend });
+    } catch (cause) {
+      if (loadedModelId === msg.modelId) {
+        transcriberPromise = null;
+        loadedModelId = null;
+      }
+      self.postMessage({
+        type: "preload_error",
+        modelId: msg.modelId,
+        message: cause instanceof Error ? cause.message : "Model preload failed.",
+      });
+    }
+    return;
+  }
+
+  if (msg.type !== "transcribe") return;
+  const { modelId, audio, language, task } = msg;
   try {
-    const { transcriber, backend } = await getTranscriber();
-    self.postMessage({ type: "progress", phase: "Transcribing locally with whisper-base…", progress: 88, backend });
+    const { transcriber, backend } = await getTranscriber(modelId, "transcribe");
+    self.postMessage({ type: "preload_ready", modelId, backend });
+    self.postMessage({ type: "progress", phase: "Transcribing locally…", progress: 88, backend });
     const run = transcriber as unknown as (
       input: Float32Array,
       opts: Record<string, unknown>,
