@@ -358,3 +358,13 @@ Added `sync-markers-24fps.mp4`, a synthetic four-second H.264/AAC fixture with a
 - Offloaded Erase Color background removal to `app/workers/image-effects.worker.ts` with job cancellation and bitmap caching.
 - Implemented 4-corner perspective warp via solved 3x3 inverse-homography with bilinear interpolation (`solveHomographyMatrix`, `warpCanvasPerspectiveCPU`), and 3D text via stacked-slice extrusion with configurable depth, angle, and shading.
 - Browser manual checking, external viewer inspection, and offline export checks remain open.
+
+## Video Speed: offline WebCodecs/Mediabunny + Bungee pipeline (2026-11-26)
+
+- Replaced the real-time `HTMLVideoElement.captureStream()` + `MediaRecorder` prototype in `app/routes/video-speed.tsx` with an offline rendering pipeline in `app/lib/video-speed.ts`.
+- Video frames are decoded via Mediabunny `VideoSampleSink`, retimed (`timestamp / speed`, `duration / speed`, capped at 60 fps output via `shouldIncludeRetimedSample` to avoid encoder limits at high speedups), and encoded via `VideoSampleSource`.
+- Audio is extracted via Mediabunny `WavOutputFormat`, processed locally with `bungee-web` (2,048-frame chunks for pitch-preserved mode; bypassed at 1×) or `renderNaturalSpeedChunk` (natural-pitch mode), and muxed via `AudioBufferSource`.
+- Output format checks `canEncodeVideo`/`canEncodeAudio` and prefers MP4 (`avc`/`aac`) by default, with WebM (`vp9`/`vp8`/`opus`) as fallback or explicit option, replacing the previous WebM-first `MediaRecorder` default.
+- Updated `app/routes/video-speed.tsx` and `app/app.css` with speed slider, custom typed speed and target-duration inputs, preset pills, pitch mode selector, format selector, before/after duration summary, frame-step preview transport, and cancellable progress.
+- Added unit tests in `tests/video-speed.test.mjs`; browser end-to-end export and external player inspection remain open.
+

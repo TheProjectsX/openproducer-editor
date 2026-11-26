@@ -1292,3 +1292,94 @@ button, a, summary, input, select, textarea, .file-picker span {
   cursor: pointer;
 }
 .be-back-btn:hover { background: #1d314d; }
+
+/* Video Speed tool layout */
+.resize-page.has-media > .resize-workspace.video-speed-workspace > .resize-controls.video-speed-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  align-items: start;
+  gap: 14px;
+}
+.video-speed-file-row,
+.video-speed-panel,
+.video-speed-summary,
+.video-speed-actions,
+.video-speed-controls .resize-error,
+.video-speed-controls .processing-progress {
+  grid-column: 1 / -1;
+}
+.video-speed-file-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+.video-speed-file-row .source-info {
+  margin: 0;
+}
+.video-speed-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #2b3c54;
+  border-radius: 10px;
+  background: #101927;
+}
+.video-speed-slider-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+}
+.video-speed-range {
+  width: 100%;
+  accent-color: #4d83ed;
+  cursor: pointer;
+}
+.speed-presets button.active {
+  border-color: #4d83ed;
+  background: #1f3557;
+  color: #ffffff;
+}
+.video-speed-options {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 12px;
+}
+.video-speed-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 10px 12px;
+  border: 1px solid #263750;
+  border-radius: 9px;
+  background: #0d1522;
+}
+.video-speed-summary > div {
+  display: grid;
+  gap: 2px;
+}
+.video-speed-summary span {
+  font-size: 11px;
+  color: #8194ad;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.video-speed-summary strong {
+  font-size: 14px;
+  color: #e8eff9;
+}
+.video-speed-summary .summary-arrow {
+  color: #6b96e8;
+  font-weight: 700;
+}
+.video-speed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.video-speed-actions > * {
+  flex: 1 1 200px;
+}
+
