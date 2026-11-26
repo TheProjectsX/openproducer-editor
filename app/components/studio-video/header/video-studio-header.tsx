@@ -1,4 +1,5 @@
 import { renameProject } from "../../../lib/project-store";
+import { NavBackButton } from "../../nav-back-button";
 
 export function VideoStudioHeader({
   projectId,
@@ -29,9 +30,7 @@ export function VideoStudioHeader({
     <>
       <div className="video-studio-top">
         <div className="studio-project-identity">
-          <a href="/projects" className="studio-back-link" aria-label="Back to projects">
-            ‹
-          </a>
+          <NavBackButton fallback="/tools" />
           <span className="studio-app-mark">L</span>
           <div>
             {projectId ? (

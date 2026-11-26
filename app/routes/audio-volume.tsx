@@ -9,7 +9,7 @@ const MAX_BYTES = 512 * 1024 * 1024;
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Audio volume and fades | Local Studio" },
+    { title: "Audio volume and fades | OpenProducer Editor" },
     { name: "description", content: "Set audio gain and custom fade-in and fade-out durations locally." },
   ];
 }
@@ -96,25 +96,67 @@ export default function AudioVolume() {
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [source, numericGain, numericIn, numericOut, valid]);
 
-  return <main className={`resize-page${source ? " has-media" : ""}`}>
-    <ToolPageHeader />
-    <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Adjust volume and fades</h1><p>Set custom gain and fade durations, then compare the result and download a WAV.</p></section>
+  return <main className={`resize-page audio-tool-page${source ? " has-media" : ""}`}>
+    <ToolPageHeader status={source ? `${numericGain > 0 ? "+" : ""}${numericGain} dB · WAV` : undefined} />
+    <section className="resize-intro">
+      <p className="eyebrow">AUDIO · LOCAL PROCESSING</p>
+      <h1>Adjust volume and fades</h1>
+      <p>Set custom gain and fade durations, then compare the result and download a WAV.</p>
+    </section>
     {!source ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">
-        <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void chooseFile(event.currentTarget.files?.[0])} /></span></label>
-        {source && <p className="source-info">{file?.name} · {source.duration.toFixed(3)} s · {source.sampleRate} Hz · {source.numberOfChannels} channel(s)</p>}
-        {source && <div className="audio-tool-timeline"><div className="preview-heading"><strong>Fade placement</strong><span>{numericIn.toFixed(3)} s in · {numericOut.toFixed(3)} s out</span></div><AudioRangeTimeline audio={source} start={Math.min(source.duration, numericIn)} end={Math.max(numericIn, source.duration - numericOut)} label="Fade placement" onChange={(start, end) => { update(setFadeIn, String(start)); update(setFadeOut, String(Math.max(0, source.duration - end))); }} /></div>}
-        <div className="filter-fields two-column">
-          <label>Gain <span>−60 to +24 dB</span><input type="number" min="-60" max="24" step="any" value={gain} onChange={(event) => update(setGain, event.currentTarget.value)} /></label>
-          <label>Fade in <span>custom seconds</span><input type="number" min="0" max={source?.duration ?? 0} step="any" value={fadeIn} onChange={(event) => update(setFadeIn, event.currentTarget.value)} /></label>
-          <label>Fade out <span>custom seconds</span><input type="number" min="0" max={source?.duration ?? 0} step="any" value={fadeOut} onChange={(event) => update(setFadeOut, event.currentTarget.value)} /></label>
+        <div className="audio-file-bar">
+          <div className="audio-file-meta">
+            <strong>{file?.name}</strong>
+            <span>{source.duration.toFixed(3)} s · {source.sampleRate} Hz · {source.numberOfChannels} ch</span>
+          </div>
+          <label className="audio-file-change">
+            <span>Change file</span>
+            <input type="file" accept="audio/*" disabled={busy} onChange={(event) => void chooseFile(event.currentTarget.files?.[0])} />
+          </label>
         </div>
-        <p className="resize-note">Positive gain raises the signal. Gain above 0 dB can clip; export clamps samples to WAV’s supported range. Preview updates automatically after each change.</p>
-        {!valid && source && <p className="resize-error" role="alert">Enter valid gain and fade values within the source duration.</p>}{error && <p className="resize-error" role="alert">{error}</p>}
+
+        <div className="audio-control-group">
+          <p className="audio-control-group-title">Gain &amp; fades</p>
+          <div className="filter-fields two-column">
+            <label>Gain <span>−60 to +24 dB</span><input type="number" min="-60" max="24" step="any" value={gain} onChange={(event) => update(setGain, event.currentTarget.value)} /></label>
+            <label>Fade in <span>s</span><input type="number" min="0" max={source?.duration ?? 0} step="any" value={fadeIn} onChange={(event) => update(setFadeIn, event.currentTarget.value)} /></label>
+            <label>Fade out <span>s</span><input type="number" min="0" max={source?.duration ?? 0} step="any" value={fadeOut} onChange={(event) => update(setFadeOut, event.currentTarget.value)} /></label>
+          </div>
+        </div>
+
+        <div className="audio-output-summary">
+          <div>
+            <span>Gain</span>
+            <strong>{valid ? `${numericGain > 0 ? "+" : ""}${numericGain} dB` : "—"}</strong>
+          </div>
+          <div>
+            <span>Fades (in / out)</span>
+            <strong>{valid ? `${numericIn.toFixed(2)}s / ${numericOut.toFixed(2)}s` : "—"}</strong>
+          </div>
+        </div>
+
+        <p className="resize-note">Gain above 0 dB can clip; export clamps samples to WAV range.</p>
+        {!valid && source && <p className="resize-error" role="alert">Enter valid gain and fade values within the source duration.</p>}
+        {error && <p className="resize-error" role="alert">{error}</p>}
+        {busy && <p className="processing-indicator" role="status"><span className="processing-spinner" />Building preview…</p>}
         {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-volume-fades.wav`}>Download WAV</a>}
-        {busy && <p className="processing-indicator" role="status"><span className="processing-spinner" />Building preview from your settings…</p>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Adjusted audio preview</strong><span>{resultUrl ? `${numericGain > 0 ? "+" : ""}${numericGain} dB · ${source?.duration.toFixed(3)} s` : "Preparing adjusted audio"}</span></div>{resultUrl ? <div className="audio-preview"><strong>{file?.name}</strong><span>Processed locally · gain and fades applied</span><CustomMediaPreview kind="audio" src={resultUrl} label="Adjusted audio" /></div> : <div className="empty-preview">{busy ? <span className="processing-inline"><span className="processing-spinner" />Processing audio preview…</span> : "Choose audio and enter valid settings."}</div>}</div>
+
+      <div className="resize-preview audio-stage">
+        <div className="preview-heading">
+          <strong>Fade placement &amp; preview</strong>
+          <span>{resultUrl ? `${numericGain > 0 ? "+" : ""}${numericGain} dB · ${source.duration.toFixed(3)} s` : "Preparing adjusted audio"}</span>
+        </div>
+        <div className="audio-tool-timeline">
+          <AudioRangeTimeline audio={source} start={Math.min(source.duration, numericIn)} end={Math.max(numericIn, source.duration - numericOut)} label="Fade placement" onChange={(start, end) => { update(setFadeIn, String(start)); update(setFadeOut, String(Math.max(0, source.duration - end))); }} />
+        </div>
+        {resultUrl ? (
+          <CustomMediaPreview kind="audio" src={resultUrl} label="Adjusted audio" />
+        ) : (
+          <div className="empty-preview">{busy ? <span className="processing-inline"><span className="processing-spinner" />Processing audio preview…</span> : "Enter valid settings to preview."}</div>
+        )}
+      </div>
     </section>}
   </main>;
 }

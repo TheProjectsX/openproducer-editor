@@ -8,8 +8,8 @@ type FilterKind = "all" | "video" | "audio" | "image" | "collage";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Local projects | Local Studio" },
-    { name: "description", content: "Manage locally saved Local Studio project workspaces." },
+    { title: "Local projects | OpenProducer Editor" },
+    { name: "description", content: "Manage locally saved OpenProducer Editor project workspaces." },
     { name: "robots", content: "noindex,nofollow" },
   ];
 }
@@ -131,7 +131,7 @@ export default function Projects() {
   return (
     <main className="projects-page">
       <header className="site-header">
-        <div className="brand-with-back"><NavBackButton fallback="/" /><a href="/" className="brand"><span className="brand-mark" aria-hidden="true">L</span>Local Studio</a></div>
+        <div className="brand-with-back"><NavBackButton fallback="/" /><a href="/" className="brand"><span className="brand-mark" aria-hidden="true">L</span>OpenProducer Editor</a></div>
         <nav className="site-nav" aria-label="Main navigation">
           <a href="/tools">Explore tools</a>
           <a href="/tools/image/editor">Image editor</a>

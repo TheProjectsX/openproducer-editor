@@ -5,7 +5,7 @@ import { MediaImportScreen } from "../components/media-import-screen";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Audio Trimmer | Local Studio" },
+    { title: "Audio Trimmer | OpenProducer Editor" },
     { name: "description", content: "Trim audio by exact start and end times in your browser." },
     { name: "robots", content: "index,follow" },
   ];
@@ -250,24 +250,93 @@ export default function AudioTrim() {
     link.download = `${file.name.replace(/\.[^.]+$/, "")}-${trimMode === "keep" ? "selection" : "selection-removed"}.wav`; link.click(); window.setTimeout(() => URL.revokeObjectURL(result), 1000);
   }
 
-  return <main className={`resize-page audio-trim-page${audio ? " has-media" : ""}`}>
-    <ToolPageHeader />
-    <section className="resize-intro"><p className="eyebrow">AUDIO TOOL · PRIVATE BY DESIGN</p><h1>Trim audio with exact times.</h1><p>Choose a start and end point, preview the selection, then download a WAV. Audio stays in your browser.</p></section>
+  return <main className={`resize-page audio-tool-page audio-trim-page${audio ? " has-media" : ""}`}>
+    <ToolPageHeader status={audio ? `${outputDuration.toFixed(3)} s WAV` : undefined} />
+    <section className="resize-intro">
+      <p className="eyebrow">AUDIO · LOCAL PROCESSING</p>
+      <h1>Trim audio with exact times</h1>
+      <p>Set start and end points on the waveform, preview the result, and export WAV in your browser.</p>
+    </section>
     {!audio ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace" aria-label="Audio trimming workspace">
       <div className="resize-controls">
-        <label className="file-picker"><span>{file ? "Choose another audio file" : "Choose an audio file"}<input type="file" accept="audio/*" onChange={(event) => void importFile(event.currentTarget.files?.[0])} /></span></label>
-        {audio && <p className="source-info">{file?.name} · {audio.duration.toFixed(3)} s · {audio.sampleRate} Hz · {audio.numberOfChannels} channel(s)</p>}
-        <fieldset className="trim-mode-toggle"><legend>Trim action</legend><label><input type="radio" name="trim-mode" checked={trimMode === "keep"} onChange={() => setTrimMode("keep")} />Keep only selection</label><label><input type="radio" name="trim-mode" checked={trimMode === "remove"} onChange={() => setTrimMode("remove")} />Remove only selection</label></fieldset>
-        <div className="dimension-fields"><label>Start <span>seconds</span><input type="number" min="0" max={audio?.duration} step="0.001" value={start.toFixed(3)} onChange={(event) => setStart(event.currentTarget.valueAsNumber)} /></label><label>End <span>seconds</span><input type="number" min="0" max={audio?.duration} step="0.001" value={end.toFixed(3)} onChange={(event) => setEnd(event.currentTarget.valueAsNumber)} /></label></div>
-        <p className="resize-note">{valid ? `Selected: ${selectedDuration.toFixed(3)} s · Output: ${outputDuration.toFixed(3)} s` : "Select a valid range that leaves audio to export."}</p>
-        <button className="export-button secondary-button" type="button" disabled={!valid || loading} onClick={exportSelection}>Download {trimMode === "keep" ? "selection" : "edited audio"} WAV</button>
-        {loading && <p role="status" className="resize-note">Loading and decoding audio…</p>}{error && <p role="alert" className="resize-error">{error}</p>}
+        <div className="audio-file-bar">
+          <div className="audio-file-meta">
+            <strong>{file?.name}</strong>
+            <span>{audio.duration.toFixed(3)} s · {audio.sampleRate} Hz · {audio.numberOfChannels} ch</span>
+          </div>
+          <label className="audio-file-change">
+            <span>Change file</span>
+            <input type="file" accept="audio/*" onChange={(event) => void importFile(event.currentTarget.files?.[0])} />
+          </label>
+        </div>
+
+        <div className="audio-control-group">
+          <fieldset className="trim-mode-toggle">
+            <legend>Trim mode</legend>
+            <label>
+              <input type="radio" name="trim-mode" checked={trimMode === "keep"} onChange={() => setTrimMode("keep")} />
+              Keep
+            </label>
+            <label>
+              <input type="radio" name="trim-mode" checked={trimMode === "remove"} onChange={() => setTrimMode("remove")} />
+              Remove
+            </label>
+          </fieldset>
+        </div>
+
+        <div className="audio-control-group">
+          <p className="audio-control-group-title">Exact range</p>
+          <div className="dimension-fields">
+            <label>Start <span>s</span><input type="number" min="0" max={audio?.duration} step="0.001" value={start.toFixed(3)} onChange={(event) => setStart(event.currentTarget.valueAsNumber)} /></label>
+            <label>End <span>s</span><input type="number" min="0" max={audio?.duration} step="0.001" value={end.toFixed(3)} onChange={(event) => setEnd(event.currentTarget.valueAsNumber)} /></label>
+          </div>
+        </div>
+
+        <div className="audio-output-summary">
+          <div>
+            <span>Selected</span>
+            <strong>{valid ? `${selectedDuration.toFixed(3)} s` : "—"}</strong>
+          </div>
+          <div>
+            <span>Output WAV</span>
+            <strong>{valid ? `${outputDuration.toFixed(3)} s` : "—"}</strong>
+          </div>
+        </div>
+
+        {loading && <p role="status" className="resize-note">Loading and decoding audio…</p>}
+        {error && <p role="alert" className="resize-error">{error}</p>}
+
+        <button className="export-button" type="button" disabled={!valid || loading} onClick={exportSelection}>
+          Download {trimMode === "keep" ? "trimmed" : "edited"} WAV
+        </button>
+
         {previewUrl && <audio ref={player} className="media-source-hidden" src={previewUrl} onTimeUpdate={updatePlaybackPosition} onPause={() => { stopAt.current = null; setPlaying(false); if (playbackRaf.current !== null) cancelAnimationFrame(playbackRaf.current); playbackRaf.current = null; }} onEnded={() => { setPlaying(false); playbackRaf.current = null; }} />}
       </div>
-      <div className="resize-preview audio-trim-preview"><div className="preview-heading"><strong>Source waveform</strong><span>{valid ? `${start.toFixed(3)} — ${end.toFixed(3)} s · ${trimMode === "keep" ? "kept" : "removed"}` : "Adjust selection"}</span></div>
-        <div className="timeline-time-labels"><span>0.000 s</span><span>{audio.duration.toFixed(3)} s</span></div>
-        <div className="audio-waveform-stage"><canvas ref={timeline} className="audio-trim-waveform" role="img" aria-label="Full-source waveform timeline. Click to seek. Drag near either selection edge to trim, drag inside the selection to move it, or drag outside the selection to create a new range." onPointerDown={beginSelection} onPointerMove={(event) => { updateSelectionCursor(event); moveSelection(event); }} onPointerLeave={(event) => { if (!selectionGesture.current) event.currentTarget.style.cursor = "crosshair"; }} onPointerUp={finishSelection} onPointerCancel={(event) => { if (selectionGesture.current?.pointerId === event.pointerId) selectionGesture.current = null; }} /><button type="button" className="waveform-playhead" style={{ left: `${playhead / audio.duration * 100}%` }} aria-label="Drag to seek source waveform playhead" onPointerDown={beginWaveformSeek} onPointerMove={moveWaveformSeek} onPointerUp={finishWaveformSeek} onPointerCancel={finishWaveformSeek}><span /></button></div>
-        <div className="trim-result-preview"><div className="preview-heading"><strong>Edited audio preview</strong><span>{previewUrl ? `${outputDuration.toFixed(3)} s output · full ${audio.duration.toFixed(3)} s source timeline` : "Preparing preview…"}</span></div><div className="custom-transport"><button type="button" className="transport-play" onClick={togglePlayback} aria-label={playing ? "Pause preview" : "Play preview"}>{playing ? "Ⅱ" : "▶"}</button><span className="transport-time">{playhead.toFixed(3)} / {audio.duration.toFixed(3)} s</span><input className="transport-scrub" type="range" min="0" max={audio.duration} step="0.001" value={Math.min(playhead, audio.duration)} aria-label="Full-source timeline playhead" onChange={(event) => seekSourceToTime(event.currentTarget.valueAsNumber)} /></div></div>
+
+      <div className="resize-preview audio-stage audio-trim-preview">
+        <div className="preview-heading">
+          <strong>Source waveform</strong>
+          <span>{valid ? `${start.toFixed(3)} — ${end.toFixed(3)} s · ${trimMode === "keep" ? "kept" : "removed"}` : "Adjust selection"}</span>
+        </div>
+        <div className="timeline-time-labels">
+          <span>0.000 s</span>
+          <span>{audio.duration.toFixed(3)} s</span>
+        </div>
+        <div className="audio-waveform-stage">
+          <canvas ref={timeline} className="audio-trim-waveform" role="img" aria-label="Full-source waveform timeline. Click to seek. Drag near either selection edge to trim, drag inside the selection to move it, or drag outside the selection to create a new range." onPointerDown={beginSelection} onPointerMove={(event) => { updateSelectionCursor(event); moveSelection(event); }} onPointerLeave={(event) => { if (!selectionGesture.current) event.currentTarget.style.cursor = "crosshair"; }} onPointerUp={finishSelection} onPointerCancel={(event) => { if (selectionGesture.current?.pointerId === event.pointerId) selectionGesture.current = null; }} />
+          <button type="button" className="waveform-playhead" style={{ left: `${playhead / audio.duration * 100}%` }} aria-label="Drag to seek source waveform playhead" onPointerDown={beginWaveformSeek} onPointerMove={moveWaveformSeek} onPointerUp={finishWaveformSeek} onPointerCancel={finishWaveformSeek}><span /></button>
+        </div>
+        <div className="trim-result-preview">
+          <div className="preview-heading">
+            <strong>Edited audio preview</strong>
+            <span>{previewUrl ? `${outputDuration.toFixed(3)} s output · ${audio.duration.toFixed(3)} s source` : "Preparing preview…"}</span>
+          </div>
+          <div className="custom-transport">
+            <button type="button" className="transport-play" onClick={togglePlayback} aria-label={playing ? "Pause preview" : "Play preview"}>{playing ? "Ⅱ" : "▶"}</button>
+            <span className="transport-time">{playhead.toFixed(3)} / {audio.duration.toFixed(3)} s</span>
+            <input className="transport-scrub" type="range" min="0" max={audio.duration} step="0.001" value={Math.min(playhead, audio.duration)} aria-label="Full-source timeline playhead" onChange={(event) => seekSourceToTime(event.currentTarget.valueAsNumber)} />
+          </div>
+        </div>
       </div>
     </section>}
   </main>;

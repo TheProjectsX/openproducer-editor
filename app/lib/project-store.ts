@@ -127,7 +127,7 @@ let databasePromise: Promise<IDBDatabase> | null = null;
 export function migrateProjectRecord(input: LocalProject): LocalProject {
   let project = { ...input };
   let version = project.schemaVersion ?? 1;
-  if (!Number.isInteger(version) || version < 1 || version > CURRENT_PROJECT_SCHEMA) throw new Error(`Project schema ${version} cannot be opened by this version of Local Studio.`);
+  if (!Number.isInteger(version) || version < 1 || version > CURRENT_PROJECT_SCHEMA) throw new Error(`Project schema ${version} cannot be opened by this version of OpenProducer Editor.`);
   if (version < 2) {
     project = { ...project, schemaVersion: 2 };
     version = 2;
@@ -170,7 +170,7 @@ function openDatabase() {
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error ?? new Error("Could not open local project storage."));
-      request.onblocked = () => reject(new Error("Project storage is blocked by another open Local Studio tab."));
+      request.onblocked = () => reject(new Error("Project storage is blocked by another open OpenProducer Editor tab."));
     }).catch((error: unknown) => { databasePromise = null; throw error; });
   }
   return databasePromise!;

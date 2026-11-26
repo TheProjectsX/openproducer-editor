@@ -9,7 +9,7 @@ import { PITCH_PRESERVE_RENDER_CHUNK_FRAMES } from "../lib/audio-speed";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Audio Speed | Local Studio" },
+    { title: "Audio Speed | OpenProducer Editor" },
     { name: "description", content: "Change audio speed with a custom value while preserving pitch." },
     { name: "robots", content: "index,follow" },
   ];
@@ -39,9 +39,11 @@ export default function AudioSpeed() {
   const nodeListenersRef = useRef<Array<() => void>>([]);
   const moduleRef = useRef<WebAssembly.Module | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
+  const waveCanvasRef = useRef<HTMLCanvasElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [duration, setDuration] = useState(0);
   const [sampleRate, setSampleRate] = useState(0);
+  const [peaks, setPeaks] = useState<Float32Array | null>(null);
   const [speed, setSpeed] = useState(1);
   const [ready, setReady] = useState(false);
   const [playhead, setPlayhead] = useState(0);
@@ -72,6 +74,19 @@ export default function AudioSpeed() {
       const node = new BungeeNode(context, module); await node.ready;
       const left = decoded.getChannelData(0).slice();
       const right = decoded.numberOfChannels > 1 ? decoded.getChannelData(1).slice() : left.slice();
+      const buckets = 512;
+      const nextPeaks = new Float32Array(buckets);
+      const step = Math.max(1, Math.floor(left.length / buckets));
+      for (let b = 0; b < buckets; b++) {
+        let peak = 0;
+        const from = b * step;
+        for (let i = from; i < Math.min(left.length, from + step); i++) {
+          const abs = Math.abs(left[i]);
+          if (abs > peak) peak = abs;
+        }
+        nextPeaks[b] = peak;
+      }
+      setPeaks(nextPeaks);
       node.load(decoded.length, [{ id: "source", left, right }]);
       node.node.connect(context.destination);
       node.setSpeed(speed);
@@ -134,22 +149,120 @@ export default function AudioSpeed() {
   const validSpeed = Number.isFinite(speed) && speed >= 0.1 && speed <= 16;
   const estimatedBytes = duration && validSpeed ? (duration / speed) * sampleRate * 4 : 0;
   const exportFitsMemory = estimatedBytes <= 512 * 1024 * 1024;
-  return <main className={`resize-page${file ? " has-media" : ""}`}>
-    <ToolPageHeader />
-    <section className="resize-intro"><p className="eyebrow">AUDIO TOOL · PITCH PRESERVED</p><h1>Set your own playback speed.</h1><p>Enter any speed from 0.1× to 16×. Pitch stays steady while the duration changes.</p></section>
+
+  useEffect(() => {
+    if (!peaks || !waveCanvasRef.current || !duration) return;
+    const canvas = waveCanvasRef.current;
+    const draw = () => {
+      const context = canvas.getContext("2d");
+      if (!context) return;
+      const width = Math.max(240, Math.round(canvas.clientWidth * window.devicePixelRatio));
+      const height = Math.max(120, Math.round(canvas.clientHeight * window.devicePixelRatio));
+      canvas.width = width;
+      canvas.height = height;
+      context.fillStyle = "#080d16";
+      context.fillRect(0, 0, width, height);
+      const ratio = Math.max(0, Math.min(1, playhead / duration));
+      const playX = Math.round(ratio * width);
+      const center = height / 2;
+      for (let x = 0; x < width; x++) {
+        const idx = Math.min(peaks.length - 1, Math.floor((x / width) * peaks.length));
+        const amp = Math.max(1, peaks[idx] * height * 0.44);
+        context.fillStyle = x <= playX ? "#5ed4d5" : "#3a4f6b";
+        context.fillRect(x, center - amp, 1, amp * 2);
+      }
+      context.fillStyle = "#ff7187";
+      context.fillRect(Math.max(0, Math.min(width - 2, playX)), 0, 2, height);
+    };
+    draw();
+    const observer = new ResizeObserver(draw);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [peaks, playhead, duration]);
+
+  return <main className={`resize-page audio-tool-page${file ? " has-media" : ""}`}>
+    <ToolPageHeader status={file ? `${speed}× · pitch preserved` : undefined} />
+    <section className="resize-intro">
+      <p className="eyebrow">AUDIO TOOL · PITCH PRESERVED</p>
+      <h1>Set your own playback speed</h1>
+      <p>Enter any speed from 0.1× to 16×. Pitch stays steady while the duration changes.</p>
+    </section>
     {!file ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace" aria-label="Audio speed workspace">
       <div className="resize-controls">
-        <label className="file-picker"><span>{file ? "Choose another audio file" : "Choose an audio file"}<input type="file" accept="audio/*" onChange={(event) => void importFile(event.currentTarget.files?.[0])} /></span></label>
-        {file && <p className="source-info">{file.name} · {duration.toFixed(3)} s · {sampleRate} Hz</p>}
-        <label className="speed-field">Speed <span>×</span><input type="number" min="0.1" max="16" step="0.1" value={speed} onChange={(event) => changeSpeed(event.currentTarget.valueAsNumber)} /></label>
-        <div className="speed-presets">{[0.5, 1, 1.5, 2, 4, 6].map((value) => <button key={value} type="button" onClick={() => changeSpeed(value)}>{value}×</button>)}</div>
-        <p className="resize-note">Estimated output: {validSpeed && duration ? `${(duration / speed).toFixed(3)} s · ${(estimatedBytes / 1024 / 1024).toFixed(1)} MB` : "Enter a speed from 0.1× to 16×."} · Pitch preserved</p>
-        <button className="export-button" type="button" disabled={!ready || working || !validSpeed} onClick={() => nodeRef.current?.play()}>{working ? "Processing…" : "Preview speed"}</button>
-        <button className="export-button secondary-button" type="button" disabled={!ready || working || !validSpeed || !exportFitsMemory} onClick={() => void exportAudio()}>Export WAV</button>
+        <div className="audio-file-bar">
+          <div className="audio-file-meta">
+            <strong>{file.name}</strong>
+            <span>{duration.toFixed(3)} s · {sampleRate} Hz</span>
+          </div>
+          <label className="audio-file-change">
+            <span>Change file</span>
+            <input type="file" accept="audio/*" onChange={(event) => void importFile(event.currentTarget.files?.[0])} />
+          </label>
+        </div>
+
+        <div className="audio-control-group">
+          <p className="audio-control-group-title">Playback rate (0.1×–16×)</p>
+          <label className="speed-field">Speed <span>×</span><input type="number" min="0.1" max="16" step="0.1" value={speed} onChange={(event) => changeSpeed(event.currentTarget.valueAsNumber)} /></label>
+          <div className="speed-presets">{[0.5, 1, 1.5, 2, 4, 6].map((value) => <button key={value} type="button" className={speed === value ? "active" : undefined} onClick={() => changeSpeed(value)}>{value}×</button>)}</div>
+        </div>
+
+        <div className="audio-output-summary">
+          <div>
+            <span>Output length</span>
+            <strong>{validSpeed && duration ? `${(duration / speed).toFixed(3)} s` : "—"}</strong>
+          </div>
+          <div>
+            <span>Est. WAV size</span>
+            <strong>{validSpeed && duration ? `${(estimatedBytes / 1024 / 1024).toFixed(1)} MB` : "—"}</strong>
+          </div>
+        </div>
+
         {!exportFitsMemory && <p className="resize-error" role="alert">Estimated WAV output exceeds the 512 MB prototype limit. Use a shorter clip or a faster rate.</p>}
-        {status && <p className="resize-note" role="status">{status}</p>}{error && <p className="resize-error" role="alert">{error}</p>}
+        {status && <p className="resize-note" role="status">{status}</p>}
+        {error && <p className="resize-error" role="alert">{error}</p>}
+
+        <button className="export-button" type="button" disabled={!ready || working || !validSpeed || !exportFitsMemory} onClick={() => void exportAudio()}>{working ? "Processing…" : "Export WAV"}</button>
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Speed preview</strong><span>{ready ? `${speed}× · pitch preserved` : "Choose audio to begin"}</span></div>{ready ? <div className="audio-speed-player"><div className="custom-audio-art"><span className="custom-audio-glyph" aria-hidden="true">♫</span><div className="custom-audio-copy"><span className="custom-audio-label">LOCAL AUDIO</span><strong>{file?.name}</strong><small>Pitch-preserved preview · {duration.toFixed(3)} s source</small></div></div><div className="custom-media-transport"><button type="button" className="transport-play" aria-label={playing ? "Pause speed preview" : "Play speed preview"} onClick={() => { const node = nodeRef.current; if (!node) return; if (playing) node.pause(); else { if (playhead >= duration) { node.seek(0); setPlayhead(0); } node.play(); } }}>{playing ? "Ⅱ" : "▶"}</button><span className="transport-time">{playhead.toFixed(3)} / {duration.toFixed(3)} s</span><input className="transport-scrub" type="range" min="0" max={duration} step="0.001" value={Math.min(playhead, duration)} aria-label="Pitch-preserved audio timeline" onChange={(event) => { const time = event.currentTarget.valueAsNumber; setPlayhead(time); nodeRef.current?.seek(Math.round(time * sampleRate)); }} /></div></div> : <div className="empty-preview">Choose an audio file to begin.</div>}</div>
+
+      <div className="resize-preview audio-stage">
+        <div className="preview-heading">
+          <strong>Speed waveform preview</strong>
+          <span>{ready ? `${speed}× · pitch preserved` : "Decoding audio…"}</span>
+        </div>
+        {ready ? (
+          <>
+            <div className="audio-waveform-stage">
+              <canvas
+                ref={waveCanvasRef}
+                className="audio-trim-waveform"
+                role="img"
+                aria-label="Audio speed waveform"
+                onClick={(event) => {
+                  if (!duration) return;
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / Math.max(1, rect.width)));
+                  const time = ratio * duration;
+                  setPlayhead(time);
+                  nodeRef.current?.seek(Math.round(time * sampleRate));
+                }}
+              />
+            </div>
+            <div className="trim-result-preview">
+              <div className="preview-heading">
+                <strong>Pitch-preserved transport</strong>
+                <span>{duration.toFixed(3)} s source → {(duration / (validSpeed ? speed : 1)).toFixed(3)} s output</span>
+              </div>
+              <div className="custom-media-transport">
+                <button type="button" className="transport-play" aria-label={playing ? "Pause speed preview" : "Play speed preview"} onClick={() => { const node = nodeRef.current; if (!node) return; if (playing) node.pause(); else { if (playhead >= duration) { node.seek(0); setPlayhead(0); } node.play(); } }}>{playing ? "Ⅱ" : "▶"}</button>
+                <span className="transport-time">{playhead.toFixed(3)} / {duration.toFixed(3)} s</span>
+                <input className="transport-scrub" type="range" min="0" max={duration} step="0.001" value={Math.min(playhead, duration)} aria-label="Pitch-preserved audio timeline" onChange={(event) => { const time = event.currentTarget.valueAsNumber; setPlayhead(time); nodeRef.current?.seek(Math.round(time * sampleRate)); }} />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="empty-preview">Decoding audio for pitch-preserved playback…</div>
+        )}
+      </div>
     </section>}
   </main>;
 }

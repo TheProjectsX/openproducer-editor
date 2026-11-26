@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CustomMediaPreview } from "../components/custom-media-preview";
 import { MediaImportScreen } from "../components/media-import-screen";
 import { ProcessingProgress } from "../components/processing-progress";
 import { ToolPageHeader } from "../components/tool-page-header";
@@ -12,7 +13,7 @@ import type { Route } from "./+types/audio-transcribe";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Voice to Transcript | Local Studio" },
+    { title: "Voice to Transcript | OpenProducer Editor" },
     {
       name: "description",
       content: "Transcribe audio, video, or microphone recordings locally in your browser with Whisper Base and custom output style and format controls.",
@@ -423,8 +424,8 @@ export default function AudioTranscribe() {
   }, [workspaceActive, modelId]);
 
   return (
-    <main className={`resize-page${workspaceActive ? " has-media" : ""}`}>
-      <ToolPageHeader />
+    <main className={`resize-page audio-tool-page${workspaceActive ? " has-media" : ""}`}>
+      <ToolPageHeader status={file ? `${segments.length} segment(s)` : undefined} />
       <section className="resize-intro">
         <p className="eyebrow">AUDIO · ON-DEVICE WHISPER</p>
         <h1>Voice to transcript</h1>
@@ -443,26 +444,25 @@ export default function AudioTranscribe() {
           }}
         />
       ) : (
-        <section className="resize-workspace" aria-label="Voice to transcript workspace">
+        <section className="resize-workspace audio-tool-workspace" aria-label="Voice to transcript workspace">
           <div className="resize-controls">
-            <h2 className="editor-sidebar-title">Voice to Transcript</h2>
-            <div className="image-layer-actions">
-              <label className="file-picker" style={{ gridColumn: "1 / -1" }}>
-                <span>{file ? "Choose another audio/video" : "Choose audio/video"}</span>
+            <div className="audio-file-bar">
+              <div className="audio-file-meta">
+                <strong>{file ? file.name : "Microphone mode"}</strong>
+                <span>{file ? (backend ? `Ready · ${backend}` : "Local source loaded") : "Record a clip or choose a file"}</span>
+              </div>
+              <label className="audio-file-change">
+                <span>Change file</span>
                 <input type="file" accept="audio/*,video/*" onChange={(e) => { loadMedia(e.currentTarget.files?.[0]); e.currentTarget.value = ""; }} />
               </label>
-              <button
-                type="button"
-                className="secondary-button"
-                style={{ gridColumn: "1 / -1" }}
-                onClick={recorderOpen ? closeOrDiscardRecorder : openRecorderInEditor}
-              >
-                {recorderOpen ? "Close microphone recorder" : file ? "🎙 Record new mic clip" : "🎙 Open microphone recorder"}
-              </button>
             </div>
-            <p className="source-info">
-              {file ? `Source: ${file.name}${backend ? ` · ${backend}` : ""}` : "Source: No audio loaded yet"}
-            </p>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={recorderOpen ? closeOrDiscardRecorder : openRecorderInEditor}
+            >
+              {recorderOpen ? "Close microphone recorder" : file ? "🎙 Record new mic clip" : "🎙 Open microphone recorder"}
+            </button>
 
             <details className="editor-control-group" open>
               <summary>Recognition</summary>
@@ -576,7 +576,7 @@ export default function AudioTranscribe() {
             </button>
           </div>
 
-          <div className="resize-preview collage-main-preview">
+          <div className="resize-preview audio-stage">
             <div className="preview-heading">
               <strong>Transcript output</strong>
               <div className="collage-history-actions">
@@ -633,7 +633,7 @@ export default function AudioTranscribe() {
               </section>
             )}
             {audioUrl ? (
-              <audio className="audio-preview-player" controls src={audioUrl} />
+              <CustomMediaPreview kind="audio" src={audioUrl} label={file?.name ?? "Source audio"} />
             ) : !recorderOpen ? (
               <div className="mic-empty-state">
                 <p>No audio loaded yet. Record from your microphone or choose a file from the sidebar.</p>

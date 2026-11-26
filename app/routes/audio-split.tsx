@@ -12,7 +12,7 @@ const MAX_DECODED_BYTES = 512 * 1024 * 1024;
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Split audio | Local Studio" },
+    { title: "Split audio | OpenProducer Editor" },
     { name: "description", content: "Split audio at custom timestamps and download the segments as a ZIP." },
   ];
 }
@@ -105,21 +105,66 @@ export default function AudioSplit() {
     finally { setBusy(false); }
   }
 
-  return <main className={`resize-page${audio ? " has-media" : ""}`}>
-    <ToolPageHeader />
-    <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Split audio at exact times</h1><p>Enter any number of custom cut points in seconds. The segments download together as a ZIP of WAV files.</p></section>
+  return <main className={`resize-page audio-tool-page${audio ? " has-media" : ""}`}>
+    <ToolPageHeader status={audio ? `${parsed.points.length + 1} part(s)` : undefined} />
+    <section className="resize-intro">
+      <p className="eyebrow">AUDIO · LOCAL PROCESSING</p>
+      <h1>Split audio at exact times</h1>
+      <p>Enter any number of custom cut points in seconds. The segments download together as a ZIP of WAV files.</p>
+    </section>
     {!audio ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">
-        <label className="file-picker"><span>{busy ? "Working…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void chooseFile(event.currentTarget.files?.[0])} /></span></label>
-        {audio && <p className="source-info">{file?.name} · {audio.duration.toFixed(3)} s · {audio.sampleRate} Hz · {audio.numberOfChannels} channel(s)</p>}
-        <label className="ratio-field">Split points <span>seconds, comma-separated; all values are custom</span><input type="text" inputMode="decimal" value={splitPoints} onChange={(event) => setSplitPoints(event.currentTarget.value)} placeholder="30, 62.5, 120" /></label>
+        <div className="audio-file-bar">
+          <div className="audio-file-meta">
+            <strong>{file?.name}</strong>
+            <span>{audio.duration.toFixed(3)} s · {audio.sampleRate} Hz · {audio.numberOfChannels} ch</span>
+          </div>
+          <label className="audio-file-change">
+            <span>Change file</span>
+            <input type="file" accept="audio/*" disabled={busy} onChange={(event) => void chooseFile(event.currentTarget.files?.[0])} />
+          </label>
+        </div>
+
+        <div className="audio-control-group">
+          <p className="audio-control-group-title">Cut markers</p>
+          <label className="ratio-field">Split points <span>seconds, comma-separated</span><input type="text" inputMode="decimal" value={splitPoints} onChange={(event) => setSplitPoints(event.currentTarget.value)} placeholder="30, 62.5, 120" /></label>
+        </div>
+
+        <div className="audio-output-summary">
+          <div>
+            <span>Cut points</span>
+            <strong>{parsed.points.length}</strong>
+          </div>
+          <div>
+            <span>Segments</span>
+            <strong>{parsed.points.length + 1} WAVs</strong>
+          </div>
+        </div>
+
         <p className={parsed.valid ? "resize-note" : "resize-error"} role={parsed.valid ? "status" : "alert"}>{error || parsed.message}</p>
-        <p className="resize-note">ZIP contains 16-bit PCM WAV parts at the source sample rate and channel count. Decoded audio is capped at 512 MiB and ZIP output at 256 MiB.</p>
+        <p className="resize-note">16-bit PCM WAV parts bundled in a ZIP.</p>
         <button className="export-button" disabled={!audio || !file || !parsed.valid || busy} onClick={exportSegments}>{busy ? "Preparing…" : "Split and download ZIP"}</button>
-        {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-segments.zip`}>Download segment ZIP</a>}
+        {resultUrl && <a className="export-button secondary-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-segments.zip`}>Download segment ZIP</a>}
+      </div>
+
+      <div className="resize-preview audio-stage">
+        <div className="preview-heading">
+          <strong>Split timeline &amp; segments</strong>
+          <span>{parsed.points.length + 1} clip(s) · {audio.duration.toFixed(3)} s</span>
+        </div>
+        <AudioSplitTimeline duration={audio.duration} points={parsed.points} onChange={(points) => setSplitPoints(points.join(", "))} />
+        <ol className="clip-list">
+          {[0, ...parsed.points, audio.duration].slice(0, -1).map((start, index) => {
+            const end = [...parsed.points, audio.duration][index];
+            return (
+              <li key={`${start}-${end}`}>
+                <span><strong>Part {String(index + 1).padStart(2, "0")}</strong><small>{start.toFixed(3)} s – {end.toFixed(3)} s · {(end - start).toFixed(3)} s</small></span>
+              </li>
+            );
+          })}
+        </ol>
         {url && <CustomMediaPreview kind="audio" src={url} label="Source audio preview" />}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Split timeline</strong><span>{audio ? `${parsed.points.length + 1} clip(s)` : "No audio selected"}</span></div>{audio ? <><AudioSplitTimeline duration={audio.duration} points={parsed.points} onChange={(points) => setSplitPoints(points.join(", "))} /><ol className="clip-list">{[0, ...parsed.points, audio.duration].slice(0, -1).map((start, index) => { const end = ([...parsed.points, audio.duration][index]); return <li key={`${start}-${end}`}><span><strong>Part {String(index + 1).padStart(2, "0")}</strong><small>{start.toFixed(3)} s – {end.toFixed(3)} s · {(end - start).toFixed(3)} s</small></span></li>; })}</ol></> : <div className="empty-preview">Choose audio and enter custom split points.</div>}</div>
     </section>}
   </main>;
 }

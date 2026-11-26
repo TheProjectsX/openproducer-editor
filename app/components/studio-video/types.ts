@@ -49,7 +49,7 @@ export const TEXT_PRESETS: { id: string; label: string; preview: string; setting
   { id: "bold-caption", label: "Bold caption", preview: "BOLD CAPTION", settings: { text: "BOLD CAPTION", fontSize: 64, color: "#ffe14d", backgroundColor: "#000000", showBackground: false, fontFamily: "Impact, sans-serif", strokeColor: "#000000", strokeWidth: 4, shadow: true, shadowColor: "#000000", shadowBlur: 10 }, transform: { y: 260 } },
   { id: "subtitle-bar", label: "Subtitle bar", preview: "Subtitle bar", settings: { text: "Subtitle text here", fontSize: 38, color: "#ffffff", backgroundColor: "#000000", showBackground: true, backgroundRadius: 6, backgroundOpacity: 0.72 }, transform: { y: 360 } },
   { id: "neon", label: "Neon glow", preview: "NEON GLOW", settings: { text: "NEON GLOW", fontSize: 78, color: "#6ef7ff", backgroundColor: "#000000", showBackground: false, fontFamily: "Impact, sans-serif", shadow: true, shadowColor: "#00b7ff", shadowBlur: 22 } },
-  { id: "minimal-tag", label: "Minimal corner tag", preview: "TAG", settings: { text: "LOCAL STUDIO", fontSize: 28, color: "#dce8f5", backgroundColor: "#142033", showBackground: true, fontFamily: "'Courier New', monospace", backgroundRadius: 6, backgroundOpacity: 0.65 }, transform: { x: -460, y: -360 } },
+  { id: "minimal-tag", label: "Minimal corner tag", preview: "TAG", settings: { text: "OPENPRODUCER EDITOR", fontSize: 28, color: "#dce8f5", backgroundColor: "#142033", showBackground: true, fontFamily: "'Courier New', monospace", backgroundRadius: 6, backgroundOpacity: 0.65 }, transform: { x: -460, y: -360 } },
 ];
 
 export const SVG_SHAPES: { id: string; label: string; svg: (color: string) => string }[] = [

@@ -1,13 +1,13 @@
 {
   "id": "/",
-  "name": "Local Studio — Media Editor",
-  "short_name": "Local Studio",
+  "name": "OpenProducer Editor",
+  "short_name": "OpenProducer",
   "description": "Private, offline-capable audio, video, and image tools.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f5f6fa",
-  "theme_color": "#4e5fd0",
+  "background_color": "#090d18",
+  "theme_color": "#090d18",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }

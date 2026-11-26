@@ -9,7 +9,7 @@ const MAX_BYTES = 512 * 1024 * 1024;
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Remove audio from video | Local Studio" },
+    { title: "Remove audio from video | OpenProducer Editor" },
     { name: "description", content: "Remove primary audio from a local video and export an MP4 in your browser." },
   ];
 }
@@ -56,20 +56,46 @@ export default function VideoRemoveAudio() {
     } finally { input?.dispose(); }
   }
 
-  return <main className={`resize-page${file ? " has-media" : ""}`}>
-    <ToolPageHeader />
+  return <main className={`resize-page video-tool-page${file ? " has-media" : ""}`}>
+    <ToolPageHeader status={resultUrl ? "Muted MP4" : duration ? `${duration.toFixed(2)} s` : undefined} />
     <section className="resize-intro"><p className="eyebrow">VIDEO · LOCAL PROCESSING</p><h1>Remove video audio</h1><p>Discard the primary audio track and export the remaining video as MP4. Your file stays in this browser.</p></section>
-    {!file ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseFile} error={error} /> : <section className="resize-workspace video-tool-workspace">
+    {!file ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseFile} error={error} /> : <section className="resize-workspace">
       <div className="resize-controls">
-        <label className="file-picker"><span>{file ? "Choose another video" : "Choose a video"}<input type="file" accept="video/*,.mkv,.webm" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} /></span></label>
-        {file && <p className="source-info">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MiB{duration ? ` · ${duration.toFixed(3)} s` : ""}</p>}
-        <p className="resize-note">The primary audio track is discarded. Video packets are copied when the source/container combination supports it; other cases may transcode. Input and output memory limits are 512 MiB.</p>
+        <div className="audio-file-bar">
+          <div className="audio-file-meta">
+            <strong>{file.name}</strong>
+            <span>{(file.size / 1024 / 1024).toFixed(1)} MiB{duration ? ` · ${duration.toFixed(3)} s` : " · Reading…"}</span>
+          </div>
+          <label className="audio-file-change">
+            <span>Change file</span>
+            <input type="file" accept="video/*,.mkv,.webm" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} />
+          </label>
+        </div>
+
+        <div className="audio-output-summary">
+          <div>
+            <span>Audio track</span>
+            <strong>Discarded</strong>
+          </div>
+          <div>
+            <span>Output</span>
+            <strong>Muted MP4</strong>
+          </div>
+        </div>
+
+        <p className="resize-note">The primary audio track is discarded. Video packets are copied when supported; other cases transcode locally. Limit: 512 MiB.</p>
         {error && <p className="resize-error" role="alert">{error}</p>}
         {progress !== null && <ProcessingProgress label="Removing audio and writing video" value={progress} />}
         <button className="export-button" disabled={!file || progress !== null} onClick={() => void removeAudio()}>{progress !== null ? "Processing…" : "Remove audio and export MP4"}</button>
-        {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-muted.mp4`}>Download muted MP4</a>}
+        {resultUrl && <a className="export-button secondary-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-muted.mp4`}>Download muted MP4</a>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Video preview</strong><span>{resultUrl ? "Muted export ready" : file ? "Original source" : "No video selected"}</span></div>{resultUrl ? <CustomMediaPreview kind="video" src={resultUrl} label="Muted video result preview" /> : url ? <CustomMediaPreview kind="video" src={url} label="Original video preview" onDuration={setDuration} /> : <div className="empty-preview">Choose a video to begin.</div>}</div>
+      <div className="resize-preview video-stage">
+        <div className="preview-heading"><strong>{resultUrl ? "Muted video result" : "Video preview"}</strong><span>{resultUrl ? "Muted MP4 ready" : duration ? `${duration.toFixed(3)} s · original source` : "Loading video…"}</span></div>
+        {resultUrl ? <>
+          <CustomMediaPreview kind="video" src={resultUrl} label="Muted video result preview" className="video-stage-media" />
+          <button type="button" className="editor-action" onClick={() => setResultUrl("")}>Back to source video</button>
+        </> : url ? <CustomMediaPreview kind="video" src={url} label="Original video preview" className="video-stage-media" onDuration={setDuration} /> : <div className="empty-preview">Choose a video to begin.</div>}
+      </div>
     </section>}
   </main>;
 }

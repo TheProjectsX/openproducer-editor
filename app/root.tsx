@@ -77,7 +77,7 @@ export default function App() {
       registration.addEventListener("updatefound", onUpdateFound);
       discoverWaitingWorker();
     }).catch((error: unknown) => {
-      console.error("Local Studio could not register its offline worker.", error);
+      console.error("OpenProducer Editor could not register its offline worker.", error);
     });
     return () => {
       disposed = true;
@@ -96,7 +96,7 @@ export default function App() {
   }
 
   return <>
-    {updateReady && <aside className="update-banner" role="status"><span>A Local Studio update is ready. Save or finish active edits before reloading.</span><button type="button" disabled={applyingUpdate} onClick={applyUpdate}>{applyingUpdate ? "Applying update…" : "Reload to update"}</button></aside>}
+    {updateReady && <aside className="update-banner" role="status"><span>A OpenProducer Editor update is ready. Save or finish active edits before reloading.</span><button type="button" disabled={applyingUpdate} onClick={applyUpdate}>{applyingUpdate ? "Applying update…" : "Reload to update"}</button></aside>}
     <Outlet />
   </>;
 }

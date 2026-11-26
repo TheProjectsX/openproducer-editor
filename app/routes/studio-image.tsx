@@ -3,7 +3,7 @@ import { ImageResizeTool } from "./image-resize";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Image workspace | Local Studio" },
+    { title: "Image workspace | OpenProducer Editor" },
     { name: "robots", content: "noindex,nofollow" },
   ];
 }

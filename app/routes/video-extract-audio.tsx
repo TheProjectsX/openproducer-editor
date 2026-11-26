@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import type { Route } from "./+types/video-extract-audio";
 import { MediaImportScreen } from "../components/media-import-screen";
 import { CustomMediaPreview } from "../components/custom-media-preview";
-import { AudioWaveformPreview } from "../components/audio-waveform-preview";
 import { ProcessingProgress } from "../components/processing-progress";
 
 const MAX_INPUT_BYTES = 512 * 1024 * 1024;
@@ -11,7 +10,7 @@ const MAX_OUTPUT_BYTES = 512 * 1024 * 1024;
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Extract audio from video | Local Studio" },
+    { title: "Extract audio from video | OpenProducer Editor" },
     { name: "description", content: "Extract the audio track from a local video and export WAV in your browser." },
   ];
 }
@@ -68,20 +67,44 @@ export default function VideoExtractAudio() {
     }
   }
 
-  return <main className={`resize-page${file ? " has-media" : ""}`}>
-    <ToolPageHeader />
+  return <main className={`resize-page video-tool-page${file ? " has-media" : ""}`}>
+    <ToolPageHeader status={file && duration ? `${duration.toFixed(2)} s` : undefined} />
     <section className="resize-intro"><p className="eyebrow">VIDEO · LOCAL PROCESSING</p><h1>Extract a video’s audio</h1><p>Keep the primary audio track and export it as 48 kHz stereo WAV. Conversion runs in this browser.</p></section>
-    {!file ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseFile} error={error} /> : <section className="resize-workspace video-tool-workspace">
+    {!file ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseFile} error={error} /> : <section className="resize-workspace">
       <div className="resize-controls">
-        <label className="file-picker"><span>{file ? "Choose another video" : "Choose a video"}<input type="file" accept="video/*,.mkv,.webm" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} /></span></label>
-        {file && <p className="source-info">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MiB{duration ? ` · ${duration.toFixed(3)} s` : " · Reading duration…"}</p>}
-        <p className="resize-note">Output: 16-bit PCM WAV, 48 kHz, stereo. Large files can use substantial browser memory. Maximum input and output size: 512 MiB.</p>
+        <div className="audio-file-bar">
+          <div className="audio-file-meta">
+            <strong>{file.name}</strong>
+            <span>{(file.size / 1024 / 1024).toFixed(1)} MiB{duration ? ` · ${duration.toFixed(3)} s` : " · Reading…"}</span>
+          </div>
+          <label className="audio-file-change">
+            <span>Change file</span>
+            <input type="file" accept="video/*,.mkv,.webm" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} />
+          </label>
+        </div>
+
+        <div className="audio-output-summary">
+          <div>
+            <span>Format</span>
+            <strong>16-bit PCM WAV</strong>
+          </div>
+          <div>
+            <span>Sample rate</span>
+            <strong>48 kHz stereo</strong>
+          </div>
+        </div>
+
+        <p className="resize-note">Extracts the primary audio stream locally in your browser. Maximum input and output size: 512 MiB.</p>
         {error && <p className="resize-error" role="alert">{error}</p>}
         {progress !== null && <ProcessingProgress label="Extracting the primary audio track" value={progress} />}
         <button className="export-button" disabled={!file || !duration || progress !== null || file.size > MAX_INPUT_BYTES || Boolean(error)} onClick={extract}>{progress !== null ? "Extracting…" : "Extract and export WAV"}</button>
-        {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-audio.wav`}>Download extracted WAV</a>}
+        {resultUrl && <a className="export-button secondary-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-audio.wav`}>Download extracted WAV</a>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Video source</strong><span>{file ? "Local preview" : "No video selected"}</span></div>{url ? <CustomMediaPreview kind="video" src={url} label="Video source preview" onDuration={setDuration} /> : <div className="empty-preview">Choose a video with an audio track.</div>}{resultUrl && <div className="extracted-audio-preview"><AudioWaveformPreview src={resultUrl} /><CustomMediaPreview kind="audio" src={resultUrl} label="Extracted audio" /></div>}</div>
+      <div className="resize-preview video-stage">
+        <div className="preview-heading"><strong>Video source</strong><span>{duration ? `${duration.toFixed(3)} s · local preview` : "Loading video…"}</span></div>
+        {url ? <CustomMediaPreview kind="video" src={url} label="Video source preview" className="video-stage-media" onDuration={setDuration} /> : <div className="empty-preview">Choose a video with an audio track.</div>}
+        {resultUrl && <div className="extracted-audio-preview"><CustomMediaPreview kind="audio" src={resultUrl} label="Extracted audio" /></div>}
+      </div>
     </section>}
   </main>;
 }

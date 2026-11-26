@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router";
 import type { Route } from "./+types/image-resize";
 import { getProject, readProjectSource, saveImageSettings, saveProjectSource, type ImageLayer, type ImageProjectSettings } from "../lib/project-store";
 import { createImageHistory, recordImageEdit, redoImageEdit, undoImageEdit } from "../lib/image-history";
+import { CanvasBackgroundPicker, ImageCanvasViewport, type CanvasBgMode } from "../components/image-canvas-viewport";
 import { MediaImportScreen } from "../components/media-import-screen";
 
 type SourceImage = { file: File; url: string; width: number; height: number };
@@ -11,7 +12,7 @@ type CropRect = { x: number; y: number; width: number; height: number };
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Image Resize | Local Studio" },
+    { title: "Image Resize | OpenProducer Editor" },
     {
       name: "description",
       content: "Resize an image to exact pixel dimensions in your browser.",
@@ -59,6 +60,7 @@ export function ImageResizeTool({ workspace = false, downscale = false }: { work
   const [error, setError] = useState("");
   const [projectTitle, setProjectTitle] = useState("");
   const [projectStatus, setProjectStatus] = useState("");
+  const [canvasBg, setCanvasBg] = useState<CanvasBgMode>("dark-checker");
 
   const originalRatio = cropApplied ? cropRect.width / cropRect.height : source ? source.width / source.height : 1;
   const downscaleValue = Number(downscaleAmount);
@@ -524,8 +526,8 @@ export function ImageResizeTool({ workspace = false, downscale = false }: { work
   }
 
   return (
-    <main className={`resize-page${source ? " has-media" : ""}${downscale ? " downscale-page" : ""}`}>
-      <ToolPageHeader />
+    <main className={`resize-page image-tool-page${source ? " has-media" : ""}${downscale ? " downscale-page" : ""}`}>
+      <ToolPageHeader status={source && outputValid ? `${rotatedWidth} × ${rotatedHeight} px` : undefined} />
       <section className="resize-intro">
         <p className="eyebrow">{workspace ? "IMAGE STUDIO · LOCAL PROJECT" : "IMAGE TOOL · PRIVATE BY DESIGN"}</p>
         <h1>{workspace ? "Edit your image project." : downscale ? "Downscale your image." : "Resize and adjust your image."}</h1>
@@ -533,13 +535,28 @@ export function ImageResizeTool({ workspace = false, downscale = false }: { work
       </section>
       {!source ? <MediaImportScreen kind="image" accept="image/*" onFile={(next) => importImage(next)} error={error} /> : <section className="resize-workspace" aria-label="Image resizing workspace" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); importImage(event.dataTransfer.files?.[0]); }}>
         <div className="resize-controls">
-          <h2 className="editor-sidebar-title">{downscale ? "Downscale Image" : workspace ? "Image Editor" : "Resize Image"}</h2>
-          <label className="file-picker">
-            <span>{source ? "Choose another image" : "Choose an image"}</span>
-            <input type="file" accept="image/*" onChange={(event) => importImage(event.currentTarget.files?.[0])} />
-          </label>
-          {projectId && <p className="resize-note" role="status">Project: {projectTitle || "Loading…"}. {projectStatus}</p>}
-          {source && <p className="source-info">Original: {ratioText} px</p>}
+          <div className="audio-file-bar">
+            <div className="audio-file-meta">
+              <strong>{source.file.name}</strong>
+              <span>{ratioText} px{projectId ? ` · ${projectTitle || "Project"}` : ""}</span>
+            </div>
+            <label className="audio-file-change">
+              <span>Change file</span>
+              <input type="file" accept="image/*" onChange={(event) => importImage(event.currentTarget.files?.[0])} />
+            </label>
+          </div>
+          {projectId && projectStatus && <p className="resize-note" role="status">{projectStatus}</p>}
+
+          <div className="audio-output-summary">
+            <div>
+              <span>Source</span>
+              <strong>{ratioText} px</strong>
+            </div>
+            <div>
+              <span>Output</span>
+              <strong>{outputValid ? `${rotatedWidth} × ${rotatedHeight} px` : "—"}</strong>
+            </div>
+          </div>
           <details className="editor-control-group" open><summary>{downscale ? "Scale image" : "Canvas size"}<span>{downscale && source ? `${renderWidth} × ${renderHeight} px output` : source ? cropApplied && !workspace ? `${Math.round(cropRect.width)} × ${Math.round(cropRect.height)} px crop` : `${ratioText} px original` : ""}</span></summary><div className="editor-control-content">
           {downscale ? <>
             <label className="ratio-field">Scale method<select value={downscaleMode} onChange={(event) => changeDownscaleMode(event.currentTarget.value as "percent" | "factor")}><option value="percent">Percentage of original</option><option value="factor">Reduction factor (1 ÷ n)</option></select></label>
@@ -600,17 +617,23 @@ export function ImageResizeTool({ workspace = false, downscale = false }: { work
           <button className="export-button" type="button" disabled={!source || !outputValid} onClick={download}>Download {downscale ? "downscaled " : ""}{exportFormat.toUpperCase()}</button>
           {error && <p className="resize-error" role="alert">{error}</p>}
         </div>
-        <div className="resize-preview">
-          <div className="preview-heading"><strong>{downscale ? "Original / downscaled comparison" : "Output preview"}</strong><span>{source && outputValid ? `${rotatedWidth} × ${rotatedHeight} px` : downscale && source ? "Set smaller dimensions within the source size" : "Choose an image to begin"}</span></div>
+        <div className="resize-preview image-stage">
+          <div className="preview-heading">
+            <strong>{downscale ? "Original / downscaled comparison" : "Output canvas"}</strong>
+            <div className="image-stage-meta">
+              <CanvasBackgroundPicker value={canvasBg} onChange={setCanvasBg} />
+              <span>{source && outputValid ? `${rotatedWidth} × ${rotatedHeight} px` : downscale && source ? "Set smaller dimensions within the source size" : "Choose an image to begin"}</span>
+            </div>
+          </div>
           {!source && <div className="empty-preview">Your image preview will appear here.</div>}
-          {downscale && source && outputValid && <div className="upscale-comparison downscale-comparison" style={{ width: `min(100%, ${(rotatedWidth / rotatedHeight) * 58}dvh, calc(${(rotatedWidth / rotatedHeight) * 100}dvh - ${(rotatedWidth / rotatedHeight) * 250}px))`, aspectRatio: `${rotatedWidth} / ${rotatedHeight}` }}>
+          {downscale && source && outputValid && <ImageCanvasViewport canvasBg={canvasBg}><div className="upscale-comparison downscale-comparison" style={{ width: `min(100%, calc((100dvh - 180px) * ${rotatedWidth / Math.max(1, rotatedHeight)}))`, aspectRatio: `${rotatedWidth} / ${rotatedHeight}` }}>
             <canvas ref={canvasRef} className="upscale-comparison-enhanced" aria-label="Downscaled image preview" />
             <div className="upscale-comparison-original" style={{ clipPath: `inset(0 ${100 - downscaleComparePosition}% 0 0)` }}><img src={source.url} alt="Original image before downscaling" draggable={false} /></div>
             <span className="upscale-comparison-label before">Original</span><span className="upscale-comparison-label after">Downscaled</span>
             <span className="upscale-comparison-divider" style={{ left: `${downscaleComparePosition}%` }} aria-hidden="true"><i /></span>
             <input className="upscale-comparison-range" type="range" min="0" max="100" step="1" value={downscaleComparePosition} aria-label="Drag to compare original and downscaled image" onChange={(event) => setDownscaleComparePosition(event.currentTarget.valueAsNumber)} />
-          </div>}
-          {(!downscale || !source || !outputValid) && <div className="image-editor-canvas-stage">
+          </div></ImageCanvasViewport>}
+          {(!downscale || !source || !outputValid) && <ImageCanvasViewport canvasBg={canvasBg}><div className="image-editor-canvas-stage">
             {!downscale && <canvas ref={canvasRef} className="preview-canvas" aria-label="Resized image preview" />}
             {downscale && source && !outputValid && <div className="empty-preview">Choose a valid scale amount to compare the result.</div>}
             {workspace && source && <canvas ref={interactionCanvasRef} className="image-layer-interaction" aria-label="Image overlay layers. Drag a selected layer to move it or drag its corner to resize." onPointerDown={beginLayerGesture} onPointerMove={moveLayerGesture} onPointerUp={endLayerGesture} onPointerCancel={endLayerGesture} />}
@@ -619,7 +642,7 @@ export function ImageResizeTool({ workspace = false, downscale = false }: { work
                 {(["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const).map((handle) => <span key={handle} className={`resize-crop-handle ${handle}`} data-resize-crop-handle={handle} aria-hidden="true" />)}
               </div>
             </div></div>}
-          </div>}
+          </div></ImageCanvasViewport>}
         </div>
       </section>}
     </main>

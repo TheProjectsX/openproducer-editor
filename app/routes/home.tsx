@@ -1,97 +1,743 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import type { Route } from "./+types/home";
+import { ALL_TOOLS, ToolIcon, type ToolSpecimen } from "../components/tool-directory";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Local Studio | A private media workspace" },
+    { title: "OpenProducer Editor | Browser media editor for audio, video, and images" },
     {
       name: "description",
-      content: "A focused local workspace for audio, video, and image editing. Your media stays on your device.",
+      content:
+        "24 browser-based tools and multitrack studios for audio, video, and image editing. All processing and project storage stay on your device.",
     },
   ];
 }
 
-const categories = [
+type HeroMode = "audio" | "video" | "image";
+
+const workspaces = [
   {
-    title: "Audio editor tools",
-    description: "Shape sound, clean recordings, adjust speed, and bring tracks together.",
+    key: "audio",
+    code: "01",
+    title: "Audio tools",
+    count: "10 tools",
+    formats: "WAV · MP3 · M4A · OGG",
+    description:
+      "Trim, split, merge, normalize, gate background noise, adjust speed from 0.1× to 16×, and transcribe speech locally.",
     href: "/tools/audio",
-    type: "audio",
-    number: "01",
-    tools: "Trim · Split · Mix · Clean",
   },
   {
-    title: "Video editor tools",
-    description: "Make precise cuts, control playback speed, and work across video and audio.",
+    key: "video",
+    code: "02",
+    title: "Video tools",
+    count: "6 tools + Studio",
+    formats: "MP4 · WebM · MOV",
+    description:
+      "Trim clips, change playback speed, extract or replace audio tracks, animate images with keyframes, and edit on a multitrack timeline.",
     href: "/tools/video",
-    type: "video",
-    number: "02",
-    tools: "Trim · Speed · Audio · Studio",
   },
   {
+    key: "image",
+    code: "03",
     title: "Image tools",
-    description: "Refine dimensions, crop with control, compose collages, and prepare exports.",
+    count: "8 tools",
+    formats: "PNG · JPEG · WebP",
+    description:
+      "Resize to exact pixel dimensions, downscale by percentage, crop in source pixels, build collages, edit layers, and upscale locally.",
     href: "/tools/image",
-    type: "image",
-    number: "03",
-    tools: "Resize · Crop · Compose · Export",
   },
 ] as const;
 
-function CategoryMark({ type }: { type: (typeof categories)[number]["type"] }) {
-  if (type === "audio") return <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 20v8m7-15v22m7-28v34m7-23v12m7-19v26m7-17v8m7-13v18" /></svg>;
-  if (type === "video") return <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="10" width="27" height="28" rx="5" /><path d="m32 20 11-7v22l-11-7z" /></svg>;
-  return <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="5" width="38" height="38" rx="8" /><circle cx="17" cy="17" r="4" /><path d="m8 36 11-11 7 7 5-5 9 9" /></svg>;
+const studios = [
+  {
+    title: "Video Studio",
+    detail: "Multitrack timeline, keyframes, text overlays, transitions, and local export",
+    href: "/studio/video",
+    badge: "MULTITRACK",
+  },
+  {
+    title: "Audio Studio",
+    detail: "Layered audio tracks, waveform editing, and WAV mixdown",
+    href: "/studio/audio",
+    badge: "MULTITRACK",
+  },
+  {
+    title: "Image Editor",
+    detail: "Multi-layer canvas, shapes, effects, and non-destructive adjustments",
+    href: "/tools/image/editor",
+    badge: "LAYERS",
+  },
+] as const;
+
+const specimens = [
+  {
+    code: "A-02",
+    domain: "audio",
+    title: "Change audio speed",
+    spec: "0.1× – 16× · Pitch preserved",
+    description: "Type any custom playback rate with pitch preservation enabled by default.",
+    href: "/tools/audio/speed",
+  },
+  {
+    code: "A-09",
+    domain: "audio",
+    title: "Voice to transcript",
+    spec: "Whisper Base · On-device",
+    description: "Transcribe audio files, video tracks, or mic recordings locally without upload.",
+    href: "/tools/audio/transcribe",
+  },
+  {
+    code: "V-03",
+    domain: "video",
+    title: "Change video speed",
+    spec: "0.1× – 16× · MP4 / WebM",
+    description: "Retime video and audio together using custom numeric rates.",
+    href: "/tools/video/speed",
+  },
+  {
+    code: "V-06",
+    domain: "video",
+    title: "Image to video",
+    spec: "Keyframes · Audio mix",
+    description: "Animate still images with pan, zoom, and motion keyframes into video.",
+    href: "/tools/video/image-to-video",
+  },
+  {
+    code: "I-02",
+    domain: "image",
+    title: "Resize pixels",
+    spec: "Exact W × H · Optional ratio",
+    description: "Set independent pixel width and height, with aspect-ratio lock as an option.",
+    href: "/tools/image/resize",
+  },
+  {
+    code: "I-04",
+    domain: "image",
+    title: "Upscale image",
+    spec: "Real-ESRGAN · Bundled model",
+    description: "Enlarge low-resolution images on-device using cached neural weights.",
+    href: "/tools/image/upscale",
+  },
+] as const;
+
+const architectureFacts = [
+  {
+    label: "PROCESSING",
+    title: "Web Workers & WebCodecs",
+    detail:
+      "Heavy decoding, resampling, and rendering run in background workers with progress reporting and cancellation.",
+  },
+  {
+    label: "STORAGE",
+    title: "IndexedDB & local projects",
+    detail:
+      "Save versioned edits and asset references in browser storage. Manage quota and cached AI models anytime.",
+  },
+  {
+    label: "COMPATIBILITY",
+    title: "Offline PWA & codec detection",
+    detail:
+      "Installable for offline use. Video export formats adapt to the codecs your browser supports via capability checks.",
+  },
+] as const;
+
+const waveformBars = [28, 46, 64, 88, 52, 74, 92, 60, 42, 78, 95, 66, 48, 84, 70, 38, 62, 86, 54, 40];
+
+const SEARCHABLE_TOOLS: readonly ToolSpecimen[] = [
+  {
+    code: "V-00",
+    category: "video",
+    title: "Video Studio",
+    description: "Multitrack timeline editor for video, audio, images, text overlays, keyframes, and transitions.",
+    spec: "Multitrack · MP4 / WebM",
+    href: "/studio/video",
+  },
+  {
+    code: "I-00",
+    category: "image",
+    title: "Image Editor",
+    description: "Create or edit multi-layer canvases with shapes, text, and non-destructive effects.",
+    spec: "Layers · PNG / JPEG / WebP",
+    href: "/tools/image/editor",
+  },
+  {
+    code: "A-00",
+    category: "audio",
+    title: "Audio Studio",
+    description: "Open the multitrack audio workspace for layered clips and mixdowns.",
+    spec: "Multitrack · WAV export",
+    href: "/studio/audio",
+  },
+  ...ALL_TOOLS,
+];
+
+function scoreToolMatch(tool: ToolSpecimen, rawQuery: string): number {
+  const q = rawQuery.trim().toLowerCase();
+  if (!q) return 1;
+  const title = tool.title.toLowerCase();
+  const desc = tool.description.toLowerCase();
+  const spec = tool.spec.toLowerCase();
+  const cat = tool.category.toLowerCase();
+  const code = tool.code.toLowerCase();
+
+  let score = 0;
+  if (title === q) score += 200;
+  else if (title.startsWith(q)) score += 120;
+  else if (title.includes(q)) score += 80;
+
+  if (code === q || code.includes(q)) score += 60;
+  if (cat === q || cat.startsWith(q)) score += 50;
+  if (spec.includes(q)) score += 45;
+  if (desc.includes(q)) score += 35;
+
+  const words = q.split(/\s+/).filter(Boolean);
+  if (words.length > 1) {
+    let matchedWords = 0;
+    for (const w of words) {
+      if (title.includes(w)) {
+        score += 30;
+        matchedWords += 1;
+      } else if (desc.includes(w) || spec.includes(w) || cat.includes(w)) {
+        score += 15;
+        matchedWords += 1;
+      }
+    }
+    if (matchedWords === words.length) score += 40;
+  }
+
+  return score;
 }
 
 export default function Home() {
+  const navigate = useNavigate();
+  const [heroMode, setHeroMode] = useState<HeroMode>("video");
+  const [sampleSpeed, setSampleSpeed] = useState(1.25);
+  const [sampleWidth, setSampleWidth] = useState(1920);
+  const [sampleHeight, setSampleHeight] = useState(1080);
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return SEARCHABLE_TOOLS.slice(0, 8);
+    return SEARCHABLE_TOOLS
+      .map((tool) => ({ tool, score: scoreToolMatch(tool, q) }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((entry) => entry.tool);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [searchQuery, searchOpen]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    searchInputRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSearchOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [searchOpen]);
+
+  useEffect(() => {
+    const onGlobalKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", onGlobalKey);
+    return () => window.removeEventListener("keydown", onGlobalKey);
+  }, []);
+
+  function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (searchResults.length > 0) {
+        setSelectedIndex((prev) => (prev + 1) % searchResults.length);
+      }
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (searchResults.length > 0) {
+        setSelectedIndex((prev) => (prev - 1 + searchResults.length) % searchResults.length);
+      }
+    } else if (event.key === "Enter") {
+      const target = searchResults[selectedIndex] ?? searchResults[0];
+      if (target) {
+        event.preventDefault();
+        setSearchOpen(false);
+        navigate(target.href);
+      }
+    }
+  }
+
   return (
-    <main className="marketing-page">
+    <div className="marketing-page">
       <header className="site-header">
-        <a href="/" className="brand"><span className="brand-mark" aria-hidden="true">L</span>Local Studio</a>
-        <nav className="site-nav" aria-label="Main navigation">
-          <a href="/tools">Explore tools</a>
-          <a href="/projects">Projects</a>
-          <a href="/settings/storage">Storage</a>
-        </nav>
+        <div className="wrap header-wrap">
+          <a href="/" className="brand">
+            <span className="brand-mark" aria-hidden="true">L</span>
+            <span>OpenProducer Editor</span>
+          </a>
+          <nav className="site-nav" aria-label="Main navigation">
+            <a href="/tools">Tools</a>
+            <a href="/tools/audio">Audio</a>
+            <a href="/tools/video">Video</a>
+            <a href="/tools/image">Image</a>
+            <a href="/projects">Projects</a>
+          </nav>
+          <div className="header-actions">
+            <button
+              type="button"
+              className="header-search-btn"
+              onClick={() => setSearchOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={searchOpen}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <span>Search</span>
+            </button>
+            <a className="header-cta" href="/studio/video">
+              Open Video Studio
+            </a>
+          </div>
+        </div>
       </header>
 
-      <section className="category-section home-workspaces" aria-labelledby="category-heading">
-        <div className="category-grid">
-          {categories.map((category) => <a className={`category-card category-${category.type}`} href={category.href} key={category.type}>
-            <div className="category-card-top"><span className="category-icon"><CategoryMark type={category.type} /></span><span className="category-number">{category.number}</span></div>
-            <div className="category-card-copy"><h2>{category.title}</h2><p>{category.description}</p></div>
-            <div className="category-card-bottom"><span>{category.tools}</span><span className="category-arrow" aria-hidden="true">↗</span></div>
-          </a>)}
-        </div>
-        <a className="creative-studio-card" href="/studio/video">
-          <span className="creative-studio-mark" aria-hidden="true">✦</span>
-          <span><strong>Creative Studio</strong><small>Multitrack editing for video, audio, and images</small></span>
-          <span className="category-arrow" aria-hidden="true">↗</span>
-        </a>
-      </section>
+      {searchOpen && (
+        <div
+          className="search-modal-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setSearchOpen(false);
+          }}
+        >
+          <div
+            className="search-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Search tools"
+          >
+            <div className="search-modal-input-row">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <input
+                ref={searchInputRef}
+                type="search"
+                placeholder="Search tools by name or description (e.g. trim, 16x, whisper, crop)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                aria-label="Search tools by name or description"
+              />
+              <button
+                type="button"
+                className="search-modal-close"
+                onClick={() => setSearchOpen(false)}
+                aria-label="Close search"
+              >
+                Esc
+              </button>
+            </div>
 
-      <section className="home-hero">
-        <div className="hero-copy">
-          <span className="hero-kicker"><span className="status-dot" /> PRIVATE BY DESIGN · READY OFFLINE</span>
-          <h1>Make more of<br /><span>your media.</span></h1>
-          <p>Thoughtful tools for the details that make audio, video, and images feel right. Your files stay on your device.</p>
-          <a className="hero-link" href="/tools">Explore the workspace <span aria-hidden="true">↗</span></a>
-        </div>
-        <div className="hero-art" aria-hidden="true">
-          <div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" />
-          <div className="art-glow" />
-          <div className="art-window">
-            <div className="art-window-top"><span /><span /><span /><i>LOCAL / 01</i></div>
-            <div className="art-wave"><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /><b /></div>
-            <div className="art-track"><i /><i /><i /></div>
-            <div className="art-image"><span /><span /><span /></div>
+            <div className="search-modal-results" role="listbox" aria-label="Matching tools">
+              {searchResults.length > 0 ? (
+                searchResults.map((tool, index) => {
+                  const isSelected = index === selectedIndex;
+                  return (
+                    <a
+                      key={tool.code}
+                      href={tool.href}
+                      role="option"
+                      aria-selected={isSelected}
+                      className={`search-result-item tone-${tool.category}${isSelected ? " is-selected" : ""}`}
+                      onMouseEnter={() => setSelectedIndex(index)}
+                      onClick={() => setSearchOpen(false)}
+                    >
+                      <span className="specimen-icon">
+                        <ToolIcon code={tool.code} />
+                      </span>
+                      <div className="search-result-copy">
+                        <div className="search-result-head">
+                          <strong>{tool.title}</strong>
+                          <span className="specimen-domain">{tool.category.toUpperCase()}</span>
+                        </div>
+                        <p>{tool.description}</p>
+                      </div>
+                      <span className="search-result-meta">
+                        {isSelected ? "Enter ↵" : tool.spec}
+                      </span>
+                    </a>
+                  );
+                })
+              ) : (
+                <div className="search-modal-empty">
+                  No tools match “{searchQuery}”. Try “speed”, “trim”, “resize”, or “transcript”.
+                </div>
+              )}
+            </div>
+
+            <div className="search-modal-footer">
+              <span>↑↓ Select</span>
+              <span>Enter Open tool</span>
+              <span>Esc Close</span>
+            </div>
           </div>
-          <div className="art-chip chip-a">✳ &nbsp; LOCAL FIRST</div>
-          <div className="art-chip chip-b">NO UPLOADS. NO ACCOUNTS.</div>
         </div>
-      </section>
+      )}
 
-      <footer className="home-footer"><span>LOCAL STUDIO</span><span>Private editing. Right on your device.</span><a href="/projects">Your projects ↗</a></footer>
-    </main>
+      <main id="top">
+        <section className="home-hero">
+          <div className="wrap hero-grid">
+            <div className="hero-copy">
+              <p className="hero-kicker">
+                <span className="status-dot" aria-hidden="true" />
+                24 BROWSER TOOLS · 0 UPLOADS · OFFLINE PWA
+              </p>
+              <h1>
+                Browser media editor for <span>audio, video, and images.</span>
+              </h1>
+              <p className="hero-lead">
+                Trim, retime, resize, transcribe, and edit multitrack timelines directly on your
+                device. No accounts, no server uploads, and no watermarks.
+              </p>
+              <div className="hero-actions">
+                <a className="btn-primary-action" href="/studio/video">
+                  Open Video Studio
+                </a>
+                <a className="btn-secondary-action" href="/tools">
+                  Browse all 24 tools
+                </a>
+              </div>
+              <dl className="hero-facts">
+                <div>
+                  <dt>Speed range</dt>
+                  <dd>0.1× – 16×</dd>
+                </div>
+                <div>
+                  <dt>Execution</dt>
+                  <dd>On-device Workers</dd>
+                </div>
+                <div>
+                  <dt>Project save</dt>
+                  <dd>Local IndexedDB</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div className="hero-stage" role="region" aria-label="Interactive workspace preview">
+              <div className="app-frame">
+                <div className="app-frame-bar">
+                  <div className="app-frame-tabs" role="tablist" aria-label="Preview media workspace">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={heroMode === "video"}
+                      className={heroMode === "video" ? "is-active" : undefined}
+                      onClick={() => setHeroMode("video")}
+                    >
+                      Video timeline
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={heroMode === "audio"}
+                      className={heroMode === "audio" ? "is-active" : undefined}
+                      onClick={() => setHeroMode("audio")}
+                    >
+                      Audio waveform
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={heroMode === "image"}
+                      className={heroMode === "image" ? "is-active" : undefined}
+                      onClick={() => setHeroMode("image")}
+                    >
+                      Image canvas
+                    </button>
+                  </div>
+                  <span className="app-frame-status">LOCAL ENGINE READY</span>
+                </div>
+
+                {heroMode === "video" && (
+                  <div className="stage-panel">
+                    <div className="stage-viewport">
+                      <div className="stage-canvas-frame">
+                        <span className="stage-badge">1920 × 1080 · 30 fps</span>
+                        <div className="stage-title-preview">Multitrack Composition</div>
+                        <span className="stage-timecode">00:04.12 / 00:12.00</span>
+                      </div>
+                    </div>
+                    <div className="stage-timeline">
+                      <div className="stage-track">
+                        <span>V1</span>
+                        <div className="stage-lane">
+                          <div className="stage-clip is-video" style={{ left: "4%", width: "44%" }}>
+                            intro_clip.mp4 · {sampleSpeed.toFixed(2)}×
+                          </div>
+                          <div className="stage-clip is-video" style={{ left: "51%", width: "38%" }}>
+                            broll_cut.webm
+                          </div>
+                        </div>
+                      </div>
+                      <div className="stage-track">
+                        <span>A1</span>
+                        <div className="stage-lane">
+                          <div className="stage-clip is-audio" style={{ left: "4%", width: "85%" }}>
+                            voice_normalized.wav · -1.0 dB
+                          </div>
+                        </div>
+                      </div>
+                      <div className="stage-track">
+                        <span>T1</span>
+                        <div className="stage-lane">
+                          <div className="stage-clip is-text" style={{ left: "14%", width: "30%" }}>
+                            Title overlay
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="stage-controls-row">
+                      <label className="stage-inline-control">
+                        <span>Playback rate</span>
+                        <input
+                          type="range"
+                          min="0.25"
+                          max="4"
+                          step="0.25"
+                          value={sampleSpeed}
+                          onChange={(e) => setSampleSpeed(Number(e.target.value))}
+                        />
+                        <strong>{sampleSpeed.toFixed(2)}×</strong>
+                      </label>
+                      <a href="/studio/video" className="stage-launch-link">
+                        Launch Video Studio ↗
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {heroMode === "audio" && (
+                  <div className="stage-panel">
+                    <div className="stage-waveform-box">
+                      <div className="stage-waveform-head">
+                        <span>podcast_take_02.wav</span>
+                        <span>48 kHz · Stereo · Pitch preserved</span>
+                      </div>
+                      <div className="stage-waveform-bars" aria-hidden="true">
+                        {waveformBars.map((height, index) => (
+                          <span
+                            key={index}
+                            className={index >= 3 && index <= 15 ? "is-selected" : undefined}
+                            style={{ height: `${height}%` }}
+                          />
+                        ))}
+                      </div>
+                      <div className="stage-range-meta">
+                        <span>In: 00:01.40</span>
+                        <span>Selected: 00:09.80</span>
+                        <span>Out: 00:11.20</span>
+                      </div>
+                    </div>
+                    <div className="stage-controls-row">
+                      <label className="stage-inline-control">
+                        <span>Speed (0.1×–16×)</span>
+                        <input
+                          type="range"
+                          min="0.25"
+                          max="4"
+                          step="0.25"
+                          value={sampleSpeed}
+                          onChange={(e) => setSampleSpeed(Number(e.target.value))}
+                        />
+                        <strong>{sampleSpeed.toFixed(2)}×</strong>
+                      </label>
+                      <a href="/tools/audio/speed" className="stage-launch-link">
+                        Open Audio Speed ↗
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {heroMode === "image" && (
+                  <div className="stage-panel">
+                    <div className="stage-image-box">
+                      <div
+                        className="stage-image-preview"
+                        style={{
+                          aspectRatio: `${Math.max(0.4, Math.min(2.4, sampleWidth / Math.max(1, sampleHeight)))}`,
+                        }}
+                      >
+                        <span>
+                          {sampleWidth} × {sampleHeight} px
+                        </span>
+                      </div>
+                    </div>
+                    <div className="stage-controls-row stage-image-inputs">
+                      <label>
+                        <span>Width (px)</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={8192}
+                          value={sampleWidth}
+                          onChange={(e) => setSampleWidth(Math.max(1, Number(e.target.value) || 1))}
+                        />
+                      </label>
+                      <label>
+                        <span>Height (px)</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={8192}
+                          value={sampleHeight}
+                          onChange={(e) => setSampleHeight(Math.max(1, Number(e.target.value) || 1))}
+                        />
+                      </label>
+                      <a href="/tools/image/resize" className="stage-launch-link">
+                        Open Pixel Resize ↗
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="home-section" aria-labelledby="workspaces-heading">
+          <div className="wrap">
+            <div className="section-head">
+              <div>
+                <p className="eyebrow">WORKSPACES &amp; STUDIOS</p>
+                <h2 id="workspaces-heading">Three media workspaces and three studios.</h2>
+              </div>
+              <a className="section-head-link" href="/tools">
+                Open full catalogue ↗
+              </a>
+            </div>
+
+            <div className="workspace-grid">
+              {workspaces.map((ws) => (
+                <a className={`workspace-card tone-${ws.key}`} href={ws.href} key={ws.key}>
+                  <div className="workspace-card-top">
+                    <span className="workspace-code">{ws.code}</span>
+                    <span className="workspace-count">{ws.count}</span>
+                  </div>
+                  <div className="workspace-card-body">
+                    <h3>{ws.title}</h3>
+                    <p>{ws.description}</p>
+                  </div>
+                  <div className="workspace-card-foot">
+                    <span>{ws.formats}</span>
+                    <span aria-hidden="true">↗</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+
+            <div className="studio-strip" aria-label="Full studio editors">
+              {studios.map((studio) => (
+                <a className="studio-strip-card" href={studio.href} key={studio.href}>
+                  <span className="studio-strip-badge">{studio.badge}</span>
+                  <div>
+                    <strong>{studio.title}</strong>
+                    <span>{studio.detail}</span>
+                  </div>
+                  <span className="studio-strip-arrow" aria-hidden="true">↗</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="home-section home-section-alt" aria-labelledby="specimens-heading">
+          <div className="wrap">
+            <div className="section-head">
+              <div>
+                <p className="eyebrow">SPECIMEN PREVIEW</p>
+                <h2 id="specimens-heading">Core tools with exact numeric controls.</h2>
+              </div>
+              <a className="section-head-link" href="/tools">
+                Filter all 24 tools ↗
+              </a>
+            </div>
+
+            <div className="specimen-grid">
+              {specimens.map((item) => (
+                <a className={`specimen-card tone-${item.domain}`} href={item.href} key={item.code}>
+                  <div className="specimen-card-top">
+                    <span className="specimen-code">{item.code}</span>
+                    <span className="specimen-domain">{item.domain.toUpperCase()}</span>
+                  </div>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                  <div className="specimen-card-foot">
+                    <span>{item.spec}</span>
+                    <span aria-hidden="true">↗</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="home-section" aria-labelledby="architecture-heading">
+          <div className="wrap">
+            <div className="section-head">
+              <div>
+                <p className="eyebrow">ON-DEVICE ARCHITECTURE</p>
+                <h2 id="architecture-heading">Runs on your hardware. Keeps your files local.</h2>
+              </div>
+              <a className="section-head-link" href="/settings/storage">
+                Inspect local storage ↗
+              </a>
+            </div>
+
+            <div className="architecture-grid">
+              {architectureFacts.map((fact) => (
+                <div className="architecture-card" key={fact.label}>
+                  <span className="eyebrow">{fact.label}</span>
+                  <h3>{fact.title}</h3>
+                  <p>{fact.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="home-footer">
+        <div className="wrap footer-wrap">
+          <div className="footer-brand">
+            <strong>OPENPRODUCER EDITOR</strong>
+            <span>Browser-based audio, video, and image editing.</span>
+          </div>
+          <nav className="footer-links" aria-label="Footer navigation">
+            <a href="/tools">All tools</a>
+            <a href="/tools/audio">Audio</a>
+            <a href="/tools/video">Video</a>
+            <a href="/tools/image">Image</a>
+            <a href="/studio/video">Video Studio</a>
+            <a href="/projects">Projects</a>
+            <a href="/settings/storage">Storage</a>
+          </nav>
+        </div>
+      </footer>
+    </div>
   );
 }

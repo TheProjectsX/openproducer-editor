@@ -36,7 +36,7 @@ type StageToolMode = "select" | "draw" | "bezier" | "erase" | "perspective";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Image Editor | Local Studio" },
+    { title: "Image Editor | OpenProducer Editor" },
     {
       name: "description",
       content:

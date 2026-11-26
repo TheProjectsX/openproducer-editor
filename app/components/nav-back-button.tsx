@@ -1,9 +1,16 @@
 import { useNavigate } from "react-router";
 
-export function NavBackButton({ fallback = "/" }: { fallback?: string }) {
+export function NavBackButton({
+  fallback = "/",
+  onBeforeBack,
+}: {
+  fallback?: string;
+  onBeforeBack?: () => boolean;
+}) {
   const navigate = useNavigate();
 
   function goBack() {
+    if (onBeforeBack?.()) return;
     if (typeof window !== "undefined" && window.history.length > 1) {
       navigate(-1);
     } else {

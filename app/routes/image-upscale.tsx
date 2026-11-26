@@ -1,6 +1,7 @@
 import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Route } from "./+types/image-upscale";
+import { CanvasBackgroundPicker, ImageCanvasViewport, type CanvasBgMode } from "../components/image-canvas-viewport";
 import { MediaImportScreen } from "../components/media-import-screen";
 import { ProcessingProgress } from "../components/processing-progress";
 
@@ -13,7 +14,7 @@ const MODEL_WASM = "/models/realesr-general-x4v3-fp32.onnx";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Upscale image | Local Studio" },
+    { title: "Upscale image | OpenProducer Editor" },
     { name: "description", content: "Enhance and upscale a local image with an on-device AI model. Works offline." },
   ];
 }
@@ -35,6 +36,7 @@ export default function ImageUpscale() {
   const [backend, setBackend] = useState("");
   const [upscaleReady, setUpscaleReady] = useState(false);
   const [comparePosition, setComparePosition] = useState(50);
+  const [canvasBg, setCanvasBg] = useState<CanvasBgMode>("dark-checker");
   const [error, setError] = useState("");
 
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
@@ -176,13 +178,32 @@ export default function ImageUpscale() {
     }, "image/png");
   }
 
-  return <main className={`resize-page${file ? " has-media" : ""}`}>
-    <ToolPageHeader />
+  return <main className={`resize-page image-tool-page${file ? " has-media" : ""}`}>
+    <ToolPageHeader status={file && valid ? `${output.width} × ${output.height} px` : undefined} />
     <section className="resize-intro"><p className="eyebrow">IMAGE · ON-DEVICE AI</p><h1>Upscale an image</h1><p>Enhance image detail with Real-ESRGAN, running on this device. The app includes the model for offline use.</p></section>
     {!file ? <MediaImportScreen kind="image" accept="image/*" onFile={chooseFile} error={error} /> : <section className="resize-workspace image-tool-workspace">
       <div className="resize-controls">
-        <label className="file-picker"><span>{file ? "Choose another image" : "Choose an image"}<input type="file" accept="image/*" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} /></span></label>
-        {file && <p className="source-info">{file.name} · Original {naturalSize.width} × {naturalSize.height} px</p>}
+        <div className="audio-file-bar">
+          <div className="audio-file-meta">
+            <strong>{file.name}</strong>
+            <span>Original {naturalSize.width} × {naturalSize.height} px</span>
+          </div>
+          <label className="audio-file-change">
+            <span>Change file</span>
+            <input type="file" accept="image/*" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} />
+          </label>
+        </div>
+
+        <div className="audio-output-summary">
+          <div>
+            <span>Source</span>
+            <strong>{naturalSize.width} × {naturalSize.height} px</strong>
+          </div>
+          <div>
+            <span>Target</span>
+            <strong>{valid ? `${output.width} × ${output.height} px` : "—"}</strong>
+          </div>
+        </div>
         <label className="ratio-field">Sizing mode<select value={mode} onChange={(event) => setMode(event.currentTarget.value)}><option value="scale">Custom scale multiplier</option><option value="custom">Exact custom dimensions</option></select></label>
         {mode === "scale" ? <label className="speed-field">Scale multiplier <span>custom · 1× to 8×</span><input type="number" min="1" max="8" step="any" value={scale} onChange={(event) => setScale(event.currentTarget.value)} /></label> : <div className="dimension-fields"><label>Width <span>px</span><input type="number" min={naturalSize.width || 1} step="1" value={width || ""} onChange={(event) => changeWidth(event.currentTarget.valueAsNumber)} /></label><label>Height <span>px</span><input type="number" min={naturalSize.height || 1} step="1" value={height || ""} onChange={(event) => changeHeight(event.currentTarget.valueAsNumber)} /></label></div>}
         {mode === "custom" && <label className="ratio-toggle"><input type="checkbox" checked={matchRatio} onChange={(event) => { const enabled = event.currentTarget.checked; setMatchRatio(enabled); if (enabled && naturalSize.width) setHeight(Math.max(naturalSize.height, Math.round(width * naturalSize.height / naturalSize.width))); }} /> Match original aspect ratio</label>}
@@ -193,15 +214,33 @@ export default function ImageUpscale() {
         {!upscaleReady ? <button className="export-button" disabled={!file || !valid || upscaling} onClick={() => void upscale()}>{upscaling ? "Enhancing image…" : "AI upscale image"}</button> : <button className="export-button" disabled={!file || !valid} onClick={download}>Download enhanced PNG</button>}
         {upscaleReady && <p className="source-info" role="status">{phase || `AI enhancement complete · ${backend}`}. This model and your image stay on this device.</p>}
       </div>
-      <div className="resize-preview upscale-preview"><div className="preview-heading"><strong>{upscaleReady ? "Before / after comparison" : "Upscaled preview"}</strong><span>{file && valid ? `${output.width} × ${output.height} px` : "Choose an image to begin"}</span></div>
-        {url && <div className="upscale-comparison" style={{ display: upscaleReady ? "" : "none", width: `min(100%, ${(output.width / output.height) * 58}dvh, calc(${(output.width / output.height) * 100}dvh - ${(output.width / output.height) * 250}px))`, aspectRatio: `${output.width} / ${output.height}` }}>
-          <canvas ref={canvasRef} className="upscale-comparison-enhanced" aria-label="AI-enhanced image" />
-          <div className="upscale-comparison-original" style={{ clipPath: `inset(0 ${100 - comparePosition}% 0 0)` }}><img src={url} alt="Original image before enhancement" draggable={false} /></div>
-          <span className="upscale-comparison-label before">Original</span><span className="upscale-comparison-label after">Enhanced</span>
-          <span className="upscale-comparison-divider" style={{ left: `${comparePosition}%` }} aria-hidden="true"><i /></span>
-          <input className="upscale-comparison-range" type="range" min="0" max="100" step="1" value={comparePosition} aria-label="Drag to compare original and enhanced image" onChange={(event) => setComparePosition(event.currentTarget.valueAsNumber)} />
-        </div>}
-        {!upscaleReady && (url ? <div className="upscale-source-preview"><img src={url} alt="Original image to enhance" draggable={false} />{upscaling && <div role="status" className="upscale-processing-overlay"><ProcessingProgress label={phase || "Enhancing image locally"} value={progress} /></div>}</div> : <div className="empty-preview">Choose an image to begin.</div>)}
+      <div className="resize-preview image-stage upscale-preview">
+        <div className="preview-heading">
+          <strong>{upscaleReady ? "Before / after comparison" : "Upscaled preview"}</strong>
+          <div className="image-stage-meta">
+            <CanvasBackgroundPicker value={canvasBg} onChange={setCanvasBg} />
+            <span>{file && valid ? `${output.width} × ${output.height} px` : "Choose an image to begin"}</span>
+          </div>
+        </div>
+        {url ? (
+          <ImageCanvasViewport canvasBg={canvasBg}>
+            <div className="upscale-comparison" style={{ display: upscaleReady ? "" : "none", width: `min(100%, calc((100dvh - 180px) * ${output.width / Math.max(1, output.height)}))`, aspectRatio: `${output.width} / ${output.height}` }}>
+              <canvas ref={canvasRef} className="upscale-comparison-enhanced" aria-label="AI-enhanced image" />
+              <div className="upscale-comparison-original" style={{ clipPath: `inset(0 ${100 - comparePosition}% 0 0)` }}><img src={url} alt="Original image before enhancement" draggable={false} /></div>
+              <span className="upscale-comparison-label before">Original</span><span className="upscale-comparison-label after">Enhanced</span>
+              <span className="upscale-comparison-divider" style={{ left: `${comparePosition}%` }} aria-hidden="true"><i /></span>
+              <input className="upscale-comparison-range" type="range" min="0" max="100" step="1" value={comparePosition} aria-label="Drag to compare original and enhanced image" onChange={(event) => setComparePosition(event.currentTarget.valueAsNumber)} />
+            </div>
+            {!upscaleReady && (
+              <div className="upscale-source-preview">
+                <img src={url} alt="Original image to enhance" draggable={false} />
+                {upscaling && <div role="status" className="upscale-processing-overlay"><ProcessingProgress label={phase || "Enhancing image locally"} value={progress} /></div>}
+              </div>
+            )}
+          </ImageCanvasViewport>
+        ) : (
+          <div className="empty-preview">Choose an image to begin.</div>
+        )}
       </div>
     </section>}
   </main>;

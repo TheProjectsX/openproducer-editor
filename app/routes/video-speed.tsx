@@ -19,7 +19,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Video Speed | Local Studio" },
+    { title: "Video Speed | OpenProducer Editor" },
     {
       name: "description",
       content: "Change video speed from 0.1× to 16× with pitch-preserved audio and fast local MP4 or WebM export.",
@@ -170,25 +170,13 @@ export default function VideoSpeed() {
     setProgressPhase("");
   }
 
-  const aspectRatio = videoDimensions ? videoDimensions.width / videoDimensions.height : 0;
-  const portraitPreviewStyle =
-    videoDimensions && aspectRatio < 1
-      ? {
-          width: `min(100%, ${aspectRatio * 26}dvh, ${aspectRatio * 380}px)`,
-          maxHeight: "min(26dvh, 380px)",
-          aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}`,
-          minHeight: 0,
-          flex: "0 0 auto",
-        }
-      : undefined;
-
   const targetDurationMin = duration ? Number((duration / MAX_VIDEO_SPEED).toFixed(2)) : 0.01;
   const targetDurationMax = duration ? Number((duration / MIN_VIDEO_SPEED).toFixed(2)) : 3600;
   const exportLabel = formatPreference === "webm" ? "Export WebM" : "Export MP4";
 
   return (
-    <main className={`resize-page video-speed-page${file ? " has-media" : ""}`}>
-      <ToolPageHeader />
+    <main className={`resize-page video-tool-page video-speed-page${file ? " has-media" : ""}`}>
+      <ToolPageHeader status={validRate ? `${rate}×` : undefined} />
       <section className="resize-intro">
         <p className="eyebrow">VIDEO · LOCAL PROCESSING</p>
         <h1>Change video speed</h1>
@@ -201,31 +189,33 @@ export default function VideoSpeed() {
       {!file ? (
         <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseFile} error={error} />
       ) : (
-        <section className="resize-workspace video-tool-workspace video-speed-workspace">
-          <div className="resize-controls video-speed-controls">
-            <div className="video-speed-file-row">
-              <label className="file-picker">
+        <section className="resize-workspace">
+          <div className="resize-controls">
+            <div className="audio-file-bar">
+              <div className="audio-file-meta">
+                <strong>{file.name}</strong>
                 <span>
-                  Choose another video
-                  <input
-                    type="file"
-                    accept="video/*,.mkv,.webm"
-                    disabled={exporting}
-                    onChange={(event) => chooseFile(event.currentTarget.files?.[0])}
-                  />
+                  {(file.size / 1024 / 1024).toFixed(1)} MiB
+                  {videoDimensions ? ` · ${videoDimensions.width}×${videoDimensions.height}` : ""}
+                  {duration ? ` · ${duration.toFixed(3)} s` : " · Reading…"}
                 </span>
+              </div>
+              <label className="audio-file-change">
+                <span>Change file</span>
+                <input
+                  type="file"
+                  accept="video/*,.mkv,.webm"
+                  disabled={exporting}
+                  onChange={(event) => chooseFile(event.currentTarget.files?.[0])}
+                />
               </label>
-              <p className="source-info">
-                {file.name} · {(file.size / 1024 / 1024).toFixed(1)} MiB
-                {videoDimensions ? ` · ${videoDimensions.width}×${videoDimensions.height}` : ""}
-                {duration ? ` · ${duration.toFixed(3)} s` : " · Reading duration…"}
-              </p>
             </div>
 
-            <div className="video-speed-panel">
-              <div className="video-speed-slider-row">
+            <div className="audio-control-group">
+              <p className="audio-control-group-title">Playback speed</p>
+              <div className="dimension-fields">
                 <label className="speed-field">
-                  Playback speed <span>0.1× – 16×</span>
+                  Speed <span>0.1× – 16×</span>
                   <input
                     type="number"
                     min={MIN_VIDEO_SPEED}
@@ -237,7 +227,7 @@ export default function VideoSpeed() {
                   />
                 </label>
                 <label className="speed-field">
-                  Target duration <span>seconds</span>
+                  Target duration <span>s</span>
                   <input
                     type="number"
                     min={targetDurationMin}
@@ -283,46 +273,44 @@ export default function VideoSpeed() {
               </div>
             </div>
 
-            <div className="video-speed-options">
-              <label className="ratio-field">
-                Audio pitch
-                <select
-                  value={pitchMode}
-                  disabled={exporting}
-                  onChange={(event) => setPitchMode(event.currentTarget.value as VideoSpeedPitchMode)}
-                >
-                  <option value="preserve">Preserve pitch (default)</option>
-                  <option value="natural">Natural pitch change</option>
-                </select>
-              </label>
+            <div className="audio-control-group">
+              <p className="audio-control-group-title">Audio &amp; format</p>
+              <div className="video-speed-selects">
+                <label className="ratio-field">
+                  Audio pitch
+                  <select
+                    value={pitchMode}
+                    disabled={exporting}
+                    onChange={(event) => setPitchMode(event.currentTarget.value as VideoSpeedPitchMode)}
+                  >
+                    <option value="preserve">Preserve pitch</option>
+                    <option value="natural">Natural pitch</option>
+                  </select>
+                </label>
 
-              <label className="ratio-field">
-                Output format
-                <select
-                  value={formatPreference}
-                  disabled={exporting}
-                  onChange={(event) => setFormatPreference(event.currentTarget.value as VideoSpeedFormatPreference)}
-                >
-                  <option value="auto">Auto (MP4 preferred)</option>
-                  <option value="mp4">MP4 (H.264 / AAC)</option>
-                  <option value="webm">WebM (VP9 / Opus)</option>
-                </select>
-              </label>
+                <label className="ratio-field">
+                  Output format
+                  <select
+                    value={formatPreference}
+                    disabled={exporting}
+                    onChange={(event) => setFormatPreference(event.currentTarget.value as VideoSpeedFormatPreference)}
+                  >
+                    <option value="auto">Auto (MP4)</option>
+                    <option value="mp4">MP4 (H.264)</option>
+                    <option value="webm">WebM (VP9)</option>
+                  </select>
+                </label>
+              </div>
             </div>
 
-            <div className="video-speed-summary" aria-live="polite">
+            <div className="audio-output-summary" aria-live="polite">
               <div>
                 <span>Original</span>
                 <strong>{duration ? `${duration.toFixed(3)} s` : "—"}</strong>
               </div>
-              <div className="summary-arrow" aria-hidden="true">→</div>
               <div>
                 <span>Output ({validRate ? `${rate}×` : "invalid"})</span>
                 <strong>{estimatedDuration ? `${estimatedDuration.toFixed(3)} s` : "—"}</strong>
-              </div>
-              <div>
-                <span>Audio</span>
-                <strong>{pitchMode === "preserve" ? "Pitch preserved" : "Natural pitch"}</strong>
               </div>
             </div>
 
@@ -338,34 +326,32 @@ export default function VideoSpeed() {
               </p>
             )}
 
-            <div className="video-speed-actions">
-              {exporting ? (
-                <button type="button" className="export-button secondary-button" onClick={cancelExport}>
-                  Cancel export
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="export-button"
-                  disabled={!file || !duration || !validRate}
-                  onClick={() => void startExport()}
-                >
-                  {exportLabel}
-                </button>
-              )}
-              {resultUrl && resultMeta && (
-                <a
-                  className="export-button download-link"
-                  href={resultUrl}
-                  download={`${file.name.replace(/\.[^.]+$/, "")}-${rate}x.${resultMeta.extension}`}
-                >
-                  Download {resultMeta.extension.toUpperCase()} ({(resultMeta.sizeBytes / 1024 / 1024).toFixed(1)} MiB)
-                </a>
-              )}
-            </div>
+            {exporting ? (
+              <button type="button" className="export-button secondary-button" onClick={cancelExport}>
+                Cancel export
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="export-button"
+                disabled={!file || !duration || !validRate}
+                onClick={() => void startExport()}
+              >
+                {exportLabel}
+              </button>
+            )}
+            {resultUrl && resultMeta && (
+              <a
+                className="export-button secondary-button download-link"
+                href={resultUrl}
+                download={`${file.name.replace(/\.[^.]+$/, "")}-${rate}x.${resultMeta.extension}`}
+              >
+                Download {resultMeta.extension.toUpperCase()} ({(resultMeta.sizeBytes / 1024 / 1024).toFixed(1)} MiB)
+              </a>
+            )}
           </div>
 
-          <div className="resize-preview">
+          <div className="resize-preview video-stage">
             <div className="preview-heading">
               <strong>{resultUrl ? "Speed-adjusted video" : "Live speed preview"}</strong>
               <span>
@@ -379,7 +365,7 @@ export default function VideoSpeed() {
 
             {resultUrl ? (
               <>
-                <CustomMediaPreview kind="video" src={resultUrl} label="Speed-adjusted video result" />
+                <CustomMediaPreview kind="video" src={resultUrl} label="Speed-adjusted video result" className="video-stage-media" />
                 <button
                   type="button"
                   className="editor-action"
@@ -393,10 +379,10 @@ export default function VideoSpeed() {
               </>
             ) : url ? (
               <>
-                <div className="custom-video-stage" style={portraitPreviewStyle}>
+                <div className="trim-video-stage">
                   <video
                     ref={videoRef}
-                    className="video-preview"
+                    className="trim-video-surface"
                     src={url}
                     playsInline
                     preload="metadata"
@@ -417,7 +403,7 @@ export default function VideoSpeed() {
                     onEnded={() => setPreviewPlaying(false)}
                   />
                 </div>
-                <div className="video-custom-transport">
+                <div className="video-custom-transport has-time">
                   <button
                     type="button"
                     className="transport-play"

@@ -9,7 +9,7 @@ const MAX_DECODED_BYTES = 512 * 1024 * 1024;
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Merge audio | Local Studio" },
+    { title: "Merge audio | OpenProducer Editor" },
     { name: "description", content: "Arrange and merge local audio files into one WAV in your browser." },
   ];
 }
@@ -100,20 +100,79 @@ export default function AudioMerge() {
     setClips((current) => { const reordered = [...current]; const [clip] = reordered.splice(index, 1); reordered.splice(destination, 0, clip); return reordered; });
   }
 
-  return <main className={`resize-page${clips.length ? " has-media" : ""}`}>
-    <ToolPageHeader />
-    <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Merge audio files</h1><p>Add audio, arrange its order, set a custom gap between clips, and export one WAV. Files stay in this browser.</p></section>
+  return <main className={`resize-page audio-tool-page${clips.length ? " has-media" : ""}`}>
+    <ToolPageHeader status={clips.length ? `${clips.length} clip(s)` : undefined} />
+    <section className="resize-intro">
+      <p className="eyebrow">AUDIO · LOCAL PROCESSING</p>
+      <h1>Merge audio files</h1>
+      <p>Add audio, arrange its order, set a custom gap between clips, and export one WAV. Files stay in this browser.</p>
+    </section>
     {!clips.length ? <MediaImportScreen kind="audio" accept="audio/*" multiple onFiles={(files) => void addFiles(files)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">
-        <label className="file-picker"><span>{busy ? "Decoding audio…" : "Add audio files"}<input type="file" accept="audio/*" multiple disabled={busy} onChange={(event) => { void addFiles(event.currentTarget.files); event.currentTarget.value = ""; }} /></span></label>
-        {clips.length > 0 && <p className="source-info">{clips.length} file(s) · {clips.reduce((sum, clip) => sum + clip.audio.duration, 0).toFixed(3)} s total audio</p>}
-        <label className="speed-field">Gap between clips <span>seconds · custom</span><input type="number" min="0" max="600" step="0.1" value={gap} onChange={(event) => setGap(event.currentTarget.value)} /></label>
-        <p className="resize-note">Output is 16-bit PCM WAV. Different sample rates are resampled to the highest source rate; mono channels are duplicated as needed. Rendering uses browser memory.</p>
+        <div className="audio-file-bar">
+          <div className="audio-file-meta">
+            <strong>{clips.length} audio file(s)</strong>
+            <span>{clips.reduce((sum, clip) => sum + clip.audio.duration, 0).toFixed(3)} s total source</span>
+          </div>
+          <label className="audio-file-change">
+            <span>{busy ? "Adding…" : "Add files"}</span>
+            <input type="file" accept="audio/*" multiple disabled={busy} onChange={(event) => { void addFiles(event.currentTarget.files); event.currentTarget.value = ""; }} />
+          </label>
+        </div>
+
+        <div className="audio-control-group">
+          <p className="audio-control-group-title">Clip spacing</p>
+          <label className="speed-field">Gap between clips <span>seconds</span><input type="number" min="0" max="600" step="0.1" value={gap} onChange={(event) => setGap(event.currentTarget.value)} /></label>
+        </div>
+
+        <div className="audio-output-summary">
+          <div>
+            <span>Clips</span>
+            <strong>{clips.length}</strong>
+          </div>
+          <div>
+            <span>Total output</span>
+            <strong>{(clips.reduce((sum, clip) => sum + clip.audio.duration, 0) + Math.max(0, Number(gap) || 0) * Math.max(0, clips.length - 1)).toFixed(3)} s</strong>
+          </div>
+        </div>
+
+        <p className="resize-note">Resamples to highest source rate; 16-bit PCM WAV output.</p>
         {error && <p className="resize-error" role="alert">{error}</p>}
         {previewBusy && <p className="processing-indicator" role="status"><span className="processing-spinner" />Updating merged preview…</p>}
         {mergedUrl && <a className="export-button download-link" href={mergedUrl} download="merged-audio.wav">Download merged WAV</a>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Merge timeline</strong><span>{clips.length} loaded · {clips.reduce((sum, clip) => sum + clip.audio.duration, 0).toFixed(3)} s audio</span></div>{clips.length ? <><div className="audio-merge-timeline" role="list" aria-label="Audio clips arranged in playback order">{clips.map((clip, index) => <span key={`${clip.file.name}-${index}`} className="merge-timeline-clip" style={{ flexGrow: Math.max(.1, clip.audio.duration) }} draggable onDragStart={() => { dragIndex.current = index; }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (dragIndex.current !== null) moveClipTo(dragIndex.current, index); dragIndex.current = null; }} onDragEnd={() => { dragIndex.current = null; }}><i aria-hidden="true">⠿</i><strong>{clip.file.name}</strong><small>{clip.audio.duration.toFixed(3)} s</small></span>)}</div><ol className="clip-list">{clips.map((clip, index) => <li key={`${clip.file.name}-${index}`} draggable onDragStart={() => { dragIndex.current = index; }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (dragIndex.current !== null) moveClipTo(dragIndex.current, index); dragIndex.current = null; }} onDragEnd={() => { dragIndex.current = null; }}><span className="clip-drag-handle" aria-label="Drag to reorder">⠿</span><span><strong>{index + 1}. {clip.file.name}</strong><small>{clip.audio.duration.toFixed(3)} s · {clip.audio.sampleRate} Hz</small></span><div><button type="button" aria-label={`Move ${clip.file.name} up`} disabled={index === 0} onClick={() => moveClipTo(index, index - 1)}>↑</button><button type="button" aria-label={`Move ${clip.file.name} down`} disabled={index === clips.length - 1} onClick={() => moveClipTo(index, index + 1)}>↓</button><button type="button" aria-label={`Remove ${clip.file.name}`} onClick={() => setClips((current) => current.filter((_, clipIndex) => clipIndex !== index))}>×</button></div></li>)}</ol>{mergedUrl && <div className="merge-output-preview"><div className="preview-heading"><strong>Live merged preview</strong><span>Updates after reorder and gap changes</span></div><CustomMediaPreview kind="audio" src={mergedUrl} label="Merged audio" /></div>}</> : <div className="empty-preview">Choose two or more audio files to arrange.</div>}</div>
+
+      <div className="resize-preview audio-stage">
+        <div className="preview-heading">
+          <strong>Merge timeline</strong>
+          <span>{clips.length} loaded · {clips.reduce((sum, clip) => sum + clip.audio.duration, 0).toFixed(3)} s audio</span>
+        </div>
+        <div className="audio-merge-timeline" role="list" aria-label="Audio clips arranged in playback order">
+          {clips.map((clip, index) => (
+            <span key={`${clip.file.name}-${index}`} className="merge-timeline-clip" style={{ flexGrow: Math.max(.1, clip.audio.duration) }} draggable onDragStart={() => { dragIndex.current = index; }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (dragIndex.current !== null) moveClipTo(dragIndex.current, index); dragIndex.current = null; }} onDragEnd={() => { dragIndex.current = null; }}>
+              <i aria-hidden="true">⠿</i>
+              <strong>{clip.file.name}</strong>
+              <small>{clip.audio.duration.toFixed(3)} s</small>
+            </span>
+          ))}
+        </div>
+        <ol className="clip-list">
+          {clips.map((clip, index) => (
+            <li key={`${clip.file.name}-${index}`} draggable onDragStart={() => { dragIndex.current = index; }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (dragIndex.current !== null) moveClipTo(dragIndex.current, index); dragIndex.current = null; }} onDragEnd={() => { dragIndex.current = null; }}>
+              <span className="clip-drag-handle" aria-label="Drag to reorder">⠿</span>
+              <span><strong>{index + 1}. {clip.file.name}</strong><small>{clip.audio.duration.toFixed(3)} s · {clip.audio.sampleRate} Hz</small></span>
+              <div>
+                <button type="button" aria-label={`Move ${clip.file.name} up`} disabled={index === 0} onClick={() => moveClipTo(index, index - 1)}>↑</button>
+                <button type="button" aria-label={`Move ${clip.file.name} down`} disabled={index === clips.length - 1} onClick={() => moveClipTo(index, index + 1)}>↓</button>
+                <button type="button" aria-label={`Remove ${clip.file.name}`} onClick={() => setClips((current) => current.filter((_, clipIndex) => clipIndex !== index))}>×</button>
+              </div>
+            </li>
+          ))}
+        </ol>
+        {mergedUrl && <div className="merge-output-preview">
+          <CustomMediaPreview kind="audio" src={mergedUrl} label="Merged audio preview" />
+        </div>}
+      </div>
     </section>}
   </main>;
 }

@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/video-replace-audio";
 import { MediaImportScreen } from "../components/media-import-screen";
 import { CustomMediaPreview } from "../components/custom-media-preview";
-import { AudioWaveformPreview } from "../components/audio-waveform-preview";
 import { ProcessingProgress } from "../components/processing-progress";
 
 const MAX_BYTES = 512 * 1024 * 1024;
@@ -17,7 +16,7 @@ type AudioLane = { id: string; file: File; url: string; duration: number; offset
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Replace video audio | Local Studio" },
+    { title: "Replace video audio | OpenProducer Editor" },
     { name: "description", content: "Replace a local video’s audio track with your own audio in the browser." },
   ];
 }
@@ -185,42 +184,53 @@ export default function VideoReplaceAudio() {
     } finally { inputs.forEach((input) => input.dispose()); await decodeContext?.close().catch(() => undefined); }
   }
 
-  return <main className={`resize-page${videoFile ? " has-media" : ""}`}>
-    <ToolPageHeader />
+  return <main className={`resize-page video-tool-page video-replace-audio-page${videoFile ? " has-media" : ""}`}>
+    <ToolPageHeader status={duration ? `${duration.toFixed(2)} s · ${enabledLanes.length + Number(keepVideoAudio)} track(s)` : undefined} />
     <section className="resize-intro"><p className="eyebrow">VIDEO · LOCAL PROCESSING</p><h1>Video audio mixer</h1><p>Keep or mute the source audio, add audio lanes, set timing and levels, then export one composed audio mix with the video.</p></section>
-    {!videoFile ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseVideo} error={error} /> : <section className="resize-workspace video-tool-workspace">
+    {!videoFile ? <MediaImportScreen kind="video" accept="video/*,.mkv,.webm" onFile={chooseVideo} error={error} /> : <section className="resize-workspace">
       <div className="resize-controls">
-        <label className="file-picker"><span>Choose another video<input type="file" accept="video/*,.mkv,.webm" onChange={(event) => chooseVideo(event.currentTarget.files?.[0])} /></span></label>
-        <p className="source-info">Video: {videoFile.name} · {duration ? `${duration.toFixed(3)} s` : "Reading duration…"}</p>
+        <div className="audio-file-bar">
+          <div className="audio-file-meta">
+            <strong>{videoFile.name}</strong>
+            <span>{(videoFile.size / 1024 / 1024).toFixed(1)} MiB{duration ? ` · ${duration.toFixed(3)} s` : " · Reading…"}</span>
+          </div>
+          <label className="audio-file-change">
+            <span>Change file</span>
+            <input type="file" accept="video/*,.mkv,.webm" onChange={(event) => chooseVideo(event.currentTarget.files?.[0])} />
+          </label>
+        </div>
         <fieldset className="mix-controller"><legend>Master audio controller</legend>
           <label className="ratio-toggle"><input type="checkbox" checked={keepVideoAudio} onChange={(event) => { setKeepVideoAudio(event.currentTarget.checked); setResultUrl(""); }} /> Keep the original video audio</label>
           {keepVideoAudio && <label className="speed-field">Source audio level <span>−60 to +6 dB</span><input type="number" min="-60" max="6" step="0.1" value={sourceVolumeDb} onChange={(event) => { setSourceVolumeDb(event.currentTarget.value); setResultUrl(""); }} /></label>}
-          <p className="resize-note">Enabled tracks are mixed together into one audio track. Drag a clip to position it; use the dB control to balance its level.</p>
+          <p className="resize-note">Enabled tracks mix into one audio track. Drag a lane on the timeline to position it.</p>
         </fieldset>
-        {duration > 0 && <div className="replace-audio-timeline"><div className="preview-heading"><strong>Studio audio timeline</strong><span>Drag a lane to change its start time</span></div><div className="replace-lane" ref={timelineRef} style={{ height: `${Math.max(52, 40 + 17 * (enabledLanes.length + Number(keepVideoAudio)))}px` }}>
+        <label className="file-picker add-audio-lanes"><span>+ Add audio tracks<input type="file" accept="audio/*" multiple onChange={(event) => { chooseAudio(event.currentTarget.files); event.currentTarget.value = ""; }} /></span></label>
+        {!audioLanes.length && <p className="resize-note">Add one or more local audio files to layer over the video.</p>}
+        {audioLanes.map((lane, index) => <fieldset className="mix-track-panel" key={lane.id}>
+          <legend>Audio {index + 1}</legend>
+          <div className="mix-track-heading"><label className="ratio-toggle"><input type="checkbox" checked={lane.enabled} onChange={(event) => updateLane(lane.id, { enabled: event.currentTarget.checked })} /> Include</label><button type="button" className="editor-action danger" onClick={() => removeLane(lane)}>Remove</button></div>
+          <strong className="mix-track-name">{lane.file.name} · {lane.duration ? `${lane.duration.toFixed(3)} s` : "Reading…"}</strong>
+          <div className="dimension-fields"><label>Start offset <span>s</span><input type="number" min="0" max={duration} step="0.001" value={lane.offset} onChange={(event) => updateLane(lane.id, { offset: event.currentTarget.value })} /></label><label>Level <span>dB</span><input type="number" min="-60" max="6" step="0.1" value={lane.volumeDb} onChange={(event) => updateLane(lane.id, { volumeDb: event.currentTarget.value })} /></label></div>
+          {duration > 0 && <input className="transport-scrub" type="range" min="0" max={Math.max(0, duration - 0.001)} step="0.001" value={Math.min(Number(lane.offset) || 0, duration - 0.001)} aria-label={`${lane.file.name} track start offset`} onChange={(event) => updateLane(lane.id, { offset: String(event.currentTarget.valueAsNumber) })} />}
+          <CustomMediaPreview kind="audio" src={lane.url} label={`${lane.file.name} preview`} onDuration={(value) => updateLane(lane.id, { duration: value })} />
+        </fieldset>)}
+        {sourceAudioProgress !== null && <ProcessingProgress label="Reading source audio" value={sourceAudioProgress} />}
+        {sourceAudioStatus && sourceAudioProgress === null && <p className="source-info" role="status">{sourceAudioStatus}</p>}
+        {!valid && duration > 0 && <p className="resize-error" role="alert">{!withinMemoryBudget ? "Combined audio exceeds the decoded-memory budget. Disable or remove long tracks." : duration > MAX_MIX_SECONDS ? `This local mixer supports video up to ${MAX_MIX_SECONDS / 60} minutes.` : "Keep source audio or enable an extra track with valid offset and level."}</p>}
+        {error && <p className="resize-error" role="alert">{error}</p>}
+        {progress !== null && <ProcessingProgress label="Composing video and audio tracks" value={progress} />}
+        <button className="export-button" disabled={!valid || progress !== null || sourceAudioProgress !== null} onClick={() => void replaceAudio()}>{progress !== null ? "Building mix…" : resultUrl ? "Rebuild mix preview" : "Preview and export mixed video"}</button>
+        {resultUrl && <a className="export-button secondary-button download-link" href={resultUrl} download={`${videoFile.name.replace(/\.[^.]+$/, "")}-audio-mix.mp4`}>Download MP4</a>}
+      </div>
+      <div className="resize-preview video-stage">
+        <div className="preview-heading"><strong>{resultUrl ? "Mixed video result" : "Video preview"}</strong><span>{resultUrl ? "Audio track mix" : duration ? `${duration.toFixed(3)} s · original source` : "Loading video…"}</span></div>
+        {resultUrl ? <CustomMediaPreview kind="video" src={resultUrl} label="Video with composed audio tracks" className="video-stage-media" /> : videoUrl ? <CustomMediaPreview kind="video" src={videoUrl} label="Original video preview" className="video-stage-media" onDuration={setDuration} /> : <div className="empty-preview">Choose a video and audio tracks.</div>}
+        {duration > 0 && <div className="replace-audio-timeline"><div className="preview-heading"><strong>Audio timeline</strong><span>Drag a lane to adjust start time</span></div><div className="replace-lane" ref={timelineRef} style={{ height: `${Math.max(52, 40 + 17 * (enabledLanes.length + Number(keepVideoAudio)))}px` }}>
           <span className="replace-video-lane">VIDEO · {duration.toFixed(3)} s</span>
           {keepVideoAudio && <span className="replace-audio-lane source-audio-lane" style={{ left: "0%", width: "100%" }}>SOURCE AUDIO · {Number(sourceVolumeDb).toFixed(1)} dB</span>}
           {enabledLanes.map((lane, index) => { const laneOffset = Number(lane.offset) || 0; const laneDuration = lane.duration || duration - laneOffset; return <span key={lane.id} className={`replace-audio-lane mix-track-color-${index % 4}`} style={{ left: `${Math.max(0, Math.min(100, laneOffset / duration * 100))}%`, width: `${Math.max(2, Math.min(100 - laneOffset / duration * 100, laneDuration / duration * 100))}%`, top: `${19 + (keepVideoAudio ? 17 : 0) + index * 17}px` }} onPointerDown={(event) => beginLaneDrag(event, lane)} onPointerMove={moveLaneDrag} onPointerUp={(event) => { if (laneDrag.current?.pointerId === event.pointerId) laneDrag.current = null; }} onPointerCancel={() => { laneDrag.current = null; }}>⠿ {lane.file.name}</span>; })}
         </div><div className="timeline-time-labels"><span>0.000 s</span><span>{duration.toFixed(3)} s</span></div></div>}
-        <label className="file-picker add-audio-lanes"><span>Add audio tracks<input type="file" accept="audio/*" multiple onChange={(event) => { chooseAudio(event.currentTarget.files); event.currentTarget.value = ""; }} /></span></label>
-        {!audioLanes.length && <p className="resize-note">Add one or more local audio files to layer over the video. Source audio can remain enabled at the same time.</p>}
-        {audioLanes.map((lane, index) => <fieldset className="mix-track-panel" key={lane.id}>
-          <legend>Audio {index + 1}</legend>
-          <div className="mix-track-heading"><label className="ratio-toggle"><input type="checkbox" checked={lane.enabled} onChange={(event) => updateLane(lane.id, { enabled: event.currentTarget.checked })} /> Include this track</label><button type="button" className="editor-action danger" onClick={() => removeLane(lane)}>Remove</button></div>
-          <strong className="mix-track-name">{lane.file.name} · {lane.duration ? `${lane.duration.toFixed(3)} s` : "Reading audio…"}</strong>
-          <div className="dimension-fields"><label>Start offset <span>0–video duration · seconds</span><input type="number" min="0" max={duration} step="0.001" value={lane.offset} onChange={(event) => updateLane(lane.id, { offset: event.currentTarget.value })} /></label><label>Track level <span>−60 to +6 dB</span><input type="number" min="-60" max="6" step="0.1" value={lane.volumeDb} onChange={(event) => updateLane(lane.id, { volumeDb: event.currentTarget.value })} /></label></div>
-          {duration > 0 && <input className="transport-scrub" type="range" min="0" max={Math.max(0, duration - 0.001)} step="0.001" value={Math.min(Number(lane.offset) || 0, duration - 0.001)} aria-label={`${lane.file.name} track start offset`} onChange={(event) => updateLane(lane.id, { offset: String(event.currentTarget.valueAsNumber) })} />}
-          <div className="mix-track-wave"><AudioWaveformPreview src={lane.url} label={`${lane.file.name} waveform`} /><CustomMediaPreview kind="audio" src={lane.url} label={`${lane.file.name} preview`} onDuration={(value) => updateLane(lane.id, { duration: value })} /></div>
-        </fieldset>)}
-        {sourceAudioProgress !== null && <ProcessingProgress label="Reading the source video's audio waveform" value={sourceAudioProgress} />}
-        {sourceAudioStatus && sourceAudioProgress === null && <p className="source-info" role="status">{sourceAudioStatus}</p>}
-        {!valid && duration > 0 && <p className="resize-error" role="alert">{!withinMemoryBudget ? "The combined source and added audio exceeds the decoded-memory budget. Disable or remove some long tracks." : duration > MAX_MIX_SECONDS ? `This local mixer supports video up to ${MAX_MIX_SECONDS / 60} minutes.` : "Keep source audio or enable an extra track. Every enabled track needs a loaded duration, valid offset, and level."}</p>}
-        {error && <p className="resize-error" role="alert">{error}</p>}
-        {progress !== null && <ProcessingProgress label="Composing video and audio tracks" value={progress} />}
-        <button className="export-button" disabled={!valid || progress !== null || sourceAudioProgress !== null} onClick={() => void replaceAudio()}>{progress !== null ? "Building mix preview…" : resultUrl ? "Rebuild mix preview" : "Preview and export mixed video"}</button>
-        {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${videoFile.name.replace(/\.[^.]+$/, "")}-audio-mix.mp4`}>Download MP4</a>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>{resultUrl ? "Mixed video result" : "Video preview"}</strong><span>{resultUrl ? "Audio track mix" : "Original source"}</span></div>{resultUrl ? <CustomMediaPreview kind="video" src={resultUrl} label="Video with composed audio tracks" /> : videoUrl ? <CustomMediaPreview kind="video" src={videoUrl} label="Original video preview" onDuration={setDuration} /> : <div className="empty-preview">Choose a video and audio tracks.</div>}{sourceAudioUrl && <div className="source-audio-wave"><AudioWaveformPreview src={sourceAudioUrl} label="Original video audio waveform" /><CustomMediaPreview kind="audio" src={sourceAudioUrl} label="Original video audio preview" /></div>}{audioLanes.length > 0 && <div className="mix-preview-lanes"><div className="preview-heading"><strong>Additional audio previews</strong><span>{enabledLanes.length} enabled track(s)</span></div>{audioLanes.filter((lane) => lane.enabled).map((lane) => <div className="mix-preview-lane" key={lane.id}><AudioWaveformPreview src={lane.url} label={`${lane.file.name} waveform`} /><span>{lane.file.name} · starts at {(Number(lane.offset) || 0).toFixed(3)} s · {Number(lane.volumeDb).toFixed(1)} dB</span></div>)}</div>}</div>
     </section>}
   </main>;
 }

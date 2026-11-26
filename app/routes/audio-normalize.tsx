@@ -32,7 +32,7 @@ function terminateWorker(worker: Worker) {
   worker.terminate();
 }
 
-export function meta({}: Route.MetaArgs) { return [{ title: "Normalize audio | Local Studio" }, { name: "description", content: "Normalize a local audio file to a custom peak level and export WAV." }]; }
+export function meta({}: Route.MetaArgs) { return [{ title: "Normalize audio | OpenProducer Editor" }, { name: "description", content: "Normalize a local audio file to a custom peak level and export WAV." }]; }
 
 export default function AudioNormalize() {
   const workerRef = useRef<Worker | null>(null);
@@ -99,17 +99,64 @@ export default function AudioNormalize() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not normalize this audio."); }
     finally { terminateWorker(worker); workerRef.current = null; setBusy(false); setRendering(false); }
   }
-  return <main className={`resize-page${audio ? " has-media" : ""}`}><ToolPageHeader />
-    <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Normalize audio peak level.</h1><p>Set a custom peak target and download a normalized WAV. The original remains unchanged.</p></section>
-    {!audio ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importAudio(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace"><div className="resize-controls">
-      <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void importAudio(event.currentTarget.files?.[0])} /></span></label>
-      {audio && <p className="source-info">{file?.name} · {audio.duration.toFixed(2)} s · {audio.sampleRate} Hz · {audio.numberOfChannels} channel(s)</p>}
-      <label className="speed-field">Target peak <span>−24 to 0 dBFS</span><input type="number" min="-24" max="0" step="any" value={target} disabled={!audio || busy} onChange={(event) => { setTarget(event.currentTarget.value); setResultUrl(""); }} /></label>
-      {audio && <p className="resize-note">{measuredPeak === null ? "Peak measurement runs in a local worker during normalization." : `Measured source peak: ${measuredPeak ? `${(20 * Math.log10(measuredPeak)).toFixed(2)} dBFS` : "silent"}.`} The same linear gain is applied to every channel; samples are clamped to WAV range.</p>}
-      {!valid && audio && <p className="resize-error" role="alert">Enter a target peak from −24 to 0 dBFS.</p>}{error && <p className="resize-error" role="alert">{error}</p>}
-      {rendering && <><p className="source-info" role="status">Worker normalization: {progress}%</p><progress max="100" value={progress} aria-label="Audio normalization progress" /><button type="button" className="editor-action danger" onClick={() => { cancelRef.current = true; }}>Cancel normalization</button></>}
-      <button className="secondary-button export-button" disabled={!valid || busy} onClick={() => void render()}>{rendering ? "Normalizing…" : "Normalize and preview"}</button>
-      {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-normalized.wav`}>Download normalized WAV</a>}
-    </div><div className="resize-preview"><div className="preview-heading"><strong>Audio comparison</strong><span>{resultUrl ? "Original and normalized" : "Original"}</span></div>{audio ? <div className="audio-preview"><strong>{file?.name}</strong><span>Original</span><CustomMediaPreview kind="audio" src={sourceUrl} label="Original audio" />{resultUrl && <><span>Normalized peak</span><CustomMediaPreview kind="audio" src={resultUrl} label="Normalized audio" /></>}</div> : <div className="empty-preview">Choose an audio file to begin.</div>}</div></section>}
+  return <main className={`resize-page audio-tool-page${audio ? " has-media" : ""}`}>
+    <ToolPageHeader status={audio ? `Target ${target} dBFS` : undefined} />
+    <section className="resize-intro">
+      <p className="eyebrow">AUDIO · LOCAL PROCESSING</p>
+      <h1>Normalize audio peak level</h1>
+      <p>Set a custom peak target and download a normalized WAV. The original remains unchanged.</p>
+    </section>
+    {!audio ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importAudio(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
+      <div className="resize-controls">
+        <div className="audio-file-bar">
+          <div className="audio-file-meta">
+            <strong>{file?.name}</strong>
+            <span>{audio.duration.toFixed(2)} s · {audio.sampleRate} Hz · {audio.numberOfChannels} ch</span>
+          </div>
+          <label className="audio-file-change">
+            <span>Change file</span>
+            <input type="file" accept="audio/*" disabled={busy} onChange={(event) => void importAudio(event.currentTarget.files?.[0])} />
+          </label>
+        </div>
+
+        <div className="audio-control-group">
+          <p className="audio-control-group-title">Target level</p>
+          <label className="speed-field">Target peak <span>−24 to 0 dBFS</span><input type="number" min="-24" max="0" step="any" value={target} disabled={!audio || busy} onChange={(event) => { setTarget(event.currentTarget.value); setResultUrl(""); }} /></label>
+        </div>
+
+        <div className="audio-output-summary">
+          <div>
+            <span>Measured peak</span>
+            <strong>{measuredPeak === null ? "Pending" : measuredPeak ? `${(20 * Math.log10(measuredPeak)).toFixed(2)} dBFS` : "Silent"}</strong>
+          </div>
+          <div>
+            <span>Target peak</span>
+            <strong>{valid ? `${target} dBFS` : "—"}</strong>
+          </div>
+        </div>
+
+        <p className="resize-note">Peak measurement and gain scaling run in a local Web Worker.</p>
+        {!valid && audio && <p className="resize-error" role="alert">Enter a target peak from −24 to 0 dBFS.</p>}
+        {error && <p className="resize-error" role="alert">{error}</p>}
+        {rendering && <>
+          <p className="source-info" role="status">Worker normalization: {progress}%</p>
+          <progress max="100" value={progress} aria-label="Audio normalization progress" />
+          <button type="button" className="editor-action danger" onClick={() => { cancelRef.current = true; }}>Cancel normalization</button>
+        </>}
+        <button className="export-button" disabled={!valid || busy} onClick={() => void render()}>{rendering ? "Normalizing…" : "Normalize and preview"}</button>
+        {resultUrl && <a className="export-button secondary-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-normalized.wav`}>Download normalized WAV</a>}
+      </div>
+
+      <div className="resize-preview audio-stage">
+        <div className="preview-heading">
+          <strong>Audio comparison</strong>
+          <span>{resultUrl ? "Original and normalized" : "Original"}</span>
+        </div>
+        <div className="audio-preview">
+          <CustomMediaPreview kind="audio" src={sourceUrl} label="Original audio" />
+          {resultUrl && <CustomMediaPreview kind="audio" src={resultUrl} label="Normalized audio" />}
+        </div>
+      </div>
+    </section>}
   </main>;
 }

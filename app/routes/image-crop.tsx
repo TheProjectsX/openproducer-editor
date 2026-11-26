@@ -1,11 +1,12 @@
 import { ToolPageHeader } from "../components/tool-page-header";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Route } from "./+types/image-crop";
+import { CanvasBackgroundPicker, ImageCanvasViewport, type CanvasBgMode } from "../components/image-canvas-viewport";
 import { MediaImportScreen } from "../components/media-import-screen";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Crop image | Local Studio" },
+    { title: "Crop image | OpenProducer Editor" },
     { name: "description", content: "Crop a local image by exact pixel coordinates in your browser." },
   ];
 }
@@ -24,6 +25,7 @@ export default function ImageCrop() {
   const [horizontalLock, setHorizontalLock] = useState(false);
   const [verticalLock, setVerticalLock] = useState(false);
   const [aspectMode, setAspectMode] = useState("free");
+  const [canvasBg, setCanvasBg] = useState<CanvasBgMode>("dark-checker");
   const [customRatioWidth, setCustomRatioWidth] = useState("1");
   const [customRatioHeight, setCustomRatioHeight] = useState("1");
   const [error, setError] = useState("");
@@ -219,14 +221,32 @@ export default function ImageCrop() {
     }, "image/png");
   }
 
-  return <main className={`resize-page image-crop-page${file ? " has-media" : ""}`}>
-    <ToolPageHeader />
+  return <main className={`resize-page image-tool-page image-crop-page${file ? " has-media" : ""}`}>
+    <ToolPageHeader status={file && valid ? `${crop.width} × ${crop.height} px` : undefined} />
     <section className="resize-intro"><p className="eyebrow">IMAGE · LOCAL PROCESSING</p><h1>Crop by exact pixels</h1><p>Set a crop rectangle in source-image coordinates. Cropping is an explicit separate action; the resize tool keeps the full frame.</p></section>
     {!file ? <MediaImportScreen kind="image" accept="image/*" onFile={chooseFile} error={error} /> : <section className="resize-workspace">
       <div className="resize-controls">
-        <h2 className="editor-sidebar-title">Crop Image</h2>
-        <label className="file-picker"><span>{file ? "Choose another image" : "Choose an image"}<input type="file" accept="image/*" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} /></span></label>
-        {file && <p className="source-info">{file.name} · Source {size.width} × {size.height} px</p>}
+        <div className="audio-file-bar">
+          <div className="audio-file-meta">
+            <strong>{file.name}</strong>
+            <span>Source {size.width} × {size.height} px</span>
+          </div>
+          <label className="audio-file-change">
+            <span>Change file</span>
+            <input type="file" accept="image/*" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} />
+          </label>
+        </div>
+
+        <div className="audio-output-summary">
+          <div>
+            <span>Source</span>
+            <strong>{size.width} × {size.height} px</strong>
+          </div>
+          <div>
+            <span>Crop output</span>
+            <strong>{valid ? `${crop.width} × ${crop.height} px` : "—"}</strong>
+          </div>
+        </div>
         <label className="ratio-field">Aspect ratio<select value={aspectMode} onChange={(event) => changeAspect(event.currentTarget.value)}><option value="free">Free selection</option><option value="original">Original image ratio</option><option value="1:1">1:1 · Square</option><option value="4:3">4:3</option><option value="3:2">3:2</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="custom">Custom ratio</option></select></label>
         {aspectMode === "custom" && <div className="dimension-fields"><label>Ratio width<input type="number" min="0.001" step="any" value={customRatioWidth} onChange={(event) => changeCustomRatio(event.currentTarget.value, customRatioHeight)} /></label><label>Ratio height<input type="number" min="0.001" step="any" value={customRatioHeight} onChange={(event) => changeCustomRatio(customRatioWidth, event.currentTarget.value)} /></label></div>}
         <div className="dimension-fields"><label>Crop width <span>px</span><input type="number" min="1" max={size.width} step="1" value={cropWidth} onChange={(event) => changeCropDimension("width", event.currentTarget.value)} /></label><label>Crop height <span>px</span><input type="number" min="1" max={size.height} step="1" value={cropHeight} onChange={(event) => changeCropDimension("height", event.currentTarget.value)} /></label></div>
@@ -246,20 +266,27 @@ export default function ImageCrop() {
         {error && <p className="resize-error" role="alert">{error}</p>}
         <button className="export-button" disabled={!valid} onClick={download}>Download cropped PNG</button>
       </div>
-      <div className="resize-preview image-crop-preview">
-        <div className="preview-heading"><strong>Select crop area</strong><span>{size.width} × {size.height} px source · drag handles to resize, drag inside to move</span></div>
-        <div className="image-crop-stage" ref={cropStageRef} onPointerDown={beginCropGesture} onPointerMove={moveCropGesture} onPointerUp={endCropGesture} onPointerCancel={endCropGesture}>
-          <img src={url} alt="Source image with an interactive crop selection" draggable={false} />
-          <span className="crop-shade top" style={{ height: `${crop.y / size.height * 100}%` }} />
-          <span className="crop-shade left" style={{ left: 0, top: `${crop.y / size.height * 100}%`, width: `${crop.x / size.width * 100}%`, height: `${crop.height / size.height * 100}%` }} />
-          <span className="crop-shade right" style={{ left: `${(crop.x + crop.width) / size.width * 100}%`, top: `${crop.y / size.height * 100}%`, width: `${(size.width - crop.x - crop.width) / size.width * 100}%`, height: `${crop.height / size.height * 100}%` }} />
-          <span className="crop-shade bottom" style={{ height: `${(size.height - crop.y - crop.height) / size.height * 100}%` }} />
-          <div className="crop-selection" data-crop-selection="true" style={{ left: `${crop.x / size.width * 100}%`, top: `${crop.y / size.height * 100}%`, width: `${crop.width / size.width * 100}%`, height: `${crop.height / size.height * 100}%` }}>
-            {(["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const).map((handle) => <span key={handle} className={`crop-selection-handle ${handle}`} data-crop-handle={handle} aria-hidden="true" />)}
+      <div className="resize-preview image-stage image-crop-preview">
+        <div className="preview-heading">
+          <strong>Crop canvas</strong>
+          <div className="image-stage-meta">
+            <CanvasBackgroundPicker value={canvasBg} onChange={setCanvasBg} />
+            <span>{valid ? `${crop.width} × ${crop.height} px` : "Adjust crop selection"}</span>
           </div>
         </div>
-        <div className="preview-heading crop-result-heading"><strong>Cropped result</strong><span>{valid ? `${crop.width} × ${crop.height} px` : "Adjust the crop selection"}</span></div>
-        {file ? <canvas ref={canvasRef} className="preview-canvas crop-result-canvas" aria-label="Cropped image preview" /> : <div className="empty-preview">The cropped image will appear here.</div>}
+        <ImageCanvasViewport canvasBg={canvasBg}>
+          <div className="image-crop-stage" ref={cropStageRef} onPointerDown={beginCropGesture} onPointerMove={moveCropGesture} onPointerUp={endCropGesture} onPointerCancel={endCropGesture}>
+            <img src={url} alt="Source image with an interactive crop selection" draggable={false} />
+            <span className="crop-shade top" style={{ height: `${crop.y / size.height * 100}%` }} />
+            <span className="crop-shade left" style={{ left: 0, top: `${crop.y / size.height * 100}%`, width: `${crop.x / size.width * 100}%`, height: `${crop.height / size.height * 100}%` }} />
+            <span className="crop-shade right" style={{ left: `${(crop.x + crop.width) / size.width * 100}%`, top: `${crop.y / size.height * 100}%`, width: `${(size.width - crop.x - crop.width) / size.width * 100}%`, height: `${crop.height / size.height * 100}%` }} />
+            <span className="crop-shade bottom" style={{ height: `${(size.height - crop.y - crop.height) / size.height * 100}%` }} />
+            <div className="crop-selection" data-crop-selection="true" style={{ left: `${crop.x / size.width * 100}%`, top: `${crop.y / size.height * 100}%`, width: `${crop.width / size.width * 100}%`, height: `${crop.height / size.height * 100}%` }}>
+              {(["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const).map((handle) => <span key={handle} className={`crop-selection-handle ${handle}`} data-crop-handle={handle} aria-hidden="true" />)}
+            </div>
+          </div>
+        </ImageCanvasViewport>
+        <canvas ref={canvasRef} className="visually-hidden" aria-hidden="true" />
       </div>
     </section>}
   </main>;

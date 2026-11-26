@@ -8,7 +8,7 @@ const MAX_FILE_BYTES = 512 * 1024 * 1024;
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Reduce centered vocals | Local Studio" },
+    { title: "Reduce centered vocals | OpenProducer Editor" },
     { name: "description", content: "Reduce centered vocals in stereo audio with an adjustable karaoke-style filter." },
   ];
 }
@@ -84,20 +84,59 @@ export default function VocalReducer() {
   }
 
   const validAmount = Number.isFinite(Number(amount)) && Number(amount) >= 0 && Number(amount) <= 100;
-  return <main className={`resize-page${source ? " has-media" : ""}`}>
-    <ToolPageHeader />
-    <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Reduce centered vocals</h1><p>Try a custom-strength stereo center cancel on a local audio file. Processing never uploads your source.</p></section>
+  return <main className={`resize-page audio-tool-page${source ? " has-media" : ""}`}>
+    <ToolPageHeader status={source ? `${amount}% center cancel` : undefined} />
+    <section className="resize-intro">
+      <p className="eyebrow">AUDIO · LOCAL PROCESSING</p>
+      <h1>Reduce centered vocals</h1>
+      <p>Try a custom-strength stereo center cancel on a local audio file. Processing never uploads your source.</p>
+    </section>
     {!source ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">
-        <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void chooseFile(event.currentTarget.files?.[0])} /></span></label>
-        {source && <p className="source-info">{file?.name} · Stereo · {source.duration.toFixed(3)} s · {source.sampleRate} Hz</p>}
-        <label className="speed-field">Center reduction <span>custom · 0–100%</span><input type="number" min="0" max="100" step="any" value={amount} onChange={(event) => { setAmount(event.currentTarget.value); if (resultUrl) URL.revokeObjectURL(resultUrl); setResultUrl(""); }} /></label>
-        <p className="resize-note">This subtracts a portion of the shared center signal from left and right. It can reduce centered vocals, but also affects centered bass, drums, and other sounds; stereo recordings only. This is not AI source separation.</p>
-        {!validAmount && <p className="resize-error" role="alert">Enter a custom amount from 0% to 100%.</p>}{error && <p className="resize-error" role="alert">{error}</p>}
+        <div className="audio-file-bar">
+          <div className="audio-file-meta">
+            <strong>{file?.name}</strong>
+            <span>Stereo · {source.duration.toFixed(3)} s · {source.sampleRate} Hz</span>
+          </div>
+          <label className="audio-file-change">
+            <span>Change file</span>
+            <input type="file" accept="audio/*" disabled={busy} onChange={(event) => void chooseFile(event.currentTarget.files?.[0])} />
+          </label>
+        </div>
+
+        <div className="audio-control-group">
+          <p className="audio-control-group-title">Stereo center cancel</p>
+          <label className="speed-field">Center reduction <span>0–100%</span><input type="number" min="0" max="100" step="any" value={amount} onChange={(event) => { setAmount(event.currentTarget.value); if (resultUrl) URL.revokeObjectURL(resultUrl); setResultUrl(""); }} /></label>
+        </div>
+
+        <div className="audio-output-summary">
+          <div>
+            <span>Reduction</span>
+            <strong>{validAmount ? `${amount}%` : "—"}</strong>
+          </div>
+          <div>
+            <span>Format</span>
+            <strong>Stereo WAV</strong>
+          </div>
+        </div>
+
+        <p className="resize-note">Subtracts shared center signal from left and right. Affects centered vocals, bass, and drums; not AI stem separation.</p>
+        {!validAmount && <p className="resize-error" role="alert">Enter a custom amount from 0% to 100%.</p>}
+        {error && <p className="resize-error" role="alert">{error}</p>}
         <button className="export-button" disabled={!source || !validAmount || busy} onClick={exportReduced}>{busy ? "Processing…" : "Create vocal-reduced preview"}</button>
-        {resultUrl && <a className="export-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-center-reduced.wav`}>Download WAV</a>}
+        {resultUrl && <a className="export-button secondary-button download-link" href={resultUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-center-reduced.wav`}>Download WAV</a>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Audio comparison</strong><span>{resultUrl ? "Original and processed" : "Original"}</span></div>{source ? <div className="audio-preview"><strong>{file?.name}</strong><span>Original stereo audio</span><CustomMediaPreview kind="audio" src={sourceUrl} label="Original stereo audio" />{resultUrl && <><span>Center-reduced audio</span><CustomMediaPreview kind="audio" src={resultUrl} label="Center-reduced audio" /></>}</div> : <div className="empty-preview">Choose a stereo audio file.</div>}</div>
+
+      <div className="resize-preview audio-stage">
+        <div className="preview-heading">
+          <strong>Audio comparison</strong>
+          <span>{resultUrl ? "Original and processed" : "Original"}</span>
+        </div>
+        <div className="audio-preview">
+          <CustomMediaPreview kind="audio" src={sourceUrl} label="Original stereo audio" />
+          {resultUrl && <CustomMediaPreview kind="audio" src={resultUrl} label="Center-reduced audio" />}
+        </div>
+      </div>
     </section>}
   </main>;
 }

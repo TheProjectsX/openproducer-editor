@@ -33,7 +33,7 @@ const MAX_OUTPUT_BYTES = 512 * 1024 * 1024;
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Image to keyframe video | Local Studio" },
+    { title: "Image to keyframe video | OpenProducer Editor" },
     { name: "description", content: "Turn one or more images into an animated MP4 or WebM video with interactive start/end keyframes, motion presets, transitions, and optional audio locally in your browser." },
   ];
 }
@@ -732,8 +732,8 @@ export default function VideoImageToVideo() {
   const isAtEnd = activeSlide ? Math.abs(localSlideTime - activeSlide.duration) < 0.03 : false;
 
   return (
-    <main className={`resize-page i2v-page${slides.length ? " has-media" : ""}`}>
-      <ToolPageHeader />
+    <main className={`resize-page video-tool-page i2v-page${slides.length ? " has-media" : ""}`}>
+      <ToolPageHeader status={slides.length ? `${canvasWidth}×${canvasHeight} · ${totalDuration.toFixed(1)} s` : undefined} />
       <section className="resize-intro">
         <p className="eyebrow">VIDEO &amp; IMAGE · LOCAL KEYFRAME ANIMATION</p>
         <h1>Image to keyframe video</h1>
@@ -1014,7 +1014,7 @@ export default function VideoImageToVideo() {
             </div>
           </div>
 
-          <div className="resize-preview i2v-preview">
+          <div className="resize-preview video-stage i2v-preview">
             <div className="preview-heading">
               <strong>{showExportPreview && resultUrl ? "Exported video" : "Interactive keyframe preview"}</strong>
               <div className="i2v-preview-tabs">
@@ -1028,7 +1028,7 @@ export default function VideoImageToVideo() {
             </div>
 
             {showExportPreview && resultUrl ? (
-              <CustomMediaPreview kind="video" src={resultUrl} label="Exported keyframe video" />
+              <CustomMediaPreview kind="video" src={resultUrl} label="Exported keyframe video" className="video-stage-media" />
             ) : (
               <div className="i2v-editor-stage-wrap">
                 {/* Interactive Pose Selector Bar: Start Frame / Keyframes / End Frame */}

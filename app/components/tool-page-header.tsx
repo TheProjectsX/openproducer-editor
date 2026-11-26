@@ -3,17 +3,76 @@ import { useLocation } from "react-router";
 import { NavBackButton } from "./nav-back-button";
 
 const groups = {
-  audio: { label: "Audio tools", href: "/tools/audio", tools: [["Trim audio", "/tools/audio/trim"], ["Change speed", "/tools/audio/speed"], ["Merge audio", "/tools/audio/merge"], ["Split audio", "/tools/audio/split"], ["Volume and fades", "/tools/audio/volume"], ["Noise reduction", "/tools/audio/noise-gate"], ["Voice to transcript", "/tools/audio/transcribe"], ["Audio Studio", "/studio/audio"]] },
-  video: { label: "Video tools", href: "/tools/video", tools: [["Trim video", "/tools/video/trim"], ["Change speed", "/tools/video/speed"], ["Extract audio", "/tools/video/extract-audio"], ["Remove audio", "/tools/video/remove-audio"], ["Replace audio", "/tools/video/replace-audio"], ["Image to video", "/tools/video/image-to-video"]] },
-  image: { label: "Image tools", href: "/tools/image", tools: [["Image editor", "/tools/image/editor"], ["Resize and edit", "/tools/image/resize"], ["Downscale image", "/tools/image/downscale"], ["Upscale image", "/tools/image/upscale"], ["Crop image", "/tools/image/crop"], ["Create collage", "/tools/image/collage"], ["Image to video", "/tools/video/image-to-video"]] },
+  audio: {
+    label: "Audio tools",
+    href: "/tools/audio",
+    tools: [
+      ["Trim audio", "/tools/audio/trim"],
+      ["Merge audio", "/tools/audio/merge"],
+      ["Split audio", "/tools/audio/split"],
+      ["Volume and fades", "/tools/audio/volume"],
+      ["Change audio speed", "/tools/audio/speed"],
+      ["Voice to transcript", "/tools/audio/transcribe"],
+      ["Reduce background noise", "/tools/audio/noise-gate"],
+      ["Normalize audio", "/tools/audio/normalize"],
+      ["Reduce centered vocals", "/tools/audio/vocal-reducer"],
+      ["Audio Studio", "/studio/audio"],
+    ],
+  },
+  video: {
+    label: "Video tools",
+    href: "/tools/video",
+    tools: [
+      ["Trim video", "/tools/video/trim"],
+      ["Change video speed", "/tools/video/speed"],
+      ["Extract video audio", "/tools/video/extract-audio"],
+      ["Remove video audio", "/tools/video/remove-audio"],
+      ["Replace video audio", "/tools/video/replace-audio"],
+      ["Image to video", "/tools/video/image-to-video"],
+      ["Video Studio", "/studio/video"],
+    ],
+  },
+  image: {
+    label: "Image tools",
+    href: "/tools/image",
+    tools: [
+      ["Crop image", "/tools/image/crop"],
+      ["Resize pixels", "/tools/image/resize"],
+      ["Downscale image", "/tools/image/downscale"],
+      ["Upscale image", "/tools/image/upscale"],
+      ["Make a collage", "/tools/image/collage"],
+      ["Image to video", "/tools/video/image-to-video"],
+      ["Image Editor", "/tools/image/editor"],
+    ],
+  },
 } as const;
 
 function titleFromPath(path: string) {
-  if (path === "/studio/video") return "Creative Studio";
+  if (path === "/studio/video") return "Video Studio";
   if (path === "/studio/audio") return "Audio Studio";
-  if (path === "/studio/image") return "Image Studio";
+  if (path === "/studio/image") return "Image editor project";
   const slug = path.split("/").at(-1) ?? "Tool";
-  const labels: Record<string, string> = { "editor": "Image editor", "transcribe": "Voice to transcript", "trim": "Trim", "speed": "Speed", "merge": "Merge", "split": "Split", "volume": "Volume and fades", "normalize": "Normalize", "noise-gate": "Noise reduction", "vocal-reducer": "Vocal reduction", "extract-audio": "Extract audio", "remove-audio": "Remove audio", "replace-audio": "Replace audio", "image-to-video": "Image to video", "resize": "Resize and edit", "downscale": "Downscale", "upscale": "Upscale", "crop": "Crop", "collage": "Collage" };
+  const labels: Record<string, string> = {
+    editor: "Image editor",
+    transcribe: "Voice to transcript",
+    trim: "Trim",
+    speed: "Speed",
+    merge: "Merge",
+    split: "Split",
+    volume: "Volume and fades",
+    normalize: "Normalize",
+    "noise-gate": "Reduce background noise",
+    "vocal-reducer": "Reduce centered vocals",
+    "extract-audio": "Extract audio",
+    "remove-audio": "Remove audio",
+    "replace-audio": "Replace audio",
+    "image-to-video": "Image to video",
+    resize: "Image resize",
+    downscale: "Downscale image",
+    upscale: "Upscale image",
+    crop: "Crop image",
+    collage: "Make a collage",
+  };
   return labels[slug] ?? slug;
 }
 
@@ -22,8 +81,13 @@ export function ToolPageHeader({ status }: { status?: string }) {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const menuRef = useRef<HTMLElement>(null);
   const lastPointerTypeRef = useRef<string>("mouse");
-  const categoryKey = pathname.startsWith("/tools/audio") || pathname === "/studio/audio" ? "audio" : pathname.startsWith("/tools/video") || pathname === "/studio/video" ? "video" : "image";
-  const category = pathname === "/studio/video" ? { label: "Creative Studio", href: "/" } : groups[categoryKey];
+  const categoryKey =
+    pathname.startsWith("/tools/audio") || pathname === "/studio/audio"
+      ? "audio"
+      : pathname.startsWith("/tools/video") || pathname === "/studio/video"
+        ? "video"
+        : "image";
+  const category = groups[categoryKey];
   const toolTitle = titleFromPath(pathname);
 
   useEffect(() => {
@@ -46,30 +110,100 @@ export function ToolPageHeader({ status }: { status?: string }) {
     };
   }, [openGroup]);
 
-  return <>
-    <header className="resize-header tool-page-header">
-      <div className="brand-with-back"><NavBackButton fallback={category.href} /><a href="/" className="brand"><span className="brand-mark" aria-hidden="true">L</span>Local Studio</a></div>
-      <nav ref={menuRef} className="tool-group-menu" aria-label="Tool groups">{Object.entries(groups).map(([key, group]) => <details
-        key={key}
-        open={openGroup === key}
-        onPointerEnter={(event) => { if (event.pointerType === "mouse") setOpenGroup(key); }}
-        onPointerLeave={(event) => { if (event.pointerType === "mouse") setOpenGroup((current) => (current === key ? null : current)); }}
-        onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpenGroup((current) => (current === key ? null : current)); }}
-      >
-        <summary
-          onPointerDown={(event) => { lastPointerTypeRef.current = event.pointerType; }}
-          onClick={(event) => {
-            event.preventDefault();
-            const isMouseClick = event.detail > 0 && lastPointerTypeRef.current === "mouse";
-            setOpenGroup((current) => (isMouseClick ? key : current === key ? null : key));
-          }}
-        >{group.label}<span aria-hidden="true">⌄</span></summary>
-        <div className="tool-dropdown"><a className="tool-dropdown-all" href={group.href}>All {group.label.toLowerCase()} ↗</a>{group.tools.map(([label, href]) => <a href={href} key={href}>{label}</a>)}</div>
-      </details>)}</nav>
-      {status && <span className="tool-page-status" role="status">{status}</span>}
-    </header>
-    <nav className="tool-breadcrumbs" aria-label="Breadcrumb">
-      <a href="/">Home</a><span aria-hidden="true">/</span><a href={category.href}>{category.label}</a><span aria-hidden="true">/</span><span aria-current="page">{toolTitle}</span>
-    </nav>
-  </>;
+  return (
+    <>
+      <header className="resize-header tool-page-header">
+        <div className="brand-with-back">
+          <NavBackButton
+            fallback={category.href}
+            onBeforeBack={() => {
+              if (
+                typeof window !== "undefined" &&
+                pathname !== "/tools/image/editor" &&
+                !pathname.startsWith("/studio/") &&
+                document.querySelector(".resize-page.has-media")
+              ) {
+                window.location.assign(pathname);
+                return true;
+              }
+              return false;
+            }}
+          />
+          <a href="/" className="brand">
+            <span className="brand-mark" aria-hidden="true">L</span>
+            <span>OpenProducer Editor</span>
+          </a>
+        </div>
+
+        <nav ref={menuRef} className="tool-group-menu" aria-label="Tool groups">
+          {Object.entries(groups).map(([key, group]) => (
+            <details
+              key={key}
+              open={openGroup === key}
+              onPointerEnter={(event) => {
+                if (event.pointerType === "mouse") setOpenGroup(key);
+              }}
+              onPointerLeave={(event) => {
+                if (event.pointerType === "mouse") {
+                  setOpenGroup((current) => (current === key ? null : current));
+                }
+              }}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setOpenGroup((current) => (current === key ? null : current));
+                }
+              }}
+            >
+              <summary
+                className={key === categoryKey ? `is-current tone-${key}` : undefined}
+                onPointerDown={(event) => {
+                  lastPointerTypeRef.current = event.pointerType;
+                }}
+                onClick={(event) => {
+                  event.preventDefault();
+                  const isMouseClick = event.detail > 0 && lastPointerTypeRef.current === "mouse";
+                  setOpenGroup((current) => (isMouseClick ? key : current === key ? null : key));
+                }}
+              >
+                {group.label}
+                <span aria-hidden="true">⌄</span>
+              </summary>
+              <div className="tool-dropdown">
+                <a className="tool-dropdown-all" href={group.href}>
+                  All {group.label.toLowerCase()} ↗
+                </a>
+                {group.tools.map(([label, href]) => (
+                  <a
+                    href={href}
+                    key={href}
+                    aria-current={pathname === href ? "page" : undefined}
+                  >
+                    {label}
+                  </a>
+                ))}
+              </div>
+            </details>
+          ))}
+          <a className="tool-header-link" href="/tools">All 24 tools</a>
+          <a className="tool-header-link" href="/projects">Projects</a>
+        </nav>
+
+        {status && (
+          <span className="tool-page-status" role="status">
+            {status}
+          </span>
+        )}
+      </header>
+
+      <nav className="tool-breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a>
+        <span aria-hidden="true">/</span>
+        <a href="/tools">Tools</a>
+        <span aria-hidden="true">/</span>
+        <a href={category.href}>{category.label}</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{toolTitle}</span>
+      </nav>
+    </>
+  );
 }

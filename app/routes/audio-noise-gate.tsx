@@ -14,7 +14,7 @@ type DenoiseWorkerMessage = { type: "progress"; jobId: number; progress: number 
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Audio noise reduction | Local Studio" },
+    { title: "Audio noise reduction | OpenProducer Editor" },
     { name: "description", content: "Reduce steady background noise with a local noise profile and custom strength." },
   ];
 }
@@ -111,28 +111,68 @@ export default function AudioNoiseGate() {
     workerRef.current.postMessage({ type: "cancel", jobId: activeJobId.current });
   }
 
-  return <main className={`resize-page${source ? " has-media" : ""}`}>
-    <ToolPageHeader />
-    <section className="resize-intro"><p className="eyebrow">AUDIO · LOCAL PROCESSING</p><h1>Reduce steady background noise</h1><p>Select a short section that contains only background noise. The app builds a frequency profile and reduces matching noise in the full recording.</p></section>
+  return <main className={`resize-page audio-tool-page${source ? " has-media" : ""}`}>
+    <ToolPageHeader status={source ? `${settings[2]}% reduction` : undefined} />
+    <section className="resize-intro">
+      <p className="eyebrow">AUDIO · LOCAL PROCESSING</p>
+      <h1>Reduce steady background noise</h1>
+      <p>Select a short section that contains only background noise. The app builds a frequency profile and reduces matching noise in the full recording.</p>
+    </section>
     {!source ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void chooseFile(next)} error={error} /> : <section className="resize-workspace audio-tool-workspace">
       <div className="resize-controls">
-        <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Choose audio file"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => { const next = event.currentTarget.files?.[0]; event.currentTarget.value = ""; void chooseFile(next); }} /></span></label>
-        {source && <p className="source-info">{file?.name} · {source.duration.toFixed(3)} s · {source.sampleRate} Hz · {source.numberOfChannels} channel(s)</p>}
-        {source && <div className="audio-tool-timeline"><div className="preview-heading"><strong>Noise sample range</strong><span>{settings[0].toFixed(3)}–{settings[1].toFixed(3)} s</span></div><AudioRangeTimeline audio={source} start={settings[0]} end={settings[1]} label="Noise sample range" onChange={(start, end) => { setNoiseStart(String(start)); setNoiseEnd(String(end)); clearResult(); }} /></div>}
-        <div className="filter-fields two-column">
-          <label>Noise sample start <span>source seconds</span><input type="number" min="0" max={source?.duration ?? 0} step="any" value={noiseStart} disabled={!source || busy} onChange={(event) => updateControl(setNoiseStart, event.currentTarget.value)} /></label>
-          <label>Noise sample end <span>source seconds</span><input type="number" min="0" max={source?.duration ?? 0} step="any" value={noiseEnd} disabled={!source || busy} onChange={(event) => updateControl(setNoiseEnd, event.currentTarget.value)} /></label>
-          <label>Reduction strength <span>custom 0–100%</span><input type="number" min="0" max="100" step="any" value={strength} disabled={!source || busy} onChange={(event) => updateControl(setStrength, event.currentTarget.value)} /></label>
+        <div className="audio-file-bar">
+          <div className="audio-file-meta">
+            <strong>{file?.name}</strong>
+            <span>{source.duration.toFixed(3)} s · {source.sampleRate} Hz · {source.numberOfChannels} ch</span>
+          </div>
+          <label className="audio-file-change">
+            <span>Change file</span>
+            <input type="file" accept="audio/*" disabled={busy} onChange={(event) => { const next = event.currentTarget.files?.[0]; event.currentTarget.value = ""; void chooseFile(next); }} />
+          </label>
         </div>
-        <p className="resize-note">Use at least 0.05 seconds of noise-only audio. Processing runs in a cancellable worker; files are limited to 128 MiB and decoded audio to 64 MiB. Strong settings can affect quiet speech and changing background sounds.</p>
+
+        <div className="audio-control-group">
+          <p className="audio-control-group-title">Noise profile &amp; strength</p>
+          <div className="filter-fields two-column">
+            <label>Sample start <span>s</span><input type="number" min="0" max={source?.duration ?? 0} step="any" value={noiseStart} disabled={!source || busy} onChange={(event) => updateControl(setNoiseStart, event.currentTarget.value)} /></label>
+            <label>Sample end <span>s</span><input type="number" min="0" max={source?.duration ?? 0} step="any" value={noiseEnd} disabled={!source || busy} onChange={(event) => updateControl(setNoiseEnd, event.currentTarget.value)} /></label>
+            <label>Strength <span>0–100%</span><input type="number" min="0" max="100" step="any" value={strength} disabled={!source || busy} onChange={(event) => updateControl(setStrength, event.currentTarget.value)} /></label>
+          </div>
+        </div>
+
+        <div className="audio-output-summary">
+          <div>
+            <span>Noise sample</span>
+            <strong>{valid ? `${(settings[1] - settings[0]).toFixed(2)} s` : "—"}</strong>
+          </div>
+          <div>
+            <span>Reduction</span>
+            <strong>{valid ? `${settings[2]}%` : "—"}</strong>
+          </div>
+        </div>
+
+        <p className="resize-note">Use at least 0.05 s of noise-only audio. Runs in a cancellable Web Worker.</p>
         {source && !valid && <p className="resize-error" role="alert">Choose a valid noise-only range of at least 0.05 seconds and a reduction strength from 0 to 100%.</p>}
         {error && <p className="resize-error" role="alert">{error}</p>}
         {!busy && status && <p className="source-info" role="status">{status}</p>}
         {busy && <><p className="source-info" role="status">{status}</p><progress max="100" value={progress} aria-label="Noise reduction progress" /><button type="button" className="editor-action danger" onClick={cancelReduction}>Cancel</button></>}
         <button className="export-button" disabled={!source || !valid || busy} onClick={() => void reduceNoise()}>{busy ? "Processing…" : "Reduce noise and preview"}</button>
-        {cleanedUrl && <a className="export-button download-link" href={cleanedUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-noise-reduced.wav`}>Download cleaned WAV</a>}
+        {cleanedUrl && <a className="export-button secondary-button download-link" href={cleanedUrl} download={`${file?.name.replace(/\.[^.]+$/, "")}-noise-reduced.wav`}>Download cleaned WAV</a>}
       </div>
-      <div className="resize-preview"><div className="preview-heading"><strong>Audio preview</strong><span>{cleanedUrl ? "Compare original and noise-reduced audio" : "Original"}</span></div>{source ? <div className="audio-preview"><strong>{file?.name}</strong><span>Original audio</span><CustomMediaPreview kind="audio" src={sourceUrl} label="Original audio" />{cleanedUrl && <><span>Noise-reduced preview</span><CustomMediaPreview kind="audio" src={cleanedUrl} label="Noise-reduced audio" /></>}</div> : <div className="empty-preview">Choose an audio file to begin.</div>}</div>
+
+      <div className="resize-preview audio-stage">
+        <div className="preview-heading">
+          <strong>Noise sample &amp; audio comparison</strong>
+          <span>{settings[0].toFixed(3)}–{settings[1].toFixed(3)} s · {cleanedUrl ? "Original & cleaned" : "Original"}</span>
+        </div>
+        <div className="audio-tool-timeline">
+          <AudioRangeTimeline audio={source} start={settings[0]} end={settings[1]} label="Noise sample range" onChange={(start, end) => { setNoiseStart(String(start)); setNoiseEnd(String(end)); clearResult(); }} />
+        </div>
+        <div className="audio-preview">
+          <CustomMediaPreview kind="audio" src={sourceUrl} label="Original audio" />
+          {cleanedUrl && <CustomMediaPreview kind="audio" src={cleanedUrl} label="Noise-reduced audio" />}
+        </div>
+      </div>
     </section>}
   </main>;
 }

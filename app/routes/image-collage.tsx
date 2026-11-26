@@ -235,7 +235,7 @@ function compactImageSlots(images: ImageFile[]): ImageFile[] {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Image collage maker | Local Studio" },
+    { title: "Image collage maker | OpenProducer Editor" },
     { name: "description", content: "Arrange local images into a custom-size collage in your browser." },
   ];
 }
@@ -269,7 +269,7 @@ export default function ImageCollage() {
   const [dragTargetSlot, setDragTargetSlot] = useState<number | null>(null);
   const [cellMenu, setCellMenu] = useState<{ imageId?: string; emptySlot?: number; slot: number; x: number; y: number } | null>(null);
   const [projectTitle, setProjectTitle] = useState("Untitled collage");
-  const [projectLoaded, setProjectLoaded] = useState(false);
+  const [projectLoaded, setProjectLoaded] = useState(() => !projectId);
   const [projectStatus, setProjectStatus] = useState("");
   const [template, setTemplate] = useState<string>("grid");
   const [columns, setColumns] = useState("3");

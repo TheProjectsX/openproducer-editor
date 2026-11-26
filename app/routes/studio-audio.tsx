@@ -5,7 +5,6 @@ import type { Route } from "./+types/studio-audio";
 import { getProject, readAudioAsset, saveAudioProject, type AudioProjectDocument } from "../lib/project-store";
 import { inspectMediaFile } from "../lib/media-inspection";
 import { PITCH_PRESERVE_RENDER_CHUNK_FRAMES } from "../lib/audio-speed";
-import { MediaImportScreen } from "../components/media-import-screen";
 import { CustomMediaPreview } from "../components/custom-media-preview";
 import { AudioRangeTimeline } from "../components/audio-range-timeline";
 
@@ -14,7 +13,7 @@ const MAX_BUFFER_BYTES = 512 * 1024 * 1024;
 const EMPTY: AudioProjectDocument = { version: 1, sourceAssetId: null, sourceName: "", sourceType: "", sourceDuration: 0, sourceStart: 0, sourceEnd: 0, speed: 1, pitchMode: "preserve", gainDb: 0, fadeIn: 0, fadeOut: 0 };
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: "Audio Studio | Local Studio" }, { name: "robots", content: "noindex,nofollow" }];
+  return [{ title: "Audio Studio | OpenProducer Editor" }, { name: "robots", content: "noindex,nofollow" }];
 }
 
 function wavBlob(left: Float32Array, right: Float32Array, sampleRate: number) {
@@ -256,10 +255,10 @@ export default function AudioStudio() {
     finally { setBusy(false); setExporting(false); }
   }
 
-  return <main className={`resize-page${buffer ? " has-media" : ""}`}>
+  return <main className="resize-page has-media">
     <ToolPageHeader status={status} />
     <section className="resize-intro"><p className="eyebrow">LOCAL AUDIO STUDIO</p><h1>Audio Studio</h1><p>Trim and shape a local audio source. Edits and source audio are saved in this browser.</p></section>
-    {!buffer ? loaded ? <MediaImportScreen kind="audio" accept="audio/*" onFile={(next) => void importAudio(next)} error={error} /> : <div className="empty-preview import-loading" role="status">Opening audio project from this device…</div> : <section className="resize-workspace" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void importAudio(event.dataTransfer.files?.[0]); }}>
+    {!loaded ? <div className="empty-preview import-loading" role="status">Opening audio project from this device…</div> : <section className="resize-workspace" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void importAudio(event.dataTransfer.files?.[0]); }}>
       <div className="resize-controls">
         <label className="file-picker"><span>{busy ? "Processing…" : file ? "Choose another audio file" : "Import audio"}<input type="file" accept="audio/*" disabled={busy} onChange={(event) => void importAudio(event.currentTarget.files?.[0])} /></span></label>
         <div className="project-actions" aria-label="Audio edit history"><button type="button" className="editor-action" disabled={!past.length || busy} onClick={undo}>Undo</button><button type="button" className="editor-action" disabled={!future.length || busy} onClick={redo}>Redo</button></div>
