@@ -2724,6 +2724,22 @@ function useVideoStudioState() {
   }, [pxPerSecond, timelineViewportWidth]);
 
   useEffect(() => {
+    if (playheadDragRef.current) return;
+    const viewport = timelineScrollRef.current;
+    if (!viewport) return;
+    const rulerOffset = timelineRulerOffset();
+    const laneViewportWidth = Math.max(120, viewport.clientWidth - rulerOffset);
+    const playheadPx = timeline.playhead * pxPerSecond;
+    const viewLeft = viewport.scrollLeft;
+    const viewRight = viewLeft + laneViewportWidth;
+    if (playheadPx > viewRight - 20) {
+      viewport.scrollLeft = Math.max(0, playheadPx - laneViewportWidth * 0.25);
+    } else if (playheadPx < viewLeft) {
+      viewport.scrollLeft = Math.max(0, playheadPx - 24);
+    }
+  }, [timeline.playhead, pxPerSecond]);
+
+  useEffect(() => {
     const viewport = timelineScrollRef.current;
     if (!viewport) return;
     function handleWheel(event: WheelEvent) {

@@ -6,6 +6,7 @@ import {
   Scripts,
   ScrollRestoration,
   useLocation,
+  useNavigation,
 } from "react-router";
 import { useEffect, useRef, useState } from "react";
 
@@ -25,6 +26,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#090d18" />
+        <link rel="icon" href="/logo.svg" type="image/svg+xml" />
         <link rel="manifest" href="/manifest.webmanifest" />
         {siteUrl && <link rel="canonical" href={`${siteUrl}${location.pathname}`} />}
         <Meta />
@@ -40,10 +42,41 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const navigation = useNavigation();
+  const isNavigating = navigation.state !== "idle";
+  const [loaderVisible, setLoaderVisible] = useState(false);
+  const [loaderProgress, setLoaderProgress] = useState(0);
   const [updateReady, setUpdateReady] = useState(false);
   const [applyingUpdate, setApplyingUpdate] = useState(false);
+  const [toolResetKey, setToolResetKey] = useState(0);
   const waitingWorkerRef = useRef<ServiceWorker | null>(null);
   const applyUpdateRef = useRef(false);
+
+  useEffect(() => {
+    if (isNavigating) {
+      setLoaderVisible(true);
+      setLoaderProgress(28);
+      const t1 = window.setTimeout(() => setLoaderProgress(68), 140);
+      const t2 = window.setTimeout(() => setLoaderProgress(88), 450);
+      return () => {
+        window.clearTimeout(t1);
+        window.clearTimeout(t2);
+      };
+    }
+    if (!loaderVisible) return;
+    setLoaderProgress(100);
+    const doneTimer = window.setTimeout(() => {
+      setLoaderVisible(false);
+      setLoaderProgress(0);
+    }, 220);
+    return () => window.clearTimeout(doneTimer);
+  }, [isNavigating, loaderVisible]);
+
+  useEffect(() => {
+    const handleResetTool = () => setToolResetKey((value) => value + 1);
+    window.addEventListener("openproducer:reset-tool", handleResetTool);
+    return () => window.removeEventListener("openproducer:reset-tool", handleResetTool);
+  }, []);
 
   useEffect(() => {
     // The worker is generated after the static production build. It does not
@@ -96,8 +129,13 @@ export default function App() {
   }
 
   return <>
-    {updateReady && <aside className="update-banner" role="status"><span>A OpenProducer Editor update is ready. Save or finish active edits before reloading.</span><button type="button" disabled={applyingUpdate} onClick={applyUpdate}>{applyingUpdate ? "Applying update…" : "Reload to update"}</button></aside>}
-    <Outlet />
+    {loaderVisible && (
+      <div className="top-loader-bar" aria-hidden="true">
+        <div className="top-loader-fill" style={{ width: `${loaderProgress}%` }} />
+      </div>
+    )}
+    {updateReady && <aside className="update-banner" role="status"><span>An OpenProducer Editor update is ready. Save or finish active edits before reloading.</span><button type="button" disabled={applyingUpdate} onClick={applyUpdate}>{applyingUpdate ? "Applying update…" : "Reload to update"}</button></aside>}
+    <Outlet key={toolResetKey} />
   </>;
 }
 

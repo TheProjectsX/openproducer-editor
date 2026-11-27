@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Route } from "./+types/projects";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 import { NavBackButton } from "../components/nav-back-button";
+import { BrandMark } from "../components/brand-mark";
 import { createProject, deleteProject, duplicateProject, listProjects, type LocalProject, type ProjectKind } from "../lib/project-store";
 
 type FilterKind = "all" | "video" | "audio" | "image" | "collage";
@@ -131,11 +132,11 @@ export default function Projects() {
   return (
     <main className="projects-page">
       <header className="site-header">
-        <div className="brand-with-back"><NavBackButton fallback="/" /><a href="/" className="brand"><span className="brand-mark" aria-hidden="true">L</span>OpenProducer Editor</a></div>
+        <div className="brand-with-back"><NavBackButton fallback="/" /><Link to="/" className="brand"><BrandMark />OpenProducer Editor</Link></div>
         <nav className="site-nav" aria-label="Main navigation">
-          <a href="/tools">Explore tools</a>
-          <a href="/tools/image/editor">Image editor</a>
-          <a href="/settings/storage">Storage settings</a>
+          <Link to="/tools">Explore tools</Link>
+          <Link to="/tools/image/editor">Image editor</Link>
+          <Link to="/settings/storage">Storage settings</Link>
         </nav>
       </header>
 

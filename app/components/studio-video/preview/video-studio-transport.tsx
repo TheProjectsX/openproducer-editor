@@ -52,7 +52,10 @@ export function VideoStudioTransport({
           disabled={!timeline.clips.length}
           onClick={() => stepFrame(-1)}
         >
-          ⏮
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="5" width="2.5" height="14" rx="1" />
+            <polygon points="19,5 8.5,12 19,19" />
+          </svg>
         </button>
         <button
           type="button"
@@ -62,7 +65,16 @@ export function VideoStudioTransport({
           disabled={!timeline.clips.length}
           onClick={togglePlayback}
         >
-          {playing ? "❚❚" : "▶"}
+          {playing ? (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="6" y="5" width="4.5" height="14" rx="1" />
+              <rect x="13.5" y="5" width="4.5" height="14" rx="1" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <polygon points="7,4.5 20,12 7,19.5" />
+            </svg>
+          )}
         </button>
         <button
           type="button"
@@ -71,7 +83,10 @@ export function VideoStudioTransport({
           disabled={!timeline.clips.length}
           onClick={() => stepFrame(1)}
         >
-          ⏭
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <polygon points="5,5 15.5,12 5,19" />
+            <rect x="17.5" y="5" width="2.5" height="14" rx="1" />
+          </svg>
         </button>
       </div>
       <div className="studio-player-tools">

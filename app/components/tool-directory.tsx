@@ -1,5 +1,7 @@
+import { Link } from "react-router";
 import { useEffect, useState } from "react";
 import { NavBackButton } from "./nav-back-button";
+import { BrandMark } from "./brand-mark";
 
 export type ToolCategory = "audio" | "video" | "image";
 
@@ -408,21 +410,21 @@ export function ToolDirectory({ category }: { category?: ToolCategory }) {
         <div className="wrap header-wrap">
           <div className="brand-with-back">
             <NavBackButton fallback={category ? "/tools" : "/"} />
-            <a href="/" className="brand">
-              <span className="brand-mark" aria-hidden="true">L</span>
+            <Link to="/" className="brand">
+              <BrandMark />
               <span>OpenProducer Editor</span>
-            </a>
+            </Link>
           </div>
           <nav className="site-nav" aria-label="Main navigation">
-            <a href="/tools" aria-current={!category ? "page" : undefined}>Tools</a>
-            <a href="/tools/audio" aria-current={category === "audio" ? "page" : undefined}>Audio</a>
-            <a href="/tools/video" aria-current={category === "video" ? "page" : undefined}>Video</a>
-            <a href="/tools/image" aria-current={category === "image" ? "page" : undefined}>Image</a>
-            <a href="/projects">Projects</a>
+            <Link to="/tools" aria-current={!category ? "page" : undefined}>Tools</Link>
+            <Link to="/tools/audio" aria-current={category === "audio" ? "page" : undefined}>Audio</Link>
+            <Link to="/tools/video" aria-current={category === "video" ? "page" : undefined}>Video</Link>
+            <Link to="/tools/image" aria-current={category === "image" ? "page" : undefined}>Image</Link>
+            <Link to="/projects">Projects</Link>
           </nav>
-          <a className="header-cta" href="/studio/video">
+          <Link className="header-cta" to="/studio/video">
             Open Video Studio
-          </a>
+          </Link>
         </div>
       </header>
 
@@ -430,9 +432,9 @@ export function ToolDirectory({ category }: { category?: ToolCategory }) {
         <section className="catalog-hero-section">
           <div className="wrap">
             {category && (
-              <a className="catalog-back" href="/tools">
+              <Link className="catalog-back" to="/tools">
                 ← All {ALL_TOOLS.length} tools
-              </a>
+              </Link>
             )}
             <p className="hero-kicker">
               <span className="status-dot" aria-hidden="true" />
@@ -498,30 +500,30 @@ export function ToolDirectory({ category }: { category?: ToolCategory }) {
             </div>
 
             <div className="studio-strip catalog-studio-strip" aria-label="Full studio workspaces">
-              <a className="studio-strip-card" href="/studio/video">
+              <Link className="studio-strip-card" to="/studio/video">
                 <span className="studio-strip-badge">MULTITRACK</span>
                 <div>
                   <strong>Video Studio</strong>
                   <span>Timeline editing for video, audio, images, text, and keyframes</span>
                 </div>
                 <span className="studio-strip-arrow" aria-hidden="true">↗</span>
-              </a>
-              <a className="studio-strip-card" href="/tools/image/editor">
+              </Link>
+              <Link className="studio-strip-card" to="/tools/image/editor">
                 <span className="studio-strip-badge">LAYERS</span>
                 <div>
                   <strong>Image Editor</strong>
                   <span>Layer-based canvas with shapes, text, and effects</span>
                 </div>
                 <span className="studio-strip-arrow" aria-hidden="true">↗</span>
-              </a>
-              <a className="studio-strip-card" href="/studio/audio">
+              </Link>
+              <Link className="studio-strip-card" to="/studio/audio">
                 <span className="studio-strip-badge">MULTITRACK</span>
                 <div>
                   <strong>Audio Studio</strong>
                   <span>Multi-track audio mixing and WAV export</span>
                 </div>
                 <span className="studio-strip-arrow" aria-hidden="true">↗</span>
-              </a>
+              </Link>
             </div>
 
             <div className="catalog-section-head">
@@ -536,7 +538,7 @@ export function ToolDirectory({ category }: { category?: ToolCategory }) {
             {visibleTools.length > 0 ? (
               <div className="specimen-grid">
                 {visibleTools.map((tool) => (
-                  <a className={`specimen-card tone-${tool.category}`} href={tool.href} key={tool.code}>
+                  <Link className={`specimen-card tone-${tool.category}`} to={tool.href} key={tool.code}>
                     <div className="specimen-card-top">
                       <span className="specimen-id-group">
                         <span className="specimen-icon">
@@ -552,7 +554,7 @@ export function ToolDirectory({ category }: { category?: ToolCategory }) {
                       <span>{tool.spec}</span>
                       <span aria-hidden="true">↗</span>
                     </div>
-                  </a>
+                  </Link>
                 ))}
               </div>
             ) : (
@@ -581,12 +583,12 @@ export function ToolDirectory({ category }: { category?: ToolCategory }) {
             <span>Browser-based audio, video, and image editing.</span>
           </div>
           <nav className="footer-links" aria-label="Footer navigation">
-            <a href="/">Home</a>
-            <a href="/tools/audio">Audio</a>
-            <a href="/tools/video">Video</a>
-            <a href="/tools/image">Image</a>
-            <a href="/projects">Projects</a>
-            <a href="/settings/storage">Storage</a>
+            <Link to="/">Home</Link>
+            <Link to="/tools/audio">Audio</Link>
+            <Link to="/tools/video">Video</Link>
+            <Link to="/tools/image">Image</Link>
+            <Link to="/projects">Projects</Link>
+            <Link to="/settings/storage">Storage</Link>
           </nav>
         </div>
       </footer>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router";
+import { useLocation, Link } from "react-router";
 import { NavBackButton } from "./nav-back-button";
+import { BrandMark } from "./brand-mark";
 
 const groups = {
   audio: {
@@ -123,16 +124,16 @@ export function ToolPageHeader({ status }: { status?: string }) {
                 !pathname.startsWith("/studio/") &&
                 document.querySelector(".resize-page.has-media")
               ) {
-                window.location.assign(pathname);
+                window.dispatchEvent(new CustomEvent("openproducer:reset-tool"));
                 return true;
               }
               return false;
             }}
           />
-          <a href="/" className="brand">
-            <span className="brand-mark" aria-hidden="true">L</span>
+          <Link to="/" className="brand">
+            <BrandMark />
             <span>OpenProducer Editor</span>
-          </a>
+          </Link>
         </div>
 
         <nav ref={menuRef} className="tool-group-menu" aria-label="Tool groups">
@@ -169,23 +170,23 @@ export function ToolPageHeader({ status }: { status?: string }) {
                 <span aria-hidden="true">⌄</span>
               </summary>
               <div className="tool-dropdown">
-                <a className="tool-dropdown-all" href={group.href}>
+                <Link className="tool-dropdown-all" to={group.href}>
                   All {group.label.toLowerCase()} ↗
-                </a>
+                </Link>
                 {group.tools.map(([label, href]) => (
-                  <a
-                    href={href}
+                  <Link
+                    to={href}
                     key={href}
                     aria-current={pathname === href ? "page" : undefined}
                   >
                     {label}
-                  </a>
+                  </Link>
                 ))}
               </div>
             </details>
           ))}
-          <a className="tool-header-link" href="/tools">All 24 tools</a>
-          <a className="tool-header-link" href="/projects">Projects</a>
+          <Link className="tool-header-link" to="/tools">All tools</Link>
+          <Link className="tool-header-link" to="/projects">Projects</Link>
         </nav>
 
         {status && (
@@ -196,11 +197,11 @@ export function ToolPageHeader({ status }: { status?: string }) {
       </header>
 
       <nav className="tool-breadcrumbs" aria-label="Breadcrumb">
-        <a href="/">Home</a>
+        <Link to="/">Home</Link>
         <span aria-hidden="true">/</span>
-        <a href="/tools">Tools</a>
+        <Link to="/tools">Tools</Link>
         <span aria-hidden="true">/</span>
-        <a href={category.href}>{category.label}</a>
+        <Link to={category.href}>{category.label}</Link>
         <span aria-hidden="true">/</span>
         <span aria-current="page">{toolTitle}</span>
       </nav>

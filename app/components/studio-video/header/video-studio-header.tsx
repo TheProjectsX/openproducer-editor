@@ -1,5 +1,6 @@
 import { renameProject } from "../../../lib/project-store";
 import { NavBackButton } from "../../nav-back-button";
+import { BrandMark } from "../../brand-mark";
 
 export function VideoStudioHeader({
   projectId,
@@ -31,7 +32,7 @@ export function VideoStudioHeader({
       <div className="video-studio-top">
         <div className="studio-project-identity">
           <NavBackButton fallback="/tools" />
-          <span className="studio-app-mark">L</span>
+          <BrandMark className="studio-app-mark" />
           <div>
             {projectId ? (
               <input

@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useLocation } from "react-router";
+import { useLocation, Link } from "react-router";
 import { ALL_TOOLS, ToolIcon } from "./tool-directory";
 
 const ACCEPT_SUMMARY: Record<"audio" | "video" | "image", string> = {
@@ -126,9 +126,9 @@ export function MediaImportScreen({
 
         <div className="import-card-foot">
           <span>Runs on-device in your browser</span>
-          <a className="import-library-link" href="/projects">
+          <Link className="import-library-link" to="/projects">
             Open saved project ↗
-          </a>
+          </Link>
         </div>
       </div>
     </section>

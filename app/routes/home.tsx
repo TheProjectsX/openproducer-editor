@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 import type { Route } from "./+types/home";
 import { ALL_TOOLS, ToolIcon, type ToolSpecimen } from "../components/tool-directory";
+import { BrandMark } from "../components/brand-mark";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -283,16 +284,16 @@ export default function Home() {
     <div className="marketing-page">
       <header className="site-header">
         <div className="wrap header-wrap">
-          <a href="/" className="brand">
-            <span className="brand-mark" aria-hidden="true">L</span>
+          <Link to="/" className="brand">
+            <BrandMark />
             <span>OpenProducer Editor</span>
-          </a>
+          </Link>
           <nav className="site-nav" aria-label="Main navigation">
-            <a href="/tools">Tools</a>
-            <a href="/tools/audio">Audio</a>
-            <a href="/tools/video">Video</a>
-            <a href="/tools/image">Image</a>
-            <a href="/projects">Projects</a>
+            <Link to="/tools">Tools</Link>
+            <Link to="/tools/audio">Audio</Link>
+            <Link to="/tools/video">Video</Link>
+            <Link to="/tools/image">Image</Link>
+            <Link to="/projects">Projects</Link>
           </nav>
           <div className="header-actions">
             <button
@@ -308,9 +309,9 @@ export default function Home() {
               </svg>
               <span>Search</span>
             </button>
-            <a className="header-cta" href="/studio/video">
+            <Link className="header-cta" to="/studio/video">
               Open Video Studio
-            </a>
+            </Link>
           </div>
         </div>
       </header>
@@ -358,9 +359,9 @@ export default function Home() {
                 searchResults.map((tool, index) => {
                   const isSelected = index === selectedIndex;
                   return (
-                    <a
+                    <Link
                       key={tool.code}
-                      href={tool.href}
+                      to={tool.href}
                       role="option"
                       aria-selected={isSelected}
                       className={`search-result-item tone-${tool.category}${isSelected ? " is-selected" : ""}`}
@@ -380,7 +381,7 @@ export default function Home() {
                       <span className="search-result-meta">
                         {isSelected ? "Enter ↵" : tool.spec}
                       </span>
-                    </a>
+                    </Link>
                   );
                 })
               ) : (
@@ -415,12 +416,12 @@ export default function Home() {
                 device. No accounts, no server uploads, and no watermarks.
               </p>
               <div className="hero-actions">
-                <a className="btn-primary-action" href="/studio/video">
+                <Link className="btn-primary-action" to="/studio/video">
                   Open Video Studio
-                </a>
-                <a className="btn-secondary-action" href="/tools">
+                </Link>
+                <Link className="btn-secondary-action" to="/tools">
                   Browse all 24 tools
-                </a>
+                </Link>
               </div>
               <dl className="hero-facts">
                 <div>
@@ -524,9 +525,9 @@ export default function Home() {
                         />
                         <strong>{sampleSpeed.toFixed(2)}×</strong>
                       </label>
-                      <a href="/studio/video" className="stage-launch-link">
+                      <Link to="/studio/video" className="stage-launch-link">
                         Launch Video Studio ↗
-                      </a>
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -566,9 +567,9 @@ export default function Home() {
                         />
                         <strong>{sampleSpeed.toFixed(2)}×</strong>
                       </label>
-                      <a href="/tools/audio/speed" className="stage-launch-link">
+                      <Link to="/tools/audio/speed" className="stage-launch-link">
                         Open Audio Speed ↗
-                      </a>
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -608,9 +609,9 @@ export default function Home() {
                           onChange={(e) => setSampleHeight(Math.max(1, Number(e.target.value) || 1))}
                         />
                       </label>
-                      <a href="/tools/image/resize" className="stage-launch-link">
+                      <Link to="/tools/image/resize" className="stage-launch-link">
                         Open Pixel Resize ↗
-                      </a>
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -626,14 +627,14 @@ export default function Home() {
                 <p className="eyebrow">WORKSPACES &amp; STUDIOS</p>
                 <h2 id="workspaces-heading">Three media workspaces and three studios.</h2>
               </div>
-              <a className="section-head-link" href="/tools">
+              <Link className="section-head-link" to="/tools">
                 Open full catalogue ↗
-              </a>
+              </Link>
             </div>
 
             <div className="workspace-grid">
               {workspaces.map((ws) => (
-                <a className={`workspace-card tone-${ws.key}`} href={ws.href} key={ws.key}>
+                <Link className={`workspace-card tone-${ws.key}`} to={ws.href} key={ws.key}>
                   <div className="workspace-card-top">
                     <span className="workspace-code">{ws.code}</span>
                     <span className="workspace-count">{ws.count}</span>
@@ -646,20 +647,20 @@ export default function Home() {
                     <span>{ws.formats}</span>
                     <span aria-hidden="true">↗</span>
                   </div>
-                </a>
+                </Link>
               ))}
             </div>
 
             <div className="studio-strip" aria-label="Full studio editors">
               {studios.map((studio) => (
-                <a className="studio-strip-card" href={studio.href} key={studio.href}>
+                <Link className="studio-strip-card" to={studio.href} key={studio.href}>
                   <span className="studio-strip-badge">{studio.badge}</span>
                   <div>
                     <strong>{studio.title}</strong>
                     <span>{studio.detail}</span>
                   </div>
                   <span className="studio-strip-arrow" aria-hidden="true">↗</span>
-                </a>
+                </Link>
               ))}
             </div>
           </div>
@@ -672,14 +673,14 @@ export default function Home() {
                 <p className="eyebrow">SPECIMEN PREVIEW</p>
                 <h2 id="specimens-heading">Core tools with exact numeric controls.</h2>
               </div>
-              <a className="section-head-link" href="/tools">
+              <Link className="section-head-link" to="/tools">
                 Filter all 24 tools ↗
-              </a>
+              </Link>
             </div>
 
             <div className="specimen-grid">
               {specimens.map((item) => (
-                <a className={`specimen-card tone-${item.domain}`} href={item.href} key={item.code}>
+                <Link className={`specimen-card tone-${item.domain}`} to={item.href} key={item.code}>
                   <div className="specimen-card-top">
                     <span className="specimen-code">{item.code}</span>
                     <span className="specimen-domain">{item.domain.toUpperCase()}</span>
@@ -690,7 +691,7 @@ export default function Home() {
                     <span>{item.spec}</span>
                     <span aria-hidden="true">↗</span>
                   </div>
-                </a>
+                </Link>
               ))}
             </div>
           </div>
@@ -703,9 +704,9 @@ export default function Home() {
                 <p className="eyebrow">ON-DEVICE ARCHITECTURE</p>
                 <h2 id="architecture-heading">Runs on your hardware. Keeps your files local.</h2>
               </div>
-              <a className="section-head-link" href="/settings/storage">
+              <Link className="section-head-link" to="/settings/storage">
                 Inspect local storage ↗
-              </a>
+              </Link>
             </div>
 
             <div className="architecture-grid">
@@ -728,13 +729,13 @@ export default function Home() {
             <span>Browser-based audio, video, and image editing.</span>
           </div>
           <nav className="footer-links" aria-label="Footer navigation">
-            <a href="/tools">All tools</a>
-            <a href="/tools/audio">Audio</a>
-            <a href="/tools/video">Video</a>
-            <a href="/tools/image">Image</a>
-            <a href="/studio/video">Video Studio</a>
-            <a href="/projects">Projects</a>
-            <a href="/settings/storage">Storage</a>
+            <Link to="/tools">All tools</Link>
+            <Link to="/tools/audio">Audio</Link>
+            <Link to="/tools/video">Video</Link>
+            <Link to="/tools/image">Image</Link>
+            <Link to="/studio/video">Video Studio</Link>
+            <Link to="/projects">Projects</Link>
+            <Link to="/settings/storage">Storage</Link>
           </nav>
         </div>
       </footer>
